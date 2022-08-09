@@ -673,6 +673,12 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
         let (dst_texture, dst_range, dst_base, _) =
             extract_texture_selector(destination, copy_size, &*texture_guard)?;
+        let (hal_copy_size, array_layer_count) = validate_texture_copy_range(
+            destination,
+            &dst_texture.desc,
+            CopySide::Destination,
+            copy_size,
+        )?;
 
         // Handle texture init *before* dealing with barrier transitions so we have an easier time inserting "immediate-inits" that may be required by prior discards in rare cases.
         handle_dst_texture_init(cmd_buf, device, destination, copy_size, &texture_guard)?;
@@ -713,12 +719,6 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let dst_barrier = dst_pending.map(|pending| pending.into_hal(dst_texture));
 
         let format_desc = dst_texture.desc.format.describe();
-        let (hal_copy_size, array_layer_count) = validate_texture_copy_range(
-            destination,
-            &dst_texture.desc,
-            CopySide::Destination,
-            copy_size,
-        )?;
         let (required_buffer_bytes_in_copy, bytes_per_array_layer) = validate_linear_texture_data(
             &source.layout,
             dst_texture.desc.format,
@@ -800,6 +800,8 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
         let (src_texture, src_range, src_base, _) =
             extract_texture_selector(source, copy_size, &*texture_guard)?;
+        let (hal_copy_size, array_layer_count) =
+            validate_texture_copy_range(source, &src_texture.desc, CopySide::Source, copy_size)?;
 
         // Handle texture init *before* dealing with barrier transitions so we have an easier time inserting "immediate-inits" that may be required by prior discards in rare cases.
         handle_src_texture_init(cmd_buf, device, source, copy_size, &texture_guard)?;
@@ -857,8 +859,6 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let dst_barrier = dst_pending.map(|pending| pending.into_hal(dst_buffer));
 
         let format_desc = src_texture.desc.format.describe();
-        let (hal_copy_size, array_layer_count) =
-            validate_texture_copy_range(source, &src_texture.desc, CopySide::Source, copy_size)?;
         let (required_buffer_bytes_in_copy, bytes_per_array_layer) = validate_linear_texture_data(
             &destination.layout,
             src_texture.desc.format,
@@ -963,6 +963,15 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             return Err(TransferError::MismatchedAspects.into());
         }
 
+        let (src_copy_size, array_layer_count) =
+            validate_texture_copy_range(source, &src_texture.desc, CopySide::Source, copy_size)?;
+        let (dst_copy_size, _) = validate_texture_copy_range(
+            destination,
+            &dst_texture.desc,
+            CopySide::Destination,
+            copy_size,
+        )?;
+
         // Handle texture init *before* dealing with barrier transitions so we have an easier time inserting "immediate-inits" that may be required by prior discards in rare cases.
         handle_src_texture_init(cmd_buf, device, source, copy_size, &texture_guard)?;
         handle_dst_texture_init(cmd_buf, device, destination, copy_size, &texture_guard)?;
@@ -1025,15 +1034,6 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         }
 
         barriers.extend(dst_pending.map(|pending| pending.into_hal(dst_texture)));
-
-        let (src_copy_size, array_layer_count) =
-            validate_texture_copy_range(source, &src_texture.desc, CopySide::Source, copy_size)?;
-        let (dst_copy_size, _) = validate_texture_copy_range(
-            destination,
-            &dst_texture.desc,
-            CopySide::Destination,
-            copy_size,
-        )?;
 
         let hal_copy_size = hal::CopyExtent {
             width: src_copy_size.width.min(dst_copy_size.width),

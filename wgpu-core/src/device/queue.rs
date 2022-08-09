@@ -588,8 +588,10 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         }
 
         let (mut texture_guard, _) = hub.textures.write(&mut token); // For clear we need write access to the texture. TODO: Can we acquire write lock later?
-        let (_, selector, dst_base, texture_format) =
+        let (dst, selector, dst_base, texture_format) =
             extract_texture_selector(destination, size, &*texture_guard)?;
+        let (hal_copy_size, array_layer_count) =
+            validate_texture_copy_range(destination, &dst.desc, CopySide::Destination, size)?;
         let format_desc = texture_format.describe();
         //Note: `_source_bytes_per_array_layer` is ignored since we have a staging copy,
         // and it can have a different value.
@@ -689,8 +691,6 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             )
             .ok_or(TransferError::InvalidTexture(destination.texture))?;
 
-        let (hal_copy_size, array_layer_count) =
-            validate_texture_copy_range(destination, &dst.desc, CopySide::Destination, size)?;
         dst.life_guard.use_at(device.active_submission_index + 1);
 
         let dst_raw = dst
