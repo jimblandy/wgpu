@@ -517,15 +517,13 @@ impl<A: hub::HalApi> TextureTracker<A> {
     ///
     /// If the ID is higher than the length of internal vectors,
     /// the vectors will be extended. A call to set_size is not needed.
-    pub fn set_single<'a>(
+    pub fn set_single(
         &mut self,
-        storage: &'a hub::Storage<Texture<A>, TextureId>,
+        storage: &hub::Storage<Texture<A>, TextureId>,
         id: TextureId,
         selector: TextureSelector,
         new_state: TextureUses,
-    ) -> Option<(&'a Texture<A>, Drain<'_, PendingTransition<TextureUses>>)> {
-        let texture = storage.get(id).ok()?;
-
+    ) -> Option<Drain<'_, PendingTransition<TextureUses>>> {
         let (index32, epoch, _) = id.unzip();
         let index = index32 as usize;
 
@@ -551,7 +549,7 @@ impl<A: hub::HalApi> TextureTracker<A> {
             )
         }
 
-        Some((texture, self.temp.drain(..)))
+        Some(self.temp.drain(..))
     }
 
     /// Sets the given state for all texture in the given tracker.

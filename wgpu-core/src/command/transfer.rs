@@ -156,11 +156,19 @@ pub enum CopyError {
     Transfer(#[from] TransferError),
 }
 
-pub(crate) fn extract_texture_selector<A: hal::Api>(
+pub(crate) fn extract_texture_selector<'a, A: hal::Api>(
     copy_texture: &ImageCopyTexture,
     copy_size: &Extent3d,
-    texture_guard: &Storage<Texture<A>, TextureId>,
-) -> Result<(TextureSelector, hal::TextureCopyBase, wgt::TextureFormat), TransferError> {
+    texture_guard: &'a Storage<Texture<A>, TextureId>,
+) -> Result<
+    (
+        &'a Texture<A>,
+        TextureSelector,
+        hal::TextureCopyBase,
+        wgt::TextureFormat,
+    ),
+    TransferError,
+> {
     let texture = texture_guard
         .get(copy_texture.texture)
         .map_err(|_| TransferError::InvalidTexture(copy_texture.texture))?;
@@ -198,7 +206,7 @@ pub(crate) fn extract_texture_selector<A: hal::Api>(
         layers,
     };
 
-    Ok((selector, base, format))
+    Ok((texture, selector, base, format))
 }
 
 /// Function copied with some modifications from webgpu standard <https://gpuweb.github.io/gpuweb/#copy-between-buffer-texture>
@@ -663,7 +671,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             return Ok(());
         }
 
-        let (dst_range, dst_base, _) =
+        let (dst_texture, dst_range, dst_base, _) =
             extract_texture_selector(destination, copy_size, &*texture_guard)?;
 
         // Handle texture init *before* dealing with barrier transitions so we have an easier time inserting "immediate-inits" that may be required by prior discards in rare cases.
@@ -683,7 +691,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         }
         let src_barrier = src_pending.map(|pending| pending.into_hal(src_buffer));
 
-        let (dst_texture, dst_pending) = cmd_buf
+        let dst_pending = cmd_buf
             .trackers
             .textures
             .set_single(
@@ -790,13 +798,13 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             return Ok(());
         }
 
-        let (src_range, src_base, _) =
+        let (src_texture, src_range, src_base, _) =
             extract_texture_selector(source, copy_size, &*texture_guard)?;
 
         // Handle texture init *before* dealing with barrier transitions so we have an easier time inserting "immediate-inits" that may be required by prior discards in rare cases.
         handle_src_texture_init(cmd_buf, device, source, copy_size, &texture_guard)?;
 
-        let (src_texture, src_pending) = cmd_buf
+        let src_pending = cmd_buf
             .trackers
             .textures
             .set_single(
@@ -947,9 +955,9 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             return Ok(());
         }
 
-        let (src_range, src_tex_base, _) =
+        let (src_texture, src_range, src_tex_base, _) =
             extract_texture_selector(source, copy_size, &*texture_guard)?;
-        let (dst_range, dst_tex_base, _) =
+        let (dst_texture, dst_range, dst_tex_base, _) =
             extract_texture_selector(destination, copy_size, &*texture_guard)?;
         if src_tex_base.aspect != dst_tex_base.aspect {
             return Err(TransferError::MismatchedAspects.into());
@@ -959,7 +967,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         handle_src_texture_init(cmd_buf, device, source, copy_size, &texture_guard)?;
         handle_dst_texture_init(cmd_buf, device, destination, copy_size, &texture_guard)?;
 
-        let (src_texture, src_pending) = cmd_buf
+        let src_pending = cmd_buf
             .trackers
             .textures
             .set_single(
@@ -984,7 +992,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             .into_iter()
             .collect();
 
-        let (dst_texture, dst_pending) = cmd_buf
+        let dst_pending = cmd_buf
             .trackers
             .textures
             .set_single(
