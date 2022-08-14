@@ -156,16 +156,39 @@ pub enum CopyError {
     Transfer(#[from] TransferError),
 }
 
+/// Validate the requested copy against the texture.
+///
+/// This function implements the WebGPU specification's [_validating
+/// GPUImageCopyTexture_][vGICT] and [_validating texture copy range_][vtcr]
+/// abstract operations, checking that:
+///
+/// - the array index and mip levels fall within bounds,
+///
+/// - the origin and extent of the copy fall within the bounds of the indicated
+///   mip level, and
+///
+/// - the origin and extent are aligned on texel block boundaries, as required
+///   by the texture's format.
+///
+/// On success, it returns `wgpu_hal` [`TextureCopyBase`] and [`CopyExtent`]
+/// values describing the copy's origin and size, as well as a
+/// [`TextureSelector`] for resource state tracking.
+///
+/// [vGICT]: https://gpuweb.github.io/gpuweb/#abstract-opdef-validating-gpuimagecopytexture
+/// [vtcr]: https://gpuweb.github.io/gpuweb/#validating-texture-copy-range
+/// [`TextureCopyBase`]: hal::TextureCopyBase
+/// [`CopyExtent`]: hal::CopyExtent
 pub(crate) fn extract_texture_selector<'a, A: hal::Api>(
+    texture_guard: &'a Storage<Texture<A>, TextureId>,
     copy_texture: &ImageCopyTexture,
     copy_size: &Extent3d,
-    texture_guard: &'a Storage<Texture<A>, TextureId>,
+    texture_side: CopySide,
 ) -> Result<
     (
         &'a Texture<A>,
-        TextureSelector,
         hal::TextureCopyBase,
-        wgt::TextureFormat,
+        hal::CopyExtent,
+        TextureSelector,
     ),
     TransferError,
 > {
@@ -173,7 +196,10 @@ pub(crate) fn extract_texture_selector<'a, A: hal::Api>(
         .get(copy_texture.texture)
         .map_err(|_| TransferError::InvalidTexture(copy_texture.texture))?;
 
-    let format = texture.desc.format;
+    let desc = &texture.desc;
+    let format = desc.format;
+
+    // We'd better be copying an aspect that the texture actually has.
     let copy_aspect =
         hal::FormatAspects::from(format) & hal::FormatAspects::from(copy_texture.aspect);
     if copy_aspect.is_empty() {
@@ -183,30 +209,134 @@ pub(crate) fn extract_texture_selector<'a, A: hal::Api>(
         });
     }
 
-    let (layers, origin_z) = match texture.desc.dimension {
+    let texture_copy_view = copy_texture;
+
+    // Operations on compressed textures need to operate on complete blocks.
+    // Obtain their dimensions.
+    let (block_width, block_height) = desc.format.describe().block_dimensions;
+    let block_width = block_width as u32;
+    let block_height = block_height as u32;
+
+    // Find the size of the accessed mip level.
+    let extent_virtual = desc.mip_level_size(texture_copy_view.mip_level).ok_or(
+        TransferError::InvalidTextureMipLevel {
+            level: texture_copy_view.mip_level,
+            total: desc.mip_level_count,
+        },
+    )?;
+
+    // The physical size is rounded up to compression block boundaries, so it
+    // can be larger than the virtual size.
+    let extent = extent_virtual.physical_size(desc.format);
+
+    // Copies of depth and depth-stencil textures must access the entire
+    // subresource.
+    match desc.format {
+        wgt::TextureFormat::Depth32Float
+        | wgt::TextureFormat::Depth32FloatStencil8
+        | wgt::TextureFormat::Depth24Plus
+        | wgt::TextureFormat::Depth24PlusStencil8
+        | wgt::TextureFormat::Depth24UnormStencil8 => {
+            if *copy_size != extent {
+                return Err(TransferError::InvalidDepthTextureExtent);
+            }
+        }
+        _ => {}
+    }
+
+    /// Return `Ok` if a run `size` texels long starting at `start_offset` falls
+    /// entirely within `texture_size`. Otherwise, return an appropriate a`Err`.
+    fn check_dimension(
+        dimension: TextureErrorDimension,
+        side: CopySide,
+        start_offset: u32,
+        size: u32,
+        texture_size: u32,
+    ) -> Result<(), TransferError> {
+        // Avoid underflow in the subtraction by checking start_offset against
+        // texture_size first.
+        if start_offset <= texture_size && size <= texture_size - start_offset {
+            Ok(())
+        } else {
+            Err(TransferError::TextureOverrun {
+                start_offset,
+                end_offset: start_offset.wrapping_add(size),
+                texture_size,
+                dimension,
+                side,
+            })
+        }
+    }
+
+    check_dimension(
+        TextureErrorDimension::X,
+        texture_side,
+        texture_copy_view.origin.x,
+        copy_size.width,
+        extent.width,
+    )?;
+    check_dimension(
+        TextureErrorDimension::Y,
+        texture_side,
+        texture_copy_view.origin.y,
+        copy_size.height,
+        extent.height,
+    )?;
+    check_dimension(
+        TextureErrorDimension::Z,
+        texture_side,
+        texture_copy_view.origin.z,
+        copy_size.depth_or_array_layers,
+        extent.depth_or_array_layers,
+    )?;
+
+    if texture_copy_view.origin.x % block_width != 0 {
+        return Err(TransferError::UnalignedCopyOriginX);
+    }
+    if texture_copy_view.origin.y % block_height != 0 {
+        return Err(TransferError::UnalignedCopyOriginY);
+    }
+    if copy_size.width % block_width != 0 {
+        return Err(TransferError::UnalignedCopyWidth);
+    }
+    if copy_size.height % block_height != 0 {
+        return Err(TransferError::UnalignedCopyHeight);
+    }
+
+    // Split `depth_or_array_layers` into a distinct z range and layer range.
+    let (z_range, layers) = match desc.dimension {
         wgt::TextureDimension::D1 | wgt::TextureDimension::D2 => (
+            0..1,
             copy_texture.origin.z..copy_texture.origin.z + copy_size.depth_or_array_layers,
-            0,
         ),
-        wgt::TextureDimension::D3 => (0..1, copy_texture.origin.z),
+        wgt::TextureDimension::D3 => (
+            copy_texture.origin.z..copy_texture.origin.z + copy_size.depth_or_array_layers,
+            0..1,
+        ),
     };
+
     let base = hal::TextureCopyBase {
         origin: wgt::Origin3d {
             x: copy_texture.origin.x,
             y: copy_texture.origin.y,
-            z: origin_z,
+            z: z_range.start,
         },
         // this value will be incremented per copied layer
         array_layer: layers.start,
         mip_level: copy_texture.mip_level,
         aspect: copy_aspect,
     };
+    let extent = hal::CopyExtent {
+        width: copy_size.width,
+        height: copy_size.height,
+        depth: z_range.end - z_range.start,
+    };
     let selector = TextureSelector {
         mips: copy_texture.mip_level..copy_texture.mip_level + 1,
         layers,
     };
 
-    Ok((texture, selector, base, format))
+    Ok((texture, base, extent, selector))
 }
 
 /// Function copied with some modifications from webgpu standard <https://gpuweb.github.io/gpuweb/#copy-between-buffer-texture>
@@ -671,16 +801,20 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             return Ok(());
         }
 
-        let (dst_texture, dst_range, dst_base, _) =
-            extract_texture_selector(destination, copy_size, &*texture_guard)?;
-        let (hal_copy_size, array_layer_count) = validate_texture_copy_range(
+        // Check that the copy falls within the texture bounds. Unsafe code in
+        // the resource tracker assumes that these checks passed. Compute the
+        // tracking selector and the hal base and extent for the copy while
+        // we're at it.
+        let (dst_texture, dst_base, hal_copy_size, dst_selector) = extract_texture_selector(
             destination,
-            &dst_texture.desc,
-            CopySide::Destination,
             copy_size,
+            &*texture_guard,
+            CopySide::Destination,
         )?;
 
-        // Handle texture init *before* dealing with barrier transitions so we have an easier time inserting "immediate-inits" that may be required by prior discards in rare cases.
+        // Handle texture init *before* dealing with barrier transitions so we
+        // have an easier time inserting "immediate-inits" that may be required
+        // by prior discards in rare cases.
         handle_dst_texture_init(cmd_buf, device, destination, copy_size, &texture_guard)?;
 
         let (src_buffer, src_pending) = cmd_buf
@@ -703,7 +837,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             .set_single(
                 &*texture_guard,
                 destination.texture,
-                dst_range,
+                dst_selector,
                 hal::TextureUses::COPY_DST,
             )
             .ok_or(TransferError::InvalidTexture(destination.texture))?;
@@ -743,11 +877,16 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 MemoryInitKind::NeedsInitializedMemory,
             ));
 
-        let regions = (0..array_layer_count).map(|rel_array_layer| {
-            let mut texture_base = dst_base.clone();
-            texture_base.array_layer += rel_array_layer;
-            let mut buffer_layout = source.layout;
-            buffer_layout.offset += rel_array_layer as u64 * bytes_per_array_layer;
+        // Split multi-layer copies into a series of single-layer copies.
+        let regions = dst_selector.layers.enumerate().map(|(i, array_layer)| {
+            let buffer_layout = wgt::ImageDataLayout {
+                offset: source.layout.offset + i as BufferAddress * bytes_per_array_layer,
+                ..source.layout
+            };
+            let texture_base = hal::TextureCopyBase {
+                array_layer,
+                ..dst_base
+            };
             hal::BufferTextureCopy {
                 buffer_layout,
                 texture_base,
@@ -798,10 +937,9 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             return Ok(());
         }
 
-        let (src_texture, src_range, src_base, _) =
-            extract_texture_selector(source, copy_size, &*texture_guard)?;
-        let (hal_copy_size, array_layer_count) =
-            validate_texture_copy_range(source, &src_texture.desc, CopySide::Source, copy_size)?;
+        let (src_texture, src_base, src_extent, src_selector) =
+            extract_texture_selector(&*texture_guard, source, copy_size, CopySide::Source)?;
+        let src_layer_range = src_selector.layers;
 
         // Handle texture init *before* dealing with barrier transitions so we have an easier time inserting "immediate-inits" that may be required by prior discards in rare cases.
         handle_src_texture_init(cmd_buf, device, source, copy_size, &texture_guard)?;
@@ -812,7 +950,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             .set_single(
                 &*texture_guard,
                 source.texture,
-                src_range,
+                src_selector,
                 hal::TextureUses::COPY_SRC,
             )
             .ok_or(TransferError::InvalidTexture(source.texture))?;
@@ -896,15 +1034,21 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 MemoryInitKind::ImplicitlyInitialized,
             ));
 
-        let regions = (0..array_layer_count).map(|rel_array_layer| {
-            let mut texture_base = src_base.clone();
-            texture_base.array_layer += rel_array_layer;
-            let mut buffer_layout = destination.layout;
-            buffer_layout.offset += rel_array_layer as u64 * bytes_per_array_layer;
+        // Since hal copies address only one array layer at a time, turn our
+        // copy into a list of single-layer copies.
+        let regions = src_layer_range.enumerate().map(|(i, array_layer)| {
+            let texture_base = hal::TextureCopyBase {
+                array_layer,
+                .. src_base.clone()
+            };
+            let buffer_layout = wgt::ImageDataLayout {
+                offset: destination.layout.offset + i as u64 * bytes_per_array_layer,
+                .. destination.layout
+            };
             hal::BufferTextureCopy {
                 buffer_layout,
                 texture_base,
-                size: hal_copy_size,
+                size: src_extent,
             }
         });
         let cmd_buf_raw = cmd_buf.encoder.open();
