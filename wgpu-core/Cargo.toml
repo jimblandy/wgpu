@@ -7,7 +7,7 @@ description = "WebGPU core logic on wgpu-hal"
 homepage.workspace = true
 repository.workspace = true
 keywords.workspace = true
-license.workspace = true
+license = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 all-features = true
