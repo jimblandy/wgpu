@@ -17,10 +17,27 @@ unsafe extern "system" fn debug_utils_messenger_callback(
     callback_data_ptr: *const vk::DebugUtilsMessengerCallbackDataEXT,
     _user_data: *mut c_void,
 ) -> vk::Bool32 {
-    const VUID_VKSWAPCHAINCREATEINFOKHR_IMAGEEXTENT_01274: i32 = 0x7cd0911d;
     use std::borrow::Cow;
 
     if thread::panicking() {
+        return vk::FALSE;
+    }
+
+    let cd = unsafe { &*callback_data_ptr };
+
+    const VUID_VKSWAPCHAINCREATEINFOKHR_IMAGEEXTENT_01274: i32 = 0x7cd0911d;
+    const VUID_VKCMDENDDEBUGUTILSLABELEXT_COMMANDBUFFER_01912: i32 = 0x56146426;
+
+    // Silence Vulkan Validation error " VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912"
+    // This is a bug in the validation layer:
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5671
+    if cd.message_id_number == VUID_VKCMDENDDEBUGUTILSLABELEXT_COMMANDBUFFER_01912 {
+        return vk::FALSE;
+    }
+
+    // Silence Vulkan Validation error "VUID-VkSwapchainCreateInfoKHR-imageExtent-01274"
+    // - it's a false positive due to the inherent racy-ness of surface resizing
+    if cd.message_id_number == VUID_VKSWAPCHAINCREATEINFOKHR_IMAGEEXTENT_01274 {
         return vk::FALSE;
     }
 
@@ -32,8 +49,6 @@ unsafe extern "system" fn debug_utils_messenger_callback(
         _ => log::Level::Warn,
     };
 
-    let cd = unsafe { &*callback_data_ptr };
-
     let message_id_name = if cd.p_message_id_name.is_null() {
         Cow::from("")
     } else {
@@ -44,12 +59,6 @@ unsafe extern "system" fn debug_utils_messenger_callback(
     } else {
         unsafe { CStr::from_ptr(cd.p_message) }.to_string_lossy()
     };
-
-    // Silence Vulkan Validation error "VUID-VkSwapchainCreateInfoKHR-imageExtent-01274"
-    // - it's a false positive due to the inherent racy-ness of surface resizing
-    if cd.message_id_number == VUID_VKSWAPCHAINCREATEINFOKHR_IMAGEEXTENT_01274 {
-        return vk::FALSE;
-    }
 
     let _ = std::panic::catch_unwind(|| {
         log::log!(
