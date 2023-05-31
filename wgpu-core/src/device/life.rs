@@ -664,10 +664,10 @@ impl<A: HalApi> LifetimeTracker<A> {
                     if let Some(res) = hub.buffers.unregister(id.0) {
                         let submit_index = res.info.submission_index();
                         if let resource::BufferMapState::Init {
-                            ref stage_buffer, ..
-                        } = *res.map_state.lock()
+                            stage_buffer, ..
+                        } = std::mem::replace(&mut *res.map_state.lock(), resource::BufferMapState::Idle)
                         {
-                            self.free_resources.buffers.push(stage_buffer.clone());
+                            self.free_resources.buffers.push(Arc::new(*stage_buffer));
                         }
                         self.active
                             .iter_mut()

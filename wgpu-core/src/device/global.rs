@@ -226,7 +226,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 *buffer.map_state.lock() = resource::BufferMapState::Init {
                     ptr: mapping.ptr,
                     needs_flush: !mapping.is_coherent,
-                    stage_buffer: Arc::new(stage),
+                    stage_buffer: Box::new(stage),
                 };
                 hal::BufferUses::COPY_DST
             };
@@ -2511,7 +2511,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                         );
                     }
                 }
-                pending_writes.consume_temp(queue::TempResource::Buffer(stage_buffer));
+                pending_writes.consume_temp(queue::TempResource::Buffer(Arc::new(*stage_buffer)));
                 pending_writes.dst_buffers.insert(buffer_id, buffer.clone());
             }
             resource::BufferMapState::Idle => {

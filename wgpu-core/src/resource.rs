@@ -167,7 +167,7 @@ pub(crate) enum BufferMapState<A: HalApi> {
     /// Mapped at creation.
     Init {
         ptr: NonNull<u8>,
-        stage_buffer: Arc<Buffer<A>>,
+        stage_buffer: Box<Buffer<A>>,
         needs_flush: bool,
     },
     /// Waiting for GPU to be done before mapping
