@@ -114,7 +114,7 @@ pub struct WrappedSubmissionIndex {
 ///   `maintain` call, no longer used anywhere
 #[derive(Debug)]
 pub enum TempResource<A: HalApi> {
-    Buffer(Arc<Buffer<A>>),
+    Buffer(Buffer<A>),
     Texture(Arc<Texture<A>>, SmallVec<[Arc<TextureView<A>>; 1]>),
 }
 
@@ -188,7 +188,7 @@ impl<A: HalApi> PendingWrites<A> {
 
     fn consume(&mut self, device: &Arc<Device<A>>, buffer: Arc<StagingBuffer<A>>) {
         self.temp_resources
-            .push(TempResource::Buffer(Arc::new(Buffer::<A> {
+            .push(TempResource::Buffer(Buffer::<A> {
                 raw: buffer.raw.lock().take(),
                 device: device.clone(),
                 usage: wgt::BufferUsages::empty(),
@@ -202,7 +202,7 @@ impl<A: HalApi> PendingWrites<A> {
                     #[cfg(not(debug_assertions))]
                     "<Buffer>",
                 ),
-            })));
+            }));
     }
 
     #[must_use]

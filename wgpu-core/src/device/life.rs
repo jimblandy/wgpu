@@ -112,7 +112,7 @@ impl<A: HalApi> SuspectedResources<A> {
 /// Raw backend resources that should be freed shortly.
 #[derive(Debug)]
 struct NonReferencedResources<A: HalApi> {
-    buffers: Vec<Arc<Buffer<A>>>,
+    buffers: Vec<Buffer<A>>,
     textures: Vec<Arc<Texture<A>>>,
     texture_views: Vec<Arc<TextureView<A>>>,
     samplers: Vec<Arc<Sampler<A>>>,
@@ -662,12 +662,14 @@ impl<A: HalApi> LifetimeTracker<A> {
                     }
 
                     if let Some(res) = hub.buffers.unregister(id.0) {
+                        drop(buffer);
+                        let res = Arc::try_unwrap(res).ok().unwrap();
                         let submit_index = res.info.submission_index();
                         if let resource::BufferMapState::Init {
                             stage_buffer, ..
                         } = std::mem::replace(&mut *res.map_state.lock(), resource::BufferMapState::Idle)
                         {
-                            self.free_resources.buffers.push(Arc::new(*stage_buffer));
+                            self.free_resources.buffers.push(*stage_buffer);
                         }
                         self.active
                             .iter_mut()
@@ -855,6 +857,8 @@ impl<A: HalApi> LifetimeTracker<A> {
                 *buffer.map_state.lock() = resource::BufferMapState::Idle;
                 log::info!("Buffer {:?} is removed from trackers", buffer_id);
                 if let Some(buf) = hub.buffers.unregister(buffer_id.0) {
+                    drop(buffer);
+                    let buf = Arc::try_unwrap(buf).ok().unwrap();
                     self.free_resources.buffers.push(buf);
                 }
             } else {

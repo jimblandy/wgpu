@@ -167,7 +167,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                         Ok(ptr) => ptr,
                         Err(e) => {
                             device.lock_life().schedule_resource_destruction(
-                                queue::TempResource::Buffer(Arc::new(buffer)),
+                                queue::TempResource::Buffer(buffer),
                                 !0,
                             );
                             break e.into();
@@ -193,10 +193,9 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 let stage = match device.create_buffer(device_id, &stage_desc, true) {
                     Ok(stage) => stage,
                     Err(e) => {
-                        device.lock_life().schedule_resource_destruction(
-                            queue::TempResource::Buffer(Arc::new(buffer)),
-                            !0,
-                        );
+                        device
+                            .lock_life()
+                            .schedule_resource_destruction(queue::TempResource::Buffer(buffer), !0);
                         break e;
                     }
                 };
@@ -204,14 +203,10 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                     Ok(mapping) => mapping,
                     Err(e) => {
                         let mut life_lock = device.lock_life();
-                        life_lock.schedule_resource_destruction(
-                            queue::TempResource::Buffer(Arc::new(buffer)),
-                            !0,
-                        );
-                        life_lock.schedule_resource_destruction(
-                            queue::TempResource::Buffer(Arc::new(stage)),
-                            !0,
-                        );
+                        life_lock
+                            .schedule_resource_destruction(queue::TempResource::Buffer(buffer), !0);
+                        life_lock
+                            .schedule_resource_destruction(queue::TempResource::Buffer(stage), !0);
                         break DeviceError::from(e).into();
                     }
                 };
@@ -448,14 +443,14 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 .get(buffer_id)
                 .map_err(|_| resource::DestroyError::Invalid)?;
 
-            let device = &buffer.device;
+            let device = buffer.device.clone();
 
             map_closure = match &*buffer.map_state.lock() {
                 &BufferMapState::Waiting(..) // To get the proper callback behavior.
                 | &BufferMapState::Init { .. }
                 | &BufferMapState::Active { .. }
                 => {
-                    self.buffer_unmap_inner(buffer_id, &buffer, device)
+                    self.buffer_unmap_inner(buffer_id, &buffer, &device)
                         .unwrap_or(None)
                 }
                 _ => None,
@@ -469,13 +464,14 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 return Err(resource::DestroyError::AlreadyDestroyed);
             }
 
-            let temp = queue::TempResource::Buffer(buffer.clone());
+            let buffer = Arc::try_unwrap(buffer).ok().unwrap();
+            let last_submit_index = buffer.info.submission_index();
+            let temp = queue::TempResource::Buffer(buffer);
             let mut pending_writes = device.pending_writes.write();
             let pending_writes = pending_writes.as_mut().unwrap();
             if pending_writes.dst_buffers.contains_key(&buffer_id) {
                 pending_writes.temp_resources.push(temp);
             } else {
-                let last_submit_index = buffer.info.submission_index();
                 device
                     .lock_life()
                     .schedule_resource_destruction(temp, last_submit_index);
@@ -2511,7 +2507,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                         );
                     }
                 }
-                pending_writes.consume_temp(queue::TempResource::Buffer(Arc::new(*stage_buffer)));
+                pending_writes.consume_temp(queue::TempResource::Buffer(*stage_buffer));
                 pending_writes.dst_buffers.insert(buffer_id, buffer.clone());
             }
             resource::BufferMapState::Idle => {
