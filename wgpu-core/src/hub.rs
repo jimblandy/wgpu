@@ -163,6 +163,7 @@ use crate::{
     storage::{Element, Storage, StorageReport},
 };
 
+use parking_lot::RwLock;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -182,6 +183,7 @@ pub struct HubReport {
     pub textures: StorageReport,
     pub texture_views: StorageReport,
     pub samplers: StorageReport,
+    pub live_devices: StorageReport,
 }
 
 impl HubReport {
@@ -217,6 +219,14 @@ impl HubReport {
 /// [`A::hub(global)`]: HalApi::hub
 pub struct Hub<A: HalApi, F: GlobalIdentityHandlerFactory> {
     pub adapters: Registry<id::AdapterId, Adapter<A>, F>,
+
+    /// All [`Device`]s accessible by id to the wgpu-core user.
+    ///
+    /// Note that the user is free to drop a [`DeviceId`], removing its entry
+    /// from this table, and yet still expect mapping and submission callbacks
+    /// to get invoked from [`Global::poll_all_devices`]. The [`Device`] to
+    /// which the [`DeviceId`] refers is not freed until all uses of it
+    /// elsewhere have ended.
     pub devices: Registry<id::DeviceId, Device<A>, F>,
     pub pipeline_layouts: Registry<id::PipelineLayoutId, PipelineLayout<A>, F>,
     pub shader_modules: Registry<id::ShaderModuleId, ShaderModule<A>, F>,
@@ -232,6 +242,16 @@ pub struct Hub<A: HalApi, F: GlobalIdentityHandlerFactory> {
     pub textures: Registry<id::TextureId, Texture<A>, F>,
     pub texture_views: Registry<id::TextureViewId, TextureView<A>, F>,
     pub samplers: Registry<id::SamplerId, Sampler<A>, F>,
+
+    /// All of this `Hub`'s live [`Device`]s, including those removed from
+    /// [`devices`] but held alive by other resources.
+    ///
+    /// This is the table of devices polled by [`Global::poll_all_devices`]. It
+    /// should always have a superset of the entries in [`Hub::devices`].
+    ///
+    /// This is a `Storage`, not a `Registry`, because we don't need to allocate
+    /// ids - we just use the ids that [`Hub::devices`] assigns.
+    pub live_devices: RwLock<Storage<Device<A>, id::DeviceId>>,
 }
 
 impl<A: HalApi, F: GlobalIdentityHandlerFactory> Hub<A, F> {
@@ -253,6 +273,7 @@ impl<A: HalApi, F: GlobalIdentityHandlerFactory> Hub<A, F> {
             textures: Registry::new(A::VARIANT, factory),
             texture_views: Registry::new(A::VARIANT, factory),
             samplers: Registry::new(A::VARIANT, factory),
+            live_devices: RwLock::new(Storage::new()),
         }
     }
 
@@ -266,8 +287,9 @@ impl<A: HalApi, F: GlobalIdentityHandlerFactory> Hub<A, F> {
     ) {
         use hal::Surface;
 
-        let mut devices = self.devices.write();
-        for element in devices.map.iter() {
+        self.devices.write().map.clear();
+        let mut live_devices = self.live_devices.write();
+        for element in live_devices.map.iter() {
             if let Element::Occupied(ref device, _) = *element {
                 device.prepare_to_die();
             }
@@ -298,7 +320,7 @@ impl<A: HalApi, F: GlobalIdentityHandlerFactory> Hub<A, F> {
                     continue;
                 }
                 if let Some(present) = surface.presentation.lock().take() {
-                    let device = &devices[present.device_id];
+                    let device = &live_devices[present.device_id];
                     let suf = A::get_surface(surface);
                     unsafe {
                         suf.unwrap().raw.unconfigure(device.raw());
@@ -308,10 +330,10 @@ impl<A: HalApi, F: GlobalIdentityHandlerFactory> Hub<A, F> {
             }
         }
 
-        devices.map.clear();
+        live_devices.map.clear();
 
         if with_adapters {
-            drop(devices);
+            drop(live_devices);
             self.adapters.write().map.clear();
         }
     }
@@ -345,6 +367,7 @@ impl<A: HalApi, F: GlobalIdentityHandlerFactory> Hub<A, F> {
             textures: self.textures.generate_report(),
             texture_views: self.texture_views.generate_report(),
             samplers: self.samplers.generate_report(),
+            live_devices: self.live_devices.read().generate_report(),
         }
     }
 }

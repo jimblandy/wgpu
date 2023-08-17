@@ -179,10 +179,9 @@ where
         }
     }
 
-    pub(crate) fn insert(&mut self, id: I, mut value: T) {
-        let (index, epoch, _) = id.unzip();
-        value.as_info_mut().set_id(id);
-        self.insert_impl(index as usize, Element::Occupied(Arc::new(value), epoch))
+    pub(crate) fn insert(&mut self, value: Arc<T>) {
+        let (index, epoch, _backend) = value.as_info().id().0.unzip();
+        self.insert_impl(index as usize, Element::Occupied(value, epoch))
     }
 
     pub(crate) fn insert_error(&mut self, id: I, label: &str) {

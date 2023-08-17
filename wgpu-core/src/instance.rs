@@ -1046,15 +1046,11 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         profiling::scope!("Adapter::drop");
 
         let hub = A::hub(self);
-        let mut adapters_locked = hub.adapters.write();
 
-        let free = match adapters_locked.get(adapter_id) {
-            Ok(adapter) => Arc::strong_count(adapter) == 1,
-            Err(_) => true,
-        };
-        if free {
+        let mut adapter_guard = hub.adapters.write();
+        if adapter_guard.contains(adapter_id) {
             hub.adapters
-                .unregister_locked(adapter_id, &mut *adapters_locked);
+                .unregister_locked(adapter_id, &mut *adapter_guard);
         }
     }
 }
@@ -1081,7 +1077,8 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 Ok(device) => device,
                 Err(e) => break e,
             };
-            let (id, _) = fid.assign(device);
+            let (id, arc) = fid.assign(device);
+            hub.live_devices.write().insert(arc);
             log::info!("Created Device {:?}", id);
             return (id.0, None);
         };

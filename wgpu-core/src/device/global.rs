@@ -2184,7 +2184,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let mut devices_to_drop = vec![];
         let mut all_queue_empty = true;
         {
-            let device_guard = hub.devices.read();
+            let device_guard = hub.live_devices.read();
 
             for (id, device) in device_guard.iter(A::VARIANT) {
                 let maintain = if force_wait {
@@ -2197,8 +2197,9 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 let (cbs, queue_empty) = device.maintain(hub, fence, maintain)?;
                 all_queue_empty = all_queue_empty && queue_empty;
 
-                // If the device's own `RefCount` is the only one left, and
-                // its submission queue is empty, then it can be freed.
+                // If the `Arc<Device<A>>` in `hub.live_devices` is the only
+                // reference left, and the device's submission queue is empty,
+                // then it can be freed.
                 if queue_empty && device.is_unique() {
                     devices_to_drop.push(id);
                 }
@@ -2206,6 +2207,10 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             }
         }
 
+        // It's okay to do this even after `device_guard` has been dropped.
+        // Although it's true that we could have two racing calls to
+        // `poll_device` each notice a device is dead, `exit_device` is
+        // idempotent, so it's fine for them both to try to clean it up.
         for device_id in devices_to_drop {
             self.exit_device::<A>(device_id);
         }
@@ -2272,17 +2277,34 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         }
     }
 
+    /// Give up access to `device_id`.
+    ///
+    /// After this call, `device_id` may no longer be used in calls to public
+    /// wgpu-core functions.
+    ///
+    /// Note that as long as there are still resources (buffers, render bundles,
+    /// etc.) allocated from this device, or if the device still has queue
+    /// submissions in flight, the underlying device will remain live. Only once
+    /// everything has been squared away will `Global::poll_device` actually
+    /// clean up the device.
     pub fn device_drop<A: HalApi>(&self, device_id: DeviceId) {
         profiling::scope!("Device::drop");
+
+        let hub = A::hub(self);
+
+        let mut device_guard = hub.devices.write();
+        if device_guard.contains(device_id) {
+            hub.devices.unregister_locked(device_id, &mut *device_guard);
+        }
+
         log::debug!("Device {:?} is asked to be dropped", device_id);
     }
 
     /// Exit the unreferenced, inactive device `device_id`.
     fn exit_device<A: HalApi>(&self, device_id: DeviceId) {
         let hub = A::hub(self);
-        let mut free_adapter_id = None;
         {
-            let device = hub.devices.unregister(device_id);
+            let device = hub.live_devices.write().remove(device_id);
             if let Some(device) = device {
                 // The things `Device::prepare_to_die` takes care are mostly
                 // unnecessary here. We know our queue is empty, so we don't
@@ -2295,20 +2317,8 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                     pending_writes.deactivate();
                 }
 
-                // Adapter is only referenced by the device and itself.
-                // This isn't a robust way to destroy them, we should find a better one.
-                // Check the refcount here should 2 -> registry and device
-                if device.adapter.ref_count() == 2 {
-                    free_adapter_id = Some(device.adapter.info.id().0);
-                }
-
                 drop(device);
             }
-        }
-
-        // Free the adapter now that we've dropped the `Device`.
-        if let Some(free_adapter_id) = free_adapter_id {
-            let _ = hub.adapters.unregister(free_adapter_id);
         }
     }
 
