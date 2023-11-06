@@ -318,7 +318,7 @@ mod type_inner_tests {
 }
 
 /// Characteristics of a scalar type.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Scalar {
     /// How the value's bits are to be interpreted.
     pub kind: crate::ScalarKind,

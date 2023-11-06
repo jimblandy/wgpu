@@ -4,7 +4,7 @@ use crate::front::wgsl::parse::ast;
 use crate::{Handle, Span};
 
 use crate::front::wgsl::error::Error;
-use crate::front::wgsl::lower::{ExpressionContext, Loaded, Lowerer, Typed};
+use crate::front::wgsl::lower::{ExpressionContext, Loaded, Lowerer};
 use crate::front::wgsl::Scalar;
 
 /// A cooked form of `ast::ConstructorType` that uses Naga types whenever
@@ -77,14 +77,24 @@ impl Constructor<(Handle<crate::Type>, &crate::TypeInner)> {
 enum Components<'a> {
     None,
     One {
-        component: Typed<Handle<crate::Expression>>,
+        component: Loaded<Handle<crate::Expression>>,
         span: Span,
         ty_inner: &'a crate::TypeInner,
     },
     Many {
-        components: Vec<Typed<Handle<crate::Expression>>>,
+        components: Vec<Loaded<Handle<crate::Expression>>>,
         spans: Vec<Span>,
     },
+}
+
+impl Components<'_> {
+    fn into_components_vec(self) -> Vec<Loaded<Handle<crate::Expression>>> {
+        match self {
+            Components::None => vec![],
+            Components::One { component, span, ty_inner } => vec![component],
+            Components::Many { components, spans } => components,
+        }
+    }
 }
 
 impl<'source, 'temp> Lowerer<'source, 'temp> {
@@ -153,21 +163,22 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
         // concrete type. Otherwise, we need to look at the components to
         // determine whether the result is abstract or concrete.
         let expr = match (components, constructor) {
-            // Empty constructor
-            (Components::None, dst_ty) => match dst_ty {
-                Constructor::Type((result_ty, _)) => {
-                    let zero =
-                        ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)?;
-                    return Ok(Typed::Loaded(zero));
-                }
-                Constructor::PartialVector { .. }
-                | Constructor::PartialMatrix { .. }
-                | Constructor::PartialArray => {
-                    // We have no arguments from which to infer the result type, so
-                    // partial constructors aren't acceptable here.
-                    return Err(Error::TypeNotInferrable(ty_span));
-                }
-            },
+            // Empty constructor, type given
+            (Components::None, Constructor::Type((result_ty, _))) => {
+                let zero =
+                    ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)?;
+                return Ok(Loaded::Concrete(zero));
+            }
+
+            // Empty constructor, partial
+            (
+                Components::None, 
+                Constructor::PartialVector { .. } | Constructor::PartialMatrix { .. } | Constructor::PartialArray
+            ) => {
+                // We have no arguments from which to infer the result type, so
+                // partial constructors aren't acceptable here.
+                return Err(Error::TypeNotInferrable(ty_span));
+            }
 
             // Scalar constructor & conversion (scalar -> scalar)
             (
@@ -284,10 +295,10 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                             width: src_width,
                             ..
                         },
-                    ..
+                    span,
                 },
                 Constructor::Type((
-                    _,
+                    ty,
                     &crate::TypeInner::Vector {
                         size,
                         kind: dst_kind,
@@ -295,10 +306,14 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     },
                 )),
             ) if dst_kind == src_kind || dst_width == src_width => {
-                let component = ctx.cast_abstract_to_scalar(component, dst_kind, dst_width)?;
-                Typed::Loaded(crate::Expression::Splat {
+                let component = ctx.apply_automatic_conversions(
+                    component,
+                    Loaded::Concrete(crate::proc::TypeResolution::Handle(ty))
+                )?
+                    .ok_or(Error::InvalidConstructorComponentType(span, 0))?;
+                component.map(|value| crate::Expression::Splat {
                     size,
-                    value: component,
+                    value,
                 })
             }
 
@@ -307,16 +322,22 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
                     |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
                 )?;
-                let inner = scalar.to_inner_vector(size);
-                let ty = ctx.ensure_type_exists(inner);
-                crate::Expression::Compose { ty, components }
+                scalar.map(|scalar| {
+                    let inner = scalar.to_inner_vector(size);
+                    let ty = ctx.ensure_type_exists(inner);
+                    let components = Loaded::container_todo(components);
+                    crate::Expression::Compose { ty, components }
+                })
             }
 
             // Vector constructor (by elements), full type given
             (
                 Components::Many { components, .. },
                 Constructor::Type((ty, &crate::TypeInner::Vector { .. })),
-            ) => crate::Expression::Compose { ty, components },
+            ) => {
+                let components = Loaded::container_todo(components);
+                Loaded::new_todo(crate::Expression::Compose { ty, components })
+            },
 
             // Matrix constructor (by elements)
             (
@@ -330,15 +351,17 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
                     |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
                 )?;
-                let vec_ty = ctx.ensure_type_exists(scalar.to_inner_vector(rows));
+                let vec_ty = ctx.ensure_type_exists(scalar.todo().to_inner_vector(rows));
 
                 let components = components
                     .chunks(rows as usize)
                     .map(|vec_components| {
+                        let vec_components = Vec::from(vec_components);
+                        let vec_components = Loaded::container_todo(vec_components);
                         ctx.append_expression(
                             crate::Expression::Compose {
                                 ty: vec_ty,
-                                components: Vec::from(vec_components),
+                                components: vec_components,
                             },
                             Default::default(),
                         )
@@ -348,9 +371,9 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 let ty = ctx.ensure_type_exists(crate::TypeInner::Matrix {
                     columns,
                     rows,
-                    width: scalar.width,
+                    width: scalar.todo().width,
                 });
-                crate::Expression::Compose { ty, components }
+                Loaded::new_todo(crate::Expression::Compose { ty, components })
             }
 
             // Matrix constructor (by columns)
@@ -368,14 +391,16 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 let ty = ctx.ensure_type_exists(crate::TypeInner::Matrix {
                     columns,
                     rows,
-                    width: scalar.width,
+                    width: scalar.todo().width,
                 });
-                crate::Expression::Compose { ty, components }
+                let components = Loaded::container_todo(components);
+                Loaded::new_todo(crate::Expression::Compose { ty, components })
             }
 
             // Array constructor - infer type
             (components, Constructor::PartialArray) => {
                 let components = components.into_components_vec();
+                let components: Vec<Handle<crate::Expression>> = Loaded::container_todo(components);
 
                 let base = ctx.register_type(components[0])?;
 
@@ -391,7 +416,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 };
                 let ty = ctx.ensure_type_exists(inner);
 
-                crate::Expression::Compose { ty, components }
+                Loaded::new_todo(crate::Expression::Compose { ty, components })
             }
 
             // Array or Struct constructor
@@ -403,7 +428,8 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 )),
             ) => {
                 let components = components.into_components_vec();
-                crate::Expression::Compose { ty, components }
+                let components = Loaded::container_todo(components);
+                Loaded::new_todo(crate::Expression::Compose { ty, components })
             }
 
             // ERRORS
@@ -431,7 +457,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             _ => return Err(Error::TypeNotConstructible(ty_span)),
         };
 
-        let expr = ctx.append_expression(expr, span)?;
+        let expr = expr.try_map(|handle| ctx.append_expression(handle, span))?;
         Ok(expr)
     }
 
@@ -513,99 +539,30 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
 /// return `Ok` even when the Naga validator will reject the resulting
 /// construction expression later.
 fn component_scalar_from_constructor_args(
-    components: &[Handle<crate::Expression>],
+    components: &[Loaded<Handle<crate::Expression>>],
     ctx: &mut ExpressionContext<'_, '_, '_>,
-) -> Result<Scalar, usize> {
-    // Since we don't yet implement abstract types, we can settle for
-    // just inspecting the first element.
-    let first = components[0];
-    ctx.grow_types(first).map_err(|_| 0_usize)?;
-    let inner = ctx.typifier()[first].inner_with(&ctx.module.types);
-    match Scalar::from_inner(inner) {
-        Some(scalar) => Ok(scalar),
-        None => Err(0),
-    }
+) -> Result<Loaded<Scalar>, usize> {
+    todo!(); // apply automatic conversions to abstract args
 }
 
 /// Convert `expr` to a concrete type whose leaves are the given scalar type.
 ///
 /// The Load Rule must have already been applied to `expr`.
 fn cast_to_concrete(
-    expr: Typed<Handle<crate::Expression>>,
+    expr: Loaded<Handle<crate::Expression>>,
     kind: crate::ScalarKind,
     width: crate::Bytes,
-) -> Typed<crate::Expression> {
+) -> Loaded<crate::Expression> {
     match expr {
         // Conveniently, since the `As` expression specifies both kind
         // and width, it will take care of converting any abstract
         // operand to the right concrete type.
-        Typed::Abstract(handle) | Typed::Loaded(handle) => Typed::Loaded(crate::Expression::As {
+        Loaded::Abstract(handle) | Loaded::Concrete(handle) => Loaded::Concrete(crate::Expression::As {
             expr: handle,
             kind,
             convert: Some(width),
         }),
-        Typed::Reference(_) => unreachable!(),
     }
-}
-
-/// Convert arguments for vector or matrix ('linear') construction.
-///
-/// Apply WGSL`s [overload resolution] rules for a vector or matrix constructor.
-/// The given `components` may be [`Scalar`]s, [`Vector`]s, or a mix. Mutate
-/// `components` in place to refer to the converted values. (If no conversions
-/// are needed, leave `components` unchanged.)
-///
-/// This is not appropriate for array constructor arguments. WGSL's constraints
-/// on array construction are tighter in some ways (no automatic splat) and
-/// looser in others (elements can be any creation-fixed-footprint type), so we
-/// handle that elsewhere.
-///
-/// The Load Rule must have been previously applied to all components.
-///
-/// [`Scalar`]: crate::TypeInner::Scalar
-/// [`Vector`]: crate::TypeInner::Vector
-/// [overload resolution]: https://gpuweb.github.io/gpuweb/wgsl/#overload-resolution-section
-fn find_consensus_type<'source>(
-    constructor: &Constructor<(Handle<crate::Type>, &crate::TypeInner)>,
-    components: &[Typed<Handle<crate::Expression>>],
-    spans: &[Span],
-    ctx: &mut ExpressionContext<'source, '_, '_>,
-) -> Result<Typed<(crate::ScalarKind, crate::Bytes)>, Error<'source>> {
-    // Track the most general type we've seen so far, and the index of the last
-    // component that influenced it, for error reporting.
-    let mut best: Option<(Typed<(crate::ScalarKind, crate::Bytes)>, usize)> = None;
-
-    for (i, component) in components.iter().enumerate() {
-        let scalar_type = component.try_map(|handle| {
-            let inner = super::resolve_inner!(ctx, handle);
-            leaf_scalar(inner, ctx.module)
-                .ok_or_else(|| Error::UnexpectedComponents(spans[i].clone()))
-        })?;
-        best = match best {
-            None => Some((scalar_type, i)),
-            Some((prev_best, prev_best_index)) => {
-                match join_scalar_types(prev_best, scalar_type) {
-                    Some(new) => {
-                        // If considering this component changed our join type,
-                        // then adopt the new join type, and cite this component
-                        // in any subsequent error messages.
-                        let index = if prev_best != new { i } else { prev_best_index };
-                        Some((new, index))
-                    }
-                    None => {
-                        return Err(Error::IrreconcilableComponents {
-                            r#type: constructor.to_error_string(ctx),
-                            this: spans[prev_best_index],
-                            that: spans[i],
-                        })
-                    }
-                }
-            }
-        };
-    }
-
-    // This `unwrap` is okay because `components` should never be empty.
-    Ok(best.unwrap().0)
 }
 
 /// Return the least upper bound of the scalar types `left` and `right`.
@@ -613,13 +570,13 @@ fn find_consensus_type<'source>(
 /// The expressions in question should have had the Load Rule applied to them:
 /// `left` and `right` must not be WGSL reference types.
 fn join_scalar_types(
-    left: Typed<(crate::ScalarKind, crate::Bytes)>,
-    right: Typed<(crate::ScalarKind, crate::Bytes)>,
-) -> Option<Typed<(crate::ScalarKind, crate::Bytes)>> {
+    left: Loaded<Scalar>,
+    right: Loaded<Scalar>,
+) -> Option<Loaded<Scalar>> {
     use crate::ScalarKind as Sk;
     match (left, right) {
-        (Typed::Abstract(left), Typed::Abstract(right)) => {
-            let kind = match (left.0, right.0) {
+        (Loaded::Abstract(left), Loaded::Abstract(right)) => {
+            let kind = match (left.kind, right.kind) {
                 // Ints coerce to floats, but not vice-versa.
                 (Sk::Float, _) | (_, Sk::Float) => Sk::Float,
                 (Sk::Sint, Sk::Sint) => Sk::Sint,
@@ -628,13 +585,13 @@ fn join_scalar_types(
                 (Sk::Uint | Sk::Bool, _) | (_, Sk::Uint | Sk::Bool) => unreachable!(),
             };
             // All our abstract types are 64 bits long.
-            Some(Typed::Abstract((kind, 8)))
+            Some(Loaded::Abstract(Scalar { kind, width: 8}))
         }
-        (Typed::Abstract(r#abstract), Typed::Loaded(concrete))
-        | (Typed::Loaded(concrete), Typed::Abstract(r#abstract)) => {
+        (Loaded::Abstract(r#abstract), Loaded::Concrete(concrete))
+        | (Loaded::Concrete(concrete), Loaded::Abstract(r#abstract)) => {
             // If we can perform the conversion at all, it should always result
             // in the type of the concrete operand.
-            let ok = match (r#abstract.0, concrete.0) {
+            let ok = match (r#abstract.kind, concrete.kind) {
                 // Abstract floats coerce to floats, but not ints.
                 (Sk::Float, Sk::Float) => true,
                 (Sk::Float, Sk::Sint | Sk::Uint) => false,
@@ -647,14 +604,13 @@ fn join_scalar_types(
                 (Sk::Uint | Sk::Bool, _) => unreachable!(),
             };
 
-            ok.then_some(Typed::Loaded(concrete))
+            ok.then_some(Loaded::Concrete(concrete))
         }
-        (Typed::Loaded(left), Typed::Loaded(right)) => {
+        (Loaded::Concrete(left), Loaded::Concrete(right)) => {
             // Concrete types must match. There are only automatic coercions
             // from abstract types.
-            (left == right).then_some(Typed::Loaded(left))
+            (left == right).then_some(Loaded::Concrete(left))
         }
-        (Typed::Reference(_), _) | (_, Typed::Reference(_)) => unreachable!(),
     }
 }
 

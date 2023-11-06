@@ -1,5 +1,6 @@
 use std::num::NonZeroU32;
 
+use crate::front::wgsl::Scalar;
 use crate::front::wgsl::error::{Error, ExpectedToken, InvalidAssignmentType};
 use crate::front::wgsl::index::Index;
 use crate::front::wgsl::parse::number::Number;
@@ -678,7 +679,7 @@ impl<'source, 'temp, 'out> ExpressionContext<'source, 'temp, 'out> {
         let target_inner = target.map(|res| res.inner_with(&self.module.types));
         match convert::convert_loaded(expr_inner, target_inner, self.module) {
             convert::Conversion::Trivial => return Ok(Some(expr)),
-            convert::Conversion::ScalarCast((kind, width)) => {
+            convert::Conversion::ScalarCast(Scalar { kind, width }) => {
                 let cast = self.cast_scalar_components(expr.handle(), kind, width)?;
                 // The resulting expression has the abstractness of `target`.
                 Ok(Some(target_inner.map(|_| cast)))
@@ -863,7 +864,7 @@ impl<T> Typed<T> {
 ///
 /// Use the `map` and `try_map` methods to convert from one expression
 /// representation to another.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Loaded<T> {
     Concrete(T),
     Abstract(T),
@@ -882,6 +883,32 @@ impl<T> Loaded<T> {
             Self::Concrete(expr) => Loaded::Concrete(f(expr)?),
             Self::Abstract(expr) => Loaded::Abstract(f(expr)?),
         })
+    }
+}
+
+// We would like to delete all uses of these functions before bringing
+// the PR out of draft. But in the mean time, using these allows the
+// code to compile again.
+impl<T> Loaded<T> {
+    fn todo(self) -> T {
+        match self {
+            Self::Concrete(handle) => handle,
+            Self::Abstract(handle) => handle,
+        }
+    }
+
+    fn new_todo(value: T) -> Self {
+        Self::Concrete(value)
+    }
+
+    fn container_todo<I, O>(wrapped: I) -> O
+    where I: IntoIterator<Item=Self>,
+          O: FromIterator<T>,
+    {
+        wrapped
+            .into_iter()
+            .map(Self::todo)
+            .collect()
     }
 }
 
@@ -1366,47 +1393,37 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     emitter.start(&ctx.function.expressions);
 
                     let mut ectx = ctx.as_expression(block, &mut emitter);
-                    let mut init = self.expression(l.init, &mut ectx)?;
-                    let mut ty = init.try_map(|handle| Ok(resolve!(ectx, handle)))?;
+
+                    // `let` bindings must be constructible types or pointers,
+                    // so references are forbidden: we must apply the Load Rule.
+                    let init = self.expression(l.init, &mut ectx)?;
 
                     // If the declaration has an explicit type, try converting,
                     // adjusting `init` and `ty` accordingly.
-                    if let Some(explicit_ty) = l.ty {
+                    let init = if let Some(explicit_ty) = l.ty {
                         let explicit_ty =
                             self.resolve_ast_type(explicit_ty, &mut ctx.as_global())?;
 
                         // Can the initializer be converted to the explicit type?
-                        let ok;
                         let explicit_res = Loaded::Concrete(TypeResolution::Handle(explicit_ty));
-                        if let Some(converted) =
-                            ectx.apply_automatic_conversions(init, explicit_res)?
-                        {
-                            // Abstract types can't be written, so after
-                            // conversion our value is definitely concrete.
-                            init = Loaded::Concrete(converted);
-                            let types = &ectx.module.types;
-                            ok = types[ty]
-                                .inner
-                                .equivalent(&types[explicit_ty].inner, &types);
-                        } else {
-                            ok = false;
+                        match ectx.apply_automatic_conversions(init, explicit_res)? {
+                            Some(converted) => {
+                                converted
+                            }
+                            None => {
+                                let init_ty = init.try_map(|handle| Ok(resolve!(ectx, handle)))?;
+                                let ctx = ectx.as_globalctx();
+                                return Err(Error::InitializationTypeMismatch {
+                                    name: l.name.span,
+                                    expected: explicit_ty.to_wgsl(&ctx),
+                                    got: init_ty.to_wgsl(&ctx),
+                                });
+                            }
                         }
-
-                        if !ok {
-                            let ctx = ectx.as_globalctx();
-                            return Err(Error::InitializationTypeMismatch {
-                                name: l.name.span,
-                                expected: explicit_ty.to_wgsl(&ctx),
-                                got: ty.to_wgsl(&ctx),
-                            });
-                        }
-
-                        ty = explicit_ty;
                     } else {
                         // The value of a `let` binding is the concretized value
                         // of the initializer.
-                        init = ctx.concretize(init)?;
-                        ty = resolve!(ectx, init);
+                        Loaded::Concrete(ectx.concretize(init)?)
                     };
 
                     let init_handle = init.handle();
@@ -1428,45 +1445,61 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     let mut emitter = Emitter::default();
                     emitter.start(&ctx.function.expressions);
 
-                    let initializer = match v.init {
-                        Some(init) => Some(
-                            self.expression(init, &mut ctx.as_expression(block, &mut emitter))?,
-                        ),
-                        None => None,
-                    };
+                    let mut ectx = ctx.as_expression(block, &mut emitter);
 
-                    let explicit_ty =
-                        v.ty.map(|ty| self.resolve_ast_type(ty, &mut ctx.as_global()))
-                            .transpose()?;
+                    let init = v.init
+                        .map(|init| {
+                            self.expression(init, &mut ectx)
+                        })
+                        .transpose()?;
 
-                    let ty = match (explicit_ty, initializer) {
-                        (Some(explicit), Some(initializer)) => {
-                            let mut ctx = ctx.as_expression(block, &mut emitter);
-                            let initializer_ty = resolve_inner!(ctx, initializer);
-                            if !ctx.module.types[explicit]
-                                .inner
-                                .equivalent(initializer_ty, &ctx.module.types)
-                            {
-                                return Err(Error::InitializationTypeMismatch {
-                                    name: v.name.span,
-                                    expected: ctx.format_type(explicit),
-                                    got: ctx.format_typeinner(initializer_ty),
-                                });
+                    let explicit_ty = v.ty
+                        .map(|ty| {
+                            self.resolve_ast_type(ty, &mut ectx.as_global())
+                        })
+                        .transpose()?;
+
+                    let var_ty: Handle<crate::Type>;
+                    let var_init: Option<Handle<crate::Expression>>;
+                    match (explicit_ty, init) {
+                        (Some(explicit_ty), Some(init)) => {
+                            var_ty = explicit_ty;
+                            let explicit_res = Loaded::Concrete(TypeResolution::Handle(explicit_ty));
+                            match ectx.apply_automatic_conversions(init, explicit_res)? {
+                                Some(converted) => {
+                                    // Since explicit_ty was written out, it
+                                    // must not be abstract, so `converted`
+                                    // should always be `Loaded::Concrete`.
+                                    var_init = Some(converted.handle());
+                                },
+                                None => {
+                                    let init_ty = init.try_map(|handle| Ok(resolve!(ectx, handle)))?;
+                                    let ctx = ectx.as_globalctx();
+                                    return Err(Error::InitializationTypeMismatch {
+                                        name: v.name.span,
+                                        expected: explicit_ty.to_wgsl(&ctx),
+                                        got: init_ty.to_wgsl(&ctx),
+                                    });
+                                }
                             }
-                            explicit
                         }
-                        (Some(explicit), None) => explicit,
-                        (None, Some(initializer)) => ctx
-                            .as_expression(block, &mut emitter)
-                            .register_type(initializer)?,
+                        (Some(explicit_ty), None) => {
+                            var_ty = explicit_ty;
+                            var_init = None;
+                        },
+                        (None, Some(init)) => {
+                            let concretized = ectx.concretize(init)?;
+                            var_init = Some(concretized);
+                            var_ty = ectx.register_type(concretized)?;
+                        }
                         (None, None) => {
                             return Err(Error::MissingType(v.name.span));
                         }
                     };
 
                     let (const_initializer, initializer) = {
-                        match initializer {
-                            Some(init) => {
+                        match var_init {
+                            Some(var_init) => {
                                 // It's not correct to hoist the initializer up
                                 // to the top of the function if:
                                 // - the initialization is inside a loop, and should
@@ -1474,10 +1507,10 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                 // - the initialization is not a constant
                                 //   expression, so its value depends on the
                                 //   state at the point of initialization.
-                                if is_inside_loop || !ctx.expression_constness.is_const(init) {
-                                    (None, Some(init))
+                                if is_inside_loop || !ctx.expression_constness.is_const(var_init) {
+                                    (None, Some(var_init))
                                 } else {
-                                    (Some(init), None)
+                                    (Some(var_init), None)
                                 }
                             }
                             None => (None, None),
@@ -1487,22 +1520,22 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     let var = ctx.function.local_variables.append(
                         crate::LocalVariable {
                             name: Some(v.name.name.to_string()),
-                            ty,
+                            ty: var_ty,
                             init: const_initializer,
                         },
                         stmt.span,
                     );
 
-                    let handle = ctx.as_expression(block, &mut emitter).interrupt_emitter(
+                    let var_expr = ctx.as_expression(block, &mut emitter).interrupt_emitter(
                         crate::Expression::LocalVariable(var),
                         Span::UNDEFINED,
                     )?;
                     block.extend(emitter.finish(&ctx.function.expressions));
-                    ctx.local_table.insert(v.handle, Typed::Reference(handle));
+                    ctx.local_table.insert(v.handle, Typed::Reference(var_expr));
 
                     match initializer {
                         Some(initializer) => crate::Statement::Store {
-                            pointer: handle,
+                            pointer: var_expr,
                             value: initializer,
                         },
                         None => return Ok(()),
@@ -1525,7 +1558,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 let reject = self.block(reject, is_inside_loop, ctx)?;
 
                 crate::Statement::If {
-                    condition,
+                    condition: condition.todo(),
                     accept,
                     reject,
                 }
@@ -1539,6 +1572,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
 
                 let mut ectx = ctx.as_expression(block, &mut emitter);
                 let selector = self.expression(selector, &mut ectx)?;
+                let selector = selector.todo();
 
                 let uint =
                     resolve_inner!(ectx, selector).scalar_kind() == Some(crate::ScalarKind::Uint);
@@ -1553,7 +1587,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                     let span = ctx.ast_expressions.get_span(expr);
                                     let expr =
                                         self.expression(expr, &mut ctx.as_global().as_const())?;
-                                    match ctx.module.to_ctx().eval_expr_to_literal(expr) {
+                                    match ctx.module.to_ctx().eval_expr_to_literal(expr.todo()) {
                                         Some(crate::Literal::I32(value)) if !uint => {
                                             crate::SwitchValue::I32(value)
                                         }
@@ -1587,7 +1621,8 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 emitter.start(&ctx.function.expressions);
                 let break_if = break_if
                     .map(|expr| self.expression(expr, &mut ctx.as_expression(block, &mut emitter)))
-                    .transpose()?;
+                    .transpose()?
+                    .map(Loaded::todo);
                 continuing.extend(emitter.finish(&ctx.function.expressions));
 
                 crate::Statement::Loop {
@@ -1604,7 +1639,8 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
 
                 let value = value
                     .map(|expr| self.expression(expr, &mut ctx.as_expression(block, &mut emitter)))
-                    .transpose()?;
+                    .transpose()?
+                    .map(Loaded::todo);
                 block.extend(emitter.finish(&ctx.function.expressions));
 
                 crate::Statement::Return { value }
@@ -1874,7 +1910,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                         // used to be a WGSL reference, but now it's a WGSL
                         // pointer. Abstract types aren't storable, so it's
                         // definitely concrete.
-                        return Ok(Typed::Loaded(expr));
+                        return Ok(Typed::Loaded(Loaded::Concrete(expr)));
                     }
                     Typed::Loaded(_) => {
                         return Err(Error::NotReference("the operand of the `&` operator", span));
@@ -1907,11 +1943,13 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 let handle = self
                     .call(span, function, arguments, ctx)?
                     .ok_or(Error::FunctionReturnsVoid(function.span))?;
-                return Ok(Typed::Loaded(handle));
+                // Calls can't return references or abstract types.
+                return Ok(Typed::Loaded(Loaded::Concrete(handle)));
             }
             ast::Expression::Index { base, index } => {
                 let lowered_base = self.expression_for_reference(base, ctx)?;
                 let index = self.expression(index, ctx)?;
+                let index = index.todo();
 
                 // WGSL subscripting can't be applied to pointers.
                 if let Typed::Loaded(Loaded::Concrete(base_handle)) = lowered_base {
@@ -1931,6 +1969,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             ast::Expression::Member { base, ref field } => self.member(base, field, ctx)?,
             ast::Expression::Bitcast { expr, to, ty_span } => {
                 let expr = self.expression(expr, ctx)?;
+                let expr = expr.todo();
                 let to_resolved = self.resolve_ast_type(to, &mut ctx.as_global())?;
 
                 let kind = match ctx.module.types[to_resolved].inner {
@@ -1946,11 +1985,11 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     }
                 };
 
-                Typed::Loaded(crate::Expression::As {
+                Typed::Loaded(Loaded::Concrete(crate::Expression::As {
                     expr,
                     kind,
                     convert: None,
-                })
+                }))
             }
         };
 
