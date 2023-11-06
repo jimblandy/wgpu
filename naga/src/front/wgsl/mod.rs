@@ -94,6 +94,31 @@ impl crate::StorageFormat {
     }
 }
 
+impl crate::proc::TypeResolution {
+    fn to_wgsl(&self, gctx: &crate::proc::GlobalCtx) -> String {
+        match *self {
+            Self::Handle(handle) => gctx.types[handle].to_wgsl(gctx),
+            Self::Value(inner) => inner.to_wgsl(gctx),
+        }
+    }
+}
+
+impl crate::Handle<crate::Type> {
+    fn to_wgsl(&self, gctx: &crate::proc::GlobalCtx) -> String {
+        gctx.types[*self].to_wgsl(gctx)
+    }
+}
+
+impl crate::Type {
+    /// Formats the type as it is written in wgsl.
+    fn to_wgsl(&self, gctx: &crate::proc::GlobalCtx) -> String {
+        match self.name {
+            Some(name) => name.clone(),
+            None => self.inner.to_wgsl(gctx),
+        }
+    }
+}
+
 impl crate::TypeInner {
     /// Formats the type as it is written in wgsl.
     ///
@@ -355,4 +380,18 @@ impl Scalar {
             width: self.width,
         }
     }
+}
+
+const ABSTRACT_WIDTH: crate::Bytes = 8;
+
+impl Scalar {
+    const ABSTRACT_INT: Scalar = Scalar {
+        kind: crate::ScalarKind::Sint,
+        width: ABSTRACT_WIDTH,
+    };
+
+    const ABSTRACT_FLOAT: Scalar = Scalar {
+        kind: crate::ScalarKind::Float,
+        width: ABSTRACT_WIDTH,
+    };
 }

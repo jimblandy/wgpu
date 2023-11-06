@@ -4,7 +4,7 @@ use crate::front::wgsl::parse::ast;
 use crate::{Handle, Span};
 
 use crate::front::wgsl::error::Error;
-use crate::front::wgsl::lower::{ExpressionContext, Lowerer};
+use crate::front::wgsl::lower::{ExpressionContext, Loaded, Lowerer, Typed};
 use crate::front::wgsl::Scalar;
 
 /// A cooked form of `ast::ConstructorType` that uses Naga types whenever
@@ -32,6 +32,9 @@ enum Constructor<T> {
     /// the module later. To avoid borrowing from the module, the type parameter
     /// `T` is `Handle<Type>` initially. Then we use `borrow_inner` to produce a
     /// version holding a tuple `(Handle<Type>, &TypeInner)`.
+    ///
+    /// This always corresponds to a WGSL concrete type: only Partial
+    /// constructors can produce abstract types.
     Type(T),
 }
 
@@ -74,24 +77,14 @@ impl Constructor<(Handle<crate::Type>, &crate::TypeInner)> {
 enum Components<'a> {
     None,
     One {
-        component: Handle<crate::Expression>,
+        component: Typed<Handle<crate::Expression>>,
         span: Span,
         ty_inner: &'a crate::TypeInner,
     },
     Many {
-        components: Vec<Handle<crate::Expression>>,
+        components: Vec<Typed<Handle<crate::Expression>>>,
         spans: Vec<Span>,
     },
-}
-
-impl Components<'_> {
-    fn into_components_vec(self) -> Vec<Handle<crate::Expression>> {
-        match self {
-            Self::None => vec![],
-            Self::One { component, .. } => vec![component],
-            Self::Many { components, .. } => components,
-        }
-    }
 }
 
 impl<'source, 'temp> Lowerer<'source, 'temp> {
@@ -115,7 +108,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
         ty_span: Span,
         components: &[Handle<ast::Expression<'source>>],
         ctx: &mut ExpressionContext<'source, '_, '_>,
-    ) -> Result<Handle<crate::Expression>, Error<'source>> {
+    ) -> Result<Loaded<Handle<crate::Expression>>, Error<'source>> {
         let constructor_h = self.constructor(constructor, ctx)?;
 
         let components = match *components {
@@ -123,7 +116,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             [component] => {
                 let span = ctx.ast_expressions.get_span(component);
                 let component = self.expression(component, ctx)?;
-                let ty_inner = super::resolve_inner!(ctx, component);
+                let ty_inner = super::resolve_inner!(ctx, component.handle());
 
                 Components::One {
                     component,
@@ -145,16 +138,27 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             }
         };
 
-        // Even though we computed `constructor` above, wait until now to borrow
+        // Even though we computed `constructor_h` above, wait until now to borrow
         // a reference to the `TypeInner`, so that the component-handling code
         // above can have mutable access to the type arena.
         let constructor = constructor_h.borrow_inner(ctx.module);
 
+        // Build a Naga expression for this construction.
+        //
+        // Construction operations never operate on or produce references. We
+        // applied `Lowerer::expression` above to apply the Load Rule to
+        // everything.
+        //
+        // Whenever `constructor` is `Constructor::Type`, the result is a
+        // concrete type. Otherwise, we need to look at the components to
+        // determine whether the result is abstract or concrete.
         let expr = match (components, constructor) {
             // Empty constructor
             (Components::None, dst_ty) => match dst_ty {
                 Constructor::Type((result_ty, _)) => {
-                    return ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)
+                    let zero =
+                        ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)?;
+                    return Ok(Typed::Loaded(zero));
                 }
                 Constructor::PartialVector { .. }
                 | Constructor::PartialMatrix { .. }
@@ -173,11 +177,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     ..
                 },
                 Constructor::Type((_, &crate::TypeInner::Scalar { kind, width })),
-            ) => crate::Expression::As {
-                expr: component,
-                kind,
-                convert: Some(width),
-            },
+            ) => cast_to_concrete(component, kind, width),
 
             // Vector conversion (vector -> vector)
             (
@@ -194,11 +194,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                         width: dst_width,
                     },
                 )),
-            ) if dst_size == src_size => crate::Expression::As {
-                expr: component,
-                kind: dst_kind,
-                convert: Some(dst_width),
-            },
+            ) if dst_size == src_size => cast_to_concrete(component, dst_kind, dst_width),
 
             // Vector conversion (vector -> vector) - partial
             (
@@ -235,11 +231,9 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                         width: dst_width,
                     },
                 )),
-            ) if dst_columns == src_columns && dst_rows == src_rows => crate::Expression::As {
-                expr: component,
-                kind: crate::ScalarKind::Float,
-                convert: Some(dst_width),
-            },
+            ) if dst_columns == src_columns && dst_rows == src_rows => {
+                cast_to_concrete(component, crate::ScalarKind::Float, dst_width)
+            }
 
             // Matrix conversion (matrix -> matrix) - partial
             (
@@ -272,10 +266,13 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     ..
                 },
                 Constructor::PartialVector { size },
-            ) => crate::Expression::Splat {
-                size,
-                value: component,
-            },
+            ) => {
+                // Preserve scalar component abstractness.
+                component.map(|handle| crate::Expression::Splat {
+                    size,
+                    value: handle,
+                })
+            }
 
             // Vector constructor (splat)
             (
@@ -297,10 +294,13 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                         width: dst_width,
                     },
                 )),
-            ) if dst_kind == src_kind || dst_width == src_width => crate::Expression::Splat {
-                size,
-                value: component,
-            },
+            ) if dst_kind == src_kind || dst_width == src_width => {
+                let component = ctx.cast_abstract_to_scalar(component, dst_kind, dst_width)?;
+                Typed::Loaded(crate::Expression::Splat {
+                    size,
+                    value: component,
+                })
+            }
 
             // Vector constructor (by elements), partial
             (Components::Many { components, spans }, Constructor::PartialVector { size }) => {
@@ -524,5 +524,152 @@ fn component_scalar_from_constructor_args(
     match Scalar::from_inner(inner) {
         Some(scalar) => Ok(scalar),
         None => Err(0),
+    }
+}
+
+/// Convert `expr` to a concrete type whose leaves are the given scalar type.
+///
+/// The Load Rule must have already been applied to `expr`.
+fn cast_to_concrete(
+    expr: Typed<Handle<crate::Expression>>,
+    kind: crate::ScalarKind,
+    width: crate::Bytes,
+) -> Typed<crate::Expression> {
+    match expr {
+        // Conveniently, since the `As` expression specifies both kind
+        // and width, it will take care of converting any abstract
+        // operand to the right concrete type.
+        Typed::Abstract(handle) | Typed::Loaded(handle) => Typed::Loaded(crate::Expression::As {
+            expr: handle,
+            kind,
+            convert: Some(width),
+        }),
+        Typed::Reference(_) => unreachable!(),
+    }
+}
+
+/// Convert arguments for vector or matrix ('linear') construction.
+///
+/// Apply WGSL`s [overload resolution] rules for a vector or matrix constructor.
+/// The given `components` may be [`Scalar`]s, [`Vector`]s, or a mix. Mutate
+/// `components` in place to refer to the converted values. (If no conversions
+/// are needed, leave `components` unchanged.)
+///
+/// This is not appropriate for array constructor arguments. WGSL's constraints
+/// on array construction are tighter in some ways (no automatic splat) and
+/// looser in others (elements can be any creation-fixed-footprint type), so we
+/// handle that elsewhere.
+///
+/// The Load Rule must have been previously applied to all components.
+///
+/// [`Scalar`]: crate::TypeInner::Scalar
+/// [`Vector`]: crate::TypeInner::Vector
+/// [overload resolution]: https://gpuweb.github.io/gpuweb/wgsl/#overload-resolution-section
+fn find_consensus_type<'source>(
+    constructor: &Constructor<(Handle<crate::Type>, &crate::TypeInner)>,
+    components: &[Typed<Handle<crate::Expression>>],
+    spans: &[Span],
+    ctx: &mut ExpressionContext<'source, '_, '_>,
+) -> Result<Typed<(crate::ScalarKind, crate::Bytes)>, Error<'source>> {
+    // Track the most general type we've seen so far, and the index of the last
+    // component that influenced it, for error reporting.
+    let mut best: Option<(Typed<(crate::ScalarKind, crate::Bytes)>, usize)> = None;
+
+    for (i, component) in components.iter().enumerate() {
+        let scalar_type = component.try_map(|handle| {
+            let inner = super::resolve_inner!(ctx, handle);
+            leaf_scalar(inner, ctx.module)
+                .ok_or_else(|| Error::UnexpectedComponents(spans[i].clone()))
+        })?;
+        best = match best {
+            None => Some((scalar_type, i)),
+            Some((prev_best, prev_best_index)) => {
+                match join_scalar_types(prev_best, scalar_type) {
+                    Some(new) => {
+                        // If considering this component changed our join type,
+                        // then adopt the new join type, and cite this component
+                        // in any subsequent error messages.
+                        let index = if prev_best != new { i } else { prev_best_index };
+                        Some((new, index))
+                    }
+                    None => {
+                        return Err(Error::IrreconcilableComponents {
+                            r#type: constructor.to_error_string(ctx),
+                            this: spans[prev_best_index],
+                            that: spans[i],
+                        })
+                    }
+                }
+            }
+        };
+    }
+
+    // This `unwrap` is okay because `components` should never be empty.
+    Ok(best.unwrap().0)
+}
+
+/// Return the least upper bound of the scalar types `left` and `right`.
+///
+/// The expressions in question should have had the Load Rule applied to them:
+/// `left` and `right` must not be WGSL reference types.
+fn join_scalar_types(
+    left: Typed<(crate::ScalarKind, crate::Bytes)>,
+    right: Typed<(crate::ScalarKind, crate::Bytes)>,
+) -> Option<Typed<(crate::ScalarKind, crate::Bytes)>> {
+    use crate::ScalarKind as Sk;
+    match (left, right) {
+        (Typed::Abstract(left), Typed::Abstract(right)) => {
+            let kind = match (left.0, right.0) {
+                // Ints coerce to floats, but not vice-versa.
+                (Sk::Float, _) | (_, Sk::Float) => Sk::Float,
+                (Sk::Sint, Sk::Sint) => Sk::Sint,
+                // The WGSL front end should never produce abstract unsigned
+                // ints or booleans.
+                (Sk::Uint | Sk::Bool, _) | (_, Sk::Uint | Sk::Bool) => unreachable!(),
+            };
+            // All our abstract types are 64 bits long.
+            Some(Typed::Abstract((kind, 8)))
+        }
+        (Typed::Abstract(r#abstract), Typed::Loaded(concrete))
+        | (Typed::Loaded(concrete), Typed::Abstract(r#abstract)) => {
+            // If we can perform the conversion at all, it should always result
+            // in the type of the concrete operand.
+            let ok = match (r#abstract.0, concrete.0) {
+                // Abstract floats coerce to floats, but not ints.
+                (Sk::Float, Sk::Float) => true,
+                (Sk::Float, Sk::Sint | Sk::Uint) => false,
+                // Abstract ints coerce to floats or ints.
+                (Sk::Sint, Sk::Float | Sk::Sint | Sk::Uint) => true,
+                // Nothing converts to bool.
+                (_, Sk::Bool) => false,
+                // The WGSL front end should never produce abstract unsigned
+                // ints or booleans.
+                (Sk::Uint | Sk::Bool, _) => unreachable!(),
+            };
+
+            ok.then_some(Typed::Loaded(concrete))
+        }
+        (Typed::Loaded(left), Typed::Loaded(right)) => {
+            // Concrete types must match. There are only automatic coercions
+            // from abstract types.
+            (left == right).then_some(Typed::Loaded(left))
+        }
+        (Typed::Reference(_), _) | (_, Typed::Reference(_)) => unreachable!(),
+    }
+}
+
+/// Return the scalar kind and width of the leaves of `ty`.
+///
+/// If `ty` argument is a scalar, vector, or matrix, return the scalar kind and
+/// width of its leaves. Otherwise, return `None`.
+fn leaf_scalar(
+    inner: &crate::TypeInner,
+    module: &crate::Module,
+) -> Option<(crate::ScalarKind, crate::Bytes)> {
+    use crate::TypeInner as Ti;
+    match *inner {
+        Ti::Scalar { kind, width } | Ti::Vector { kind, width, .. } => Some((kind, width)),
+        Ti::Matrix { width, .. } => Some((crate::ScalarKind::Float, width)),
+        _ => None,
     }
 }

@@ -127,11 +127,12 @@ pub enum NumberError {
     UnimplementedF16,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InvalidAssignmentType {
     Other,
     Swizzle,
     ImmutableBinding(Span),
+    Type { to_type: String, from_type: String },
 }
 
 #[derive(Clone, Debug)]
@@ -139,6 +140,11 @@ pub enum Error<'a> {
     Unexpected(Span, ExpectedToken<'a>),
     UnexpectedComponents(Span),
     UnexpectedOperationInConstContext(Span),
+    IrreconcilableComponents {
+        r#type: String,
+        this: Span,
+        that: Span,
+    },
     BadNumber(Span, NumberError),
     BadMatrixScalarKind(Span, Scalar),
     BadAccessor(Span),
@@ -297,6 +303,17 @@ impl<'a> Error<'a> {
             Error::UnexpectedOperationInConstContext(span) => ParseError {
                 message: "this operation is not supported in a const context".to_string(),
                 labels: vec![(span, "operation not supported here".into())],
+                notes: vec![],
+            },
+            Error::IrreconcilableComponents { r#type, this, that } => ParseError {
+                message: format!(
+                    "can't construct `{}` from components with these types",
+                    r#type,
+                ),
+                labels: vec![
+                    (this, "this component's type can't be reconciled...".into()),
+                    (that, "... with this component's type".into()),
+                ],
                 notes: vec![],
             },
             Error::BadNumber(bad_span, ref err) => ParseError {
@@ -551,6 +568,12 @@ impl<'a> Error<'a> {
                             "consider declaring '{}' with `var` instead of `let`",
                             &source[binding_span]
                         )],
+                    ),
+                    InvalidAssignmentType::Type { to_type, from_type } => (
+                        None,
+                        vec![
+                            format!("cannot assign a value of type `{from_type}` to a location of type `{to_type}`")
+                        ],
                     ),
                     InvalidAssignmentType::Other => (None, vec![]),
                 };

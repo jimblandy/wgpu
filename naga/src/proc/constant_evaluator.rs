@@ -946,7 +946,7 @@ impl<'a> ConstantEvaluator<'a> {
     /// Convert the scalar components of `expr` to `kind` and `target_width`.
     ///
     /// Treat `span` as the location of the resulting expression.
-    pub fn cast(
+    pub(crate) fn cast(
         &mut self,
         expr: Handle<Expression>,
         kind: ScalarKind,
