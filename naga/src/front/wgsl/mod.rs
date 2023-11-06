@@ -303,6 +303,24 @@ pub struct Scalar {
 }
 
 impl Scalar {
+    /// Return the scalar type of a Naga [`TypeInner`].
+    ///
+    /// If `inner` is a scalar, vector, or matrix type, return
+    /// its scalar type. Otherwise, return `None`.
+    ///
+    /// [`TypeInner`]: crate::TypeInner
+    const fn from_inner(inner: &crate::TypeInner) -> Option<Self> {
+        match *inner {
+            crate::TypeInner::Scalar { kind, width }
+            | crate::TypeInner::Vector { kind, width, .. } => Some(Scalar { kind, width }),
+            crate::TypeInner::Matrix { width, .. } => Some(Scalar {
+                kind: crate::ScalarKind::Float,
+                width,
+            }),
+            _ => None,
+        }
+    }
+
     /// Format a scalar kind+width as a type is written in wgsl.
     ///
     /// Examples: `f32`, `u64`, `bool`.
