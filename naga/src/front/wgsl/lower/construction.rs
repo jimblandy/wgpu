@@ -150,287 +150,286 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
         // above can have mutable access to the type arena.
         let constructor = constructor_h.borrow_inner(ctx.module);
 
-        let expr =
-            match (components, constructor) {
-                // Empty constructor
-                (Components::None, dst_ty) => match dst_ty {
-                    Constructor::Type((result_ty, _)) => {
-                        return ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)
-                    }
-                    Constructor::PartialVector { .. }
-                    | Constructor::PartialMatrix { .. }
-                    | Constructor::PartialArray => {
-                        // We have no arguments from which to infer the result type, so
-                        // partial constructors aren't acceptable here.
-                        return Err(Error::TypeNotInferrable(ty_span));
-                    }
-                },
-
-                // Scalar constructor & conversion (scalar -> scalar)
-                (
-                    Components::One {
-                        component,
-                        ty_inner: &crate::TypeInner::Scalar { .. },
-                        ..
-                    },
-                    Constructor::Type((_, &crate::TypeInner::Scalar { kind, width })),
-                ) => crate::Expression::As {
-                    expr: component,
-                    kind,
-                    convert: Some(width),
-                },
-
-                // Vector conversion (vector -> vector)
-                (
-                    Components::One {
-                        component,
-                        ty_inner: &crate::TypeInner::Vector { size: src_size, .. },
-                        ..
-                    },
-                    Constructor::Type((
-                        _,
-                        &crate::TypeInner::Vector {
-                            size: dst_size,
-                            kind: dst_kind,
-                            width: dst_width,
-                        },
-                    )),
-                ) if dst_size == src_size => crate::Expression::As {
-                    expr: component,
-                    kind: dst_kind,
-                    convert: Some(dst_width),
-                },
-
-                // Vector conversion (vector -> vector) - partial
-                (
-                    Components::One {
-                        component,
-                        ty_inner: &crate::TypeInner::Vector { size: src_size, .. },
-                        ..
-                    },
-                    Constructor::PartialVector { size: dst_size },
-                ) if dst_size == src_size => {
-                    // This is a trivial conversion: the sizes match, and a Partial
-                    // constructor doesn't specify a scalar type, so nothing can
-                    // possibly happen.
-                    return Ok(component);
+        let expr = match (components, constructor) {
+            // Empty constructor
+            (Components::None, dst_ty) => match dst_ty {
+                Constructor::Type((result_ty, _)) => {
+                    return ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)
                 }
+                Constructor::PartialVector { .. }
+                | Constructor::PartialMatrix { .. }
+                | Constructor::PartialArray => {
+                    // We have no arguments from which to infer the result type, so
+                    // partial constructors aren't acceptable here.
+                    return Err(Error::TypeNotInferrable(ty_span));
+                }
+            },
 
-                // Matrix conversion (matrix -> matrix)
-                (
-                    Components::One {
-                        component,
-                        ty_inner:
-                            &crate::TypeInner::Matrix {
-                                columns: src_columns,
-                                rows: src_rows,
-                                ..
-                            },
-                        ..
-                    },
-                    Constructor::Type((
-                        _,
-                        &crate::TypeInner::Matrix {
-                            columns: dst_columns,
-                            rows: dst_rows,
-                            width: dst_width,
-                        },
-                    )),
-                ) if dst_columns == src_columns && dst_rows == src_rows => crate::Expression::As {
-                    expr: component,
-                    kind: crate::ScalarKind::Float,
-                    convert: Some(dst_width),
+            // Scalar constructor & conversion (scalar -> scalar)
+            (
+                Components::One {
+                    component,
+                    ty_inner: &crate::TypeInner::Scalar { .. },
+                    ..
                 },
+                Constructor::Type((_, &crate::TypeInner::Scalar { kind, width })),
+            ) => crate::Expression::As {
+                expr: component,
+                kind,
+                convert: Some(width),
+            },
 
-                // Matrix conversion (matrix -> matrix) - partial
-                (
-                    Components::One {
-                        component,
-                        ty_inner:
-                            &crate::TypeInner::Matrix {
-                                columns: src_columns,
-                                rows: src_rows,
-                                ..
-                            },
-                        ..
+            // Vector conversion (vector -> vector)
+            (
+                Components::One {
+                    component,
+                    ty_inner: &crate::TypeInner::Vector { size: src_size, .. },
+                    ..
+                },
+                Constructor::Type((
+                    _,
+                    &crate::TypeInner::Vector {
+                        size: dst_size,
+                        kind: dst_kind,
+                        width: dst_width,
                     },
-                    Constructor::PartialMatrix {
+                )),
+            ) if dst_size == src_size => crate::Expression::As {
+                expr: component,
+                kind: dst_kind,
+                convert: Some(dst_width),
+            },
+
+            // Vector conversion (vector -> vector) - partial
+            (
+                Components::One {
+                    component,
+                    ty_inner: &crate::TypeInner::Vector { size: src_size, .. },
+                    ..
+                },
+                Constructor::PartialVector { size: dst_size },
+            ) if dst_size == src_size => {
+                // This is a trivial conversion: the sizes match, and a Partial
+                // constructor doesn't specify a scalar type, so nothing can
+                // possibly happen.
+                return Ok(component);
+            }
+
+            // Matrix conversion (matrix -> matrix)
+            (
+                Components::One {
+                    component,
+                    ty_inner:
+                        &crate::TypeInner::Matrix {
+                            columns: src_columns,
+                            rows: src_rows,
+                            ..
+                        },
+                    ..
+                },
+                Constructor::Type((
+                    _,
+                    &crate::TypeInner::Matrix {
                         columns: dst_columns,
                         rows: dst_rows,
+                        width: dst_width,
                     },
-                ) if dst_columns == src_columns && dst_rows == src_rows => {
-                    // This is a trivial conversion: the sizes match, and a Partial
-                    // constructor doesn't specify a scalar type, so nothing can
-                    // possibly happen.
-                    return Ok(component);
-                }
+                )),
+            ) if dst_columns == src_columns && dst_rows == src_rows => crate::Expression::As {
+                expr: component,
+                kind: crate::ScalarKind::Float,
+                convert: Some(dst_width),
+            },
 
-                // Vector constructor (splat) - infer type
-                (
-                    Components::One {
-                        component,
-                        ty_inner: &crate::TypeInner::Scalar { .. },
-                        ..
-                    },
-                    Constructor::PartialVector { size },
-                ) => crate::Expression::Splat {
-                    size,
-                    value: component,
+            // Matrix conversion (matrix -> matrix) - partial
+            (
+                Components::One {
+                    component,
+                    ty_inner:
+                        &crate::TypeInner::Matrix {
+                            columns: src_columns,
+                            rows: src_rows,
+                            ..
+                        },
+                    ..
                 },
+                Constructor::PartialMatrix {
+                    columns: dst_columns,
+                    rows: dst_rows,
+                },
+            ) if dst_columns == src_columns && dst_rows == src_rows => {
+                // This is a trivial conversion: the sizes match, and a Partial
+                // constructor doesn't specify a scalar type, so nothing can
+                // possibly happen.
+                return Ok(component);
+            }
 
-                // Vector constructor (splat)
-                (
-                    Components::One {
-                        component,
-                        ty_inner:
-                            &crate::TypeInner::Scalar {
-                                kind: src_kind,
-                                width: src_width,
-                                ..
+            // Vector constructor (splat) - infer type
+            (
+                Components::One {
+                    component,
+                    ty_inner: &crate::TypeInner::Scalar { .. },
+                    ..
+                },
+                Constructor::PartialVector { size },
+            ) => crate::Expression::Splat {
+                size,
+                value: component,
+            },
+
+            // Vector constructor (splat)
+            (
+                Components::One {
+                    component,
+                    ty_inner:
+                        &crate::TypeInner::Scalar {
+                            kind: src_kind,
+                            width: src_width,
+                            ..
+                        },
+                    ..
+                },
+                Constructor::Type((
+                    _,
+                    &crate::TypeInner::Vector {
+                        size,
+                        kind: dst_kind,
+                        width: dst_width,
+                    },
+                )),
+            ) if dst_kind == src_kind || dst_width == src_width => crate::Expression::Splat {
+                size,
+                value: component,
+            },
+
+            // Vector constructor (by elements), partial
+            (Components::Many { components, spans }, Constructor::PartialVector { size }) => {
+                let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
+                    |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
+                )?;
+                let inner = scalar.to_inner_vector(size);
+                let ty = ctx.ensure_type_exists(inner);
+                crate::Expression::Compose { ty, components }
+            }
+
+            // Vector constructor (by elements), full type given
+            (
+                Components::Many { components, .. },
+                Constructor::Type((ty, &crate::TypeInner::Vector { .. })),
+            ) => crate::Expression::Compose { ty, components },
+
+            // Matrix constructor (by elements)
+            (
+                Components::Many { components, spans },
+                Constructor::PartialMatrix { columns, rows },
+            )
+            | (
+                Components::Many { components, spans },
+                Constructor::Type((_, &crate::TypeInner::Matrix { columns, rows, .. })),
+            ) if components.len() == columns as usize * rows as usize => {
+                let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
+                    |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
+                )?;
+                let vec_ty = ctx.ensure_type_exists(scalar.to_inner_vector(rows));
+
+                let components = components
+                    .chunks(rows as usize)
+                    .map(|vec_components| {
+                        ctx.append_expression(
+                            crate::Expression::Compose {
+                                ty: vec_ty,
+                                components: Vec::from(vec_components),
                             },
-                        ..
+                            Default::default(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let ty = ctx.ensure_type_exists(crate::TypeInner::Matrix {
+                    columns,
+                    rows,
+                    width: scalar.width,
+                });
+                crate::Expression::Compose { ty, components }
+            }
+
+            // Matrix constructor (by columns)
+            (
+                Components::Many { components, spans },
+                Constructor::PartialMatrix { columns, rows },
+            )
+            | (
+                Components::Many { components, spans },
+                Constructor::Type((_, &crate::TypeInner::Matrix { columns, rows, .. })),
+            ) => {
+                let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
+                    |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
+                )?;
+                let ty = ctx.ensure_type_exists(crate::TypeInner::Matrix {
+                    columns,
+                    rows,
+                    width: scalar.width,
+                });
+                crate::Expression::Compose { ty, components }
+            }
+
+            // Array constructor - infer type
+            (components, Constructor::PartialArray) => {
+                let components = components.into_components_vec();
+
+                let base = ctx.register_type(components[0])?;
+
+                let inner = crate::TypeInner::Array {
+                    base,
+                    size: crate::ArraySize::Constant(
+                        NonZeroU32::new(u32::try_from(components.len()).unwrap()).unwrap(),
+                    ),
+                    stride: {
+                        self.layouter.update(ctx.module.to_ctx()).unwrap();
+                        self.layouter[base].to_stride()
                     },
-                    Constructor::Type((
-                        _,
-                        &crate::TypeInner::Vector {
-                            size,
-                            kind: dst_kind,
-                            width: dst_width,
-                        },
-                    )),
-                ) if dst_kind == src_kind || dst_width == src_width => crate::Expression::Splat {
-                    size,
-                    value: component,
-                },
+                };
+                let ty = ctx.ensure_type_exists(inner);
 
-                // Vector constructor (by elements), partial
-                (Components::Many { components, spans }, Constructor::PartialVector { size }) => {
-                    let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
-                        |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
-                    )?;
-                    let inner = scalar.to_inner_vector(size);
-                    let ty = ctx.ensure_type_exists(inner);
-                    crate::Expression::Compose { ty, components }
-                }
+                crate::Expression::Compose { ty, components }
+            }
 
-                // Vector constructor (by elements), full type given
-                (
-                    Components::Many { components, .. },
-                    Constructor::Type((ty, &crate::TypeInner::Vector { .. })),
-                ) => crate::Expression::Compose { ty, components },
+            // Array or Struct constructor
+            (
+                components,
+                Constructor::Type((
+                    ty,
+                    &crate::TypeInner::Array { .. } | &crate::TypeInner::Struct { .. },
+                )),
+            ) => {
+                let components = components.into_components_vec();
+                crate::Expression::Compose { ty, components }
+            }
 
-                // Matrix constructor (by elements)
-                (
-                    Components::Many { components, spans },
-                    Constructor::PartialMatrix { columns, rows },
-                )
-                | (
-                    Components::Many { components, spans },
-                    Constructor::Type((_, &crate::TypeInner::Matrix { columns, rows, .. })),
-                ) if components.len() == columns as usize * rows as usize => {
-                    let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
-                        |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
-                    )?;
-                    let vec_ty = ctx.ensure_type_exists(scalar.to_inner_vector(rows));
+            // ERRORS
 
-                    let components = components
-                        .chunks(rows as usize)
-                        .map(|vec_components| {
-                            ctx.append_expression(
-                                crate::Expression::Compose {
-                                    ty: vec_ty,
-                                    components: Vec::from(vec_components),
-                                },
-                                Default::default(),
-                            )
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
+            // Bad conversion (type cast)
+            (Components::One { span, ty_inner, .. }, constructor) => {
+                let from_type = ctx.format_typeinner(ty_inner);
+                return Err(Error::BadTypeCast {
+                    span,
+                    from_type,
+                    to_type: constructor.to_error_string(ctx),
+                });
+            }
 
-                    let ty = ctx.ensure_type_exists(crate::TypeInner::Matrix {
-                        columns,
-                        rows,
-                        width: scalar.width,
-                    });
-                    crate::Expression::Compose { ty, components }
-                }
+            // Too many parameters for scalar constructor
+            (
+                Components::Many { spans, .. },
+                Constructor::Type((_, &crate::TypeInner::Scalar { .. })),
+            ) => {
+                let span = spans[1].until(spans.last().unwrap());
+                return Err(Error::UnexpectedComponents(span));
+            }
 
-                // Matrix constructor (by columns)
-                (
-                    Components::Many { components, spans },
-                    Constructor::PartialMatrix { columns, rows },
-                )
-                | (
-                    Components::Many { components, spans },
-                    Constructor::Type((_, &crate::TypeInner::Matrix { columns, rows, .. })),
-                ) => {
-                    let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
-                        |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
-                    )?;
-                    let ty = ctx.ensure_type_exists(crate::TypeInner::Matrix {
-                        columns,
-                        rows,
-                        width: scalar.width,
-                    });
-                    crate::Expression::Compose { ty, components }
-                }
-
-                // Array constructor - infer type
-                (components, Constructor::PartialArray) => {
-                    let components = components.into_components_vec();
-
-                    let base = ctx.register_type(components[0])?;
-
-                    let inner = crate::TypeInner::Array {
-                        base,
-                        size: crate::ArraySize::Constant(
-                            NonZeroU32::new(u32::try_from(components.len()).unwrap()).unwrap(),
-                        ),
-                        stride: {
-                            self.layouter.update(ctx.module.to_ctx()).unwrap();
-                            self.layouter[base].to_stride()
-                        },
-                    };
-                    let ty = ctx.ensure_type_exists(inner);
-
-                    crate::Expression::Compose { ty, components }
-                }
-
-                // Array or Struct constructor
-                (
-                    components,
-                    Constructor::Type((
-                        ty,
-                        &crate::TypeInner::Array { .. } | &crate::TypeInner::Struct { .. },
-                    )),
-                ) => {
-                    let components = components.into_components_vec();
-                    crate::Expression::Compose { ty, components }
-                }
-
-                // ERRORS
-
-                // Bad conversion (type cast)
-                (Components::One { span, ty_inner, .. }, constructor) => {
-                    let from_type = ctx.format_typeinner(ty_inner);
-                    return Err(Error::BadTypeCast {
-                        span,
-                        from_type,
-                        to_type: constructor.to_error_string(ctx),
-                    });
-                }
-
-                // Too many parameters for scalar constructor
-                (
-                    Components::Many { spans, .. },
-                    Constructor::Type((_, &crate::TypeInner::Scalar { .. })),
-                ) => {
-                    let span = spans[1].until(spans.last().unwrap());
-                    return Err(Error::UnexpectedComponents(span));
-                }
-
-                // Other types can't be constructed
-                _ => return Err(Error::TypeNotConstructible(ty_span)),
-            };
+            // Other types can't be constructed
+            _ => return Err(Error::TypeNotConstructible(ty_span)),
+        };
 
         let expr = ctx.append_expression(expr, span)?;
         Ok(expr)
