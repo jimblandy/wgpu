@@ -94,11 +94,12 @@ impl crate::StorageFormat {
     }
 }
 
+#[allow(dead_code)]
 impl crate::proc::TypeResolution {
     fn to_wgsl(&self, gctx: &crate::proc::GlobalCtx) -> String {
         match *self {
             Self::Handle(handle) => gctx.types[handle].to_wgsl(gctx),
-            Self::Value(inner) => inner.to_wgsl(gctx),
+            Self::Value(ref inner) => inner.to_wgsl(gctx),
         }
     }
 }
@@ -113,7 +114,7 @@ impl crate::Type {
     /// Formats the type as it is written in wgsl.
     fn to_wgsl(&self, gctx: &crate::proc::GlobalCtx) -> String {
         match self.name {
-            Some(name) => name.clone(),
+            Some(ref name) => name.clone(),
             None => self.inner.to_wgsl(gctx),
         }
     }
@@ -334,6 +335,7 @@ impl Scalar {
     /// its scalar type. Otherwise, return `None`.
     ///
     /// [`TypeInner`]: crate::TypeInner
+    #[allow(dead_code)]
     const fn from_inner(inner: &crate::TypeInner) -> Option<Self> {
         match *inner {
             crate::TypeInner::Scalar { kind, width }
@@ -382,14 +384,17 @@ impl Scalar {
     }
 }
 
+#[allow(dead_code)]
 const ABSTRACT_WIDTH: crate::Bytes = 8;
 
 impl Scalar {
+    #[allow(dead_code)]
     const ABSTRACT_INT: Scalar = Scalar {
         kind: crate::ScalarKind::Sint,
         width: ABSTRACT_WIDTH,
     };
 
+    #[allow(dead_code)]
     const ABSTRACT_FLOAT: Scalar = Scalar {
         kind: crate::ScalarKind::Float,
         width: ABSTRACT_WIDTH,

@@ -1,3 +1,5 @@
+#![allow(unused_variables, dead_code)]
+
 use std::num::NonZeroU32;
 
 use crate::front::wgsl::parse::ast;
@@ -91,7 +93,11 @@ impl Components<'_> {
     fn into_components_vec(self) -> Vec<Loaded<Handle<crate::Expression>>> {
         match self {
             Components::None => vec![],
-            Components::One { component, span, ty_inner } => vec![component],
+            Components::One {
+                component,
+                span,
+                ty_inner,
+            } => vec![component],
             Components::Many { components, spans } => components,
         }
     }
@@ -111,7 +117,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
     ///
     /// [`Construct`]: ast::Expression::Construct
     /// [`Call`]: ast::Expression::Call
-    pub fn construct(
+    pub(super) fn construct(
         &mut self,
         span: Span,
         constructor: &ast::ConstructorType<'source>,
@@ -165,15 +171,16 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
         let expr = match (components, constructor) {
             // Empty constructor, type given
             (Components::None, Constructor::Type((result_ty, _))) => {
-                let zero =
-                    ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)?;
+                let zero = ctx.append_expression(crate::Expression::ZeroValue(result_ty), span)?;
                 return Ok(Loaded::Concrete(zero));
             }
 
             // Empty constructor, partial
             (
-                Components::None, 
-                Constructor::PartialVector { .. } | Constructor::PartialMatrix { .. } | Constructor::PartialArray
+                Components::None,
+                Constructor::PartialVector { .. }
+                | Constructor::PartialMatrix { .. }
+                | Constructor::PartialArray,
             ) => {
                 // We have no arguments from which to infer the result type, so
                 // partial constructors aren't acceptable here.
@@ -306,26 +313,26 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     },
                 )),
             ) if dst_kind == src_kind || dst_width == src_width => {
-                let component = ctx.apply_automatic_conversions(
-                    component,
-                    Loaded::Concrete(crate::proc::TypeResolution::Handle(ty))
-                )?
+                let component = ctx
+                    .apply_automatic_conversions(
+                        component,
+                        Loaded::Concrete(crate::proc::TypeResolution::Handle(ty)),
+                    )?
                     .ok_or(Error::InvalidConstructorComponentType(span, 0))?;
-                component.map(|value| crate::Expression::Splat {
-                    size,
-                    value,
-                })
+                component.map(|value| crate::Expression::Splat { size, value })
             }
 
             // Vector constructor (by elements), partial
             (Components::Many { components, spans }, Constructor::PartialVector { size }) => {
-                let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
-                    |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
-                )?;
+                let scalar =
+                    component_scalar_from_constructor_args(&components, ctx).map_err(|index| {
+                        Error::InvalidConstructorComponentType(spans[index], index as i32)
+                    })?;
+                let components = Loaded::container_todo(components);
+                let ctx = &mut *ctx;
                 scalar.map(|scalar| {
                     let inner = scalar.to_inner_vector(size);
                     let ty = ctx.ensure_type_exists(inner);
-                    let components = Loaded::container_todo(components);
                     crate::Expression::Compose { ty, components }
                 })
             }
@@ -337,7 +344,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             ) => {
                 let components = Loaded::container_todo(components);
                 Loaded::new_todo(crate::Expression::Compose { ty, components })
-            },
+            }
 
             // Matrix constructor (by elements)
             (
@@ -348,9 +355,10 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 Components::Many { components, spans },
                 Constructor::Type((_, &crate::TypeInner::Matrix { columns, rows, .. })),
             ) if components.len() == columns as usize * rows as usize => {
-                let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
-                    |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
-                )?;
+                let scalar =
+                    component_scalar_from_constructor_args(&components, ctx).map_err(|index| {
+                        Error::InvalidConstructorComponentType(spans[index], index as i32)
+                    })?;
                 let vec_ty = ctx.ensure_type_exists(scalar.todo().to_inner_vector(rows));
 
                 let components = components
@@ -385,9 +393,10 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 Components::Many { components, spans },
                 Constructor::Type((_, &crate::TypeInner::Matrix { columns, rows, .. })),
             ) => {
-                let scalar = component_scalar_from_constructor_args(&components, ctx).map_err(
-                    |index| Error::InvalidConstructorComponentType(spans[index], index as i32),
-                )?;
+                let scalar =
+                    component_scalar_from_constructor_args(&components, ctx).map_err(|index| {
+                        Error::InvalidConstructorComponentType(spans[index], index as i32)
+                    })?;
                 let ty = ctx.ensure_type_exists(crate::TypeInner::Matrix {
                     columns,
                     rows,
@@ -557,11 +566,13 @@ fn cast_to_concrete(
         // Conveniently, since the `As` expression specifies both kind
         // and width, it will take care of converting any abstract
         // operand to the right concrete type.
-        Loaded::Abstract(handle) | Loaded::Concrete(handle) => Loaded::Concrete(crate::Expression::As {
-            expr: handle,
-            kind,
-            convert: Some(width),
-        }),
+        Loaded::Abstract(handle) | Loaded::Concrete(handle) => {
+            Loaded::Concrete(crate::Expression::As {
+                expr: handle,
+                kind,
+                convert: Some(width),
+            })
+        }
     }
 }
 
@@ -569,10 +580,7 @@ fn cast_to_concrete(
 ///
 /// The expressions in question should have had the Load Rule applied to them:
 /// `left` and `right` must not be WGSL reference types.
-fn join_scalar_types(
-    left: Loaded<Scalar>,
-    right: Loaded<Scalar>,
-) -> Option<Loaded<Scalar>> {
+fn join_scalar_types(left: Loaded<Scalar>, right: Loaded<Scalar>) -> Option<Loaded<Scalar>> {
     use crate::ScalarKind as Sk;
     match (left, right) {
         (Loaded::Abstract(left), Loaded::Abstract(right)) => {
@@ -585,7 +593,7 @@ fn join_scalar_types(
                 (Sk::Uint | Sk::Bool, _) | (_, Sk::Uint | Sk::Bool) => unreachable!(),
             };
             // All our abstract types are 64 bits long.
-            Some(Loaded::Abstract(Scalar { kind, width: 8}))
+            Some(Loaded::Abstract(Scalar { kind, width: 8 }))
         }
         (Loaded::Abstract(r#abstract), Loaded::Concrete(concrete))
         | (Loaded::Concrete(concrete), Loaded::Abstract(r#abstract)) => {

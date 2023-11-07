@@ -1,6 +1,8 @@
+#![allow(unused_variables)]
+
 use super::Loaded;
-use crate::{ScalarKind, TypeInner};
 use crate::front::wgsl::Scalar;
+use crate::{ScalarKind, TypeInner};
 
 /// What sort of automatic conversion is needed.
 #[derive(Clone, Copy, Debug)]
@@ -20,7 +22,8 @@ pub enum Conversion {
 /// Determine whether WGSL automatic conversions can convert  `from` to `to`.
 ///
 /// If so, return the scalar type of `to`.
-pub(crate) fn find_automatic_conversion(
+#[allow(dead_code)]
+pub(super) fn find_automatic_conversion(
     from: Loaded<&TypeInner>,
     to: Loaded<&TypeInner>,
     module: &crate::Module,
@@ -28,7 +31,7 @@ pub(crate) fn find_automatic_conversion(
     todo!();
 }
 
-pub fn convert_loaded(
+pub(super) fn convert_loaded(
     from: Loaded<&TypeInner>,
     to: Loaded<&TypeInner>,
     module: &crate::Module,
@@ -79,27 +82,33 @@ fn convert_inner_with(
 ) -> Conversion {
     use TypeInner as Ti;
 
-    match (*from, *to) {
+    match (from, to) {
         (
-            Ti::Scalar {
+            &Ti::Scalar {
                 kind: from_kind,
                 width: 8,
             },
-            Ti::Scalar {
+            &Ti::Scalar {
                 kind: to_kind,
                 width: to_width,
             },
         ) => scalars_convertible(
-            Scalar { kind: from_kind, width: 8},
-            Scalar { kind: to_kind, width: to_width }
+            Scalar {
+                kind: from_kind,
+                width: 8,
+            },
+            Scalar {
+                kind: to_kind,
+                width: to_width,
+            },
         ),
         (
-            Ti::Vector {
+            &Ti::Vector {
                 size: from_size,
                 kind: from_kind,
                 width: 8,
             },
-            Ti::Vector {
+            &Ti::Vector {
                 size: to_size,
                 kind: to_kind,
                 width: to_width,
@@ -109,18 +118,24 @@ fn convert_inner_with(
                 Conversion::None
             } else {
                 scalars_convertible(
-                    Scalar { kind: from_kind, width: 8 },
-                    Scalar { kind: to_kind, width: to_width },
+                    Scalar {
+                        kind: from_kind,
+                        width: 8,
+                    },
+                    Scalar {
+                        kind: to_kind,
+                        width: to_width,
+                    },
                 )
             }
         }
         (
-            Ti::Matrix {
+            &Ti::Matrix {
                 width: 8,
                 columns: from_columns,
                 rows: from_rows,
             },
-            Ti::Matrix {
+            &Ti::Matrix {
                 columns: to_columns,
                 rows: to_rows,
                 width: to_width,
@@ -130,18 +145,24 @@ fn convert_inner_with(
                 Conversion::None
             } else {
                 scalars_convertible(
-                    Scalar { kind: ScalarKind::Float, width: 8 },
-                    Scalar { kind: ScalarKind::Float, width: to_width },
+                    Scalar {
+                        kind: ScalarKind::Float,
+                        width: 8,
+                    },
+                    Scalar {
+                        kind: ScalarKind::Float,
+                        width: to_width,
+                    },
                 )
             }
         }
         (
-            Ti::Array {
+            &Ti::Array {
                 base: from_base,
                 size: from_size,
                 stride: from_stride,
             },
-            Ti::Array {
+            &Ti::Array {
                 base: to_base,
                 size: to_size,
                 stride: to_stride,

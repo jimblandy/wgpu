@@ -140,6 +140,7 @@ pub enum Error<'a> {
     Unexpected(Span, ExpectedToken<'a>),
     UnexpectedComponents(Span),
     UnexpectedOperationInConstContext(Span),
+    #[allow(dead_code)]
     IrreconcilableComponents {
         r#type: String,
         this: Span,
@@ -305,7 +306,7 @@ impl<'a> Error<'a> {
                 labels: vec![(span, "operation not supported here".into())],
                 notes: vec![],
             },
-            Error::IrreconcilableComponents { r#type, this, that } => ParseError {
+            Error::IrreconcilableComponents { ref r#type, this, that } => ParseError {
                 message: format!(
                     "can't construct `{}` from components with these types",
                     r#type,
@@ -553,8 +554,8 @@ impl<'a> Error<'a> {
                 labels: vec![(span, "expression is not a reference".into())],
                 notes: vec![],
             },
-            Error::InvalidAssignment { span, ty } => {
-                let (extra_label, notes) = match ty {
+            Error::InvalidAssignment { span, ref ty } => {
+                let (extra_label, notes) = match *ty {
                     InvalidAssignmentType::Swizzle => (
                         None,
                         vec![
@@ -562,14 +563,14 @@ impl<'a> Error<'a> {
                             "consider assigning each component individually".into(),
                         ],
                     ),
-                    InvalidAssignmentType::ImmutableBinding(binding_span) => (
-                        Some((binding_span, "this is an immutable binding".into())),
+                    InvalidAssignmentType::ImmutableBinding(ref binding_span) => (
+                        Some((binding_span.clone(), "this is an immutable binding".into())),
                         vec![format!(
                             "consider declaring '{}' with `var` instead of `let`",
-                            &source[binding_span]
+                            &source[binding_span.clone()]
                         )],
                     ),
-                    InvalidAssignmentType::Type { to_type, from_type } => (
+                    InvalidAssignmentType::Type { ref to_type, ref from_type } => (
                         None,
                         vec![
                             format!("cannot assign a value of type `{from_type}` to a location of type `{to_type}`")
