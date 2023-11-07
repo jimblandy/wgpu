@@ -16,7 +16,7 @@ enum Behavior {
 /// newly evaluated expressions: you pass [`try_eval_and_append`] whatever kind
 /// of Naga [`Expression`] you like, and if its value can be computed at compile
 /// time, `try_eval_and_append` appends an expression representing the computed
-/// value - a tree of [`Literal`], [`Compose`], [`ZeroValue`], and [`Swizzle`]
+/// value - a tree of [`Literal`], [`Compose`], [`ZeroValue`], and [`Splat`]
 /// expressions - to the arena. See the [`try_eval_and_append`] method for details.
 ///
 /// A `ConstantEvaluator` also holds whatever information we need to carry out
@@ -26,7 +26,7 @@ enum Behavior {
 /// [`Compose`]: Expression::Compose
 /// [`ZeroValue`]: Expression::ZeroValue
 /// [`Literal`]: Expression::Literal
-/// [`Swizzle`]: Expression::Swizzle
+/// [`Splat`]: Expression::Splat
 #[derive(Debug)]
 pub struct ConstantEvaluator<'a> {
     /// Which language's evaluation rules we should follow.
@@ -309,7 +309,7 @@ impl<'a> ConstantEvaluator<'a> {
     /// The `expr` argument can be any sort of Naga [`Expression`] you like. If
     /// we can determine its value at compile time, we append an expression
     /// representing its value - a tree of [`Literal`], [`Compose`],
-    /// [`ZeroValue`], and [`Swizzle`] expressions - to the expression arena
+    /// [`ZeroValue`], and [`Splat`] expressions - to the expression arena
     /// `self` contributes to.
     ///
     /// If `expr`'s value cannot be determined at compile time, return a an
@@ -324,7 +324,7 @@ impl<'a> ConstantEvaluator<'a> {
     /// [`Literal`]: Expression::Literal
     /// [`Compose`]: Expression::Compose
     /// [`ZeroValue`]: Expression::ZeroValue
-    /// [`Swizzle`]: Expression::Swizzle
+    /// [`Splat`]: Expression::Splat
     pub fn try_eval_and_append(
         &mut self,
         expr: &Expression,
