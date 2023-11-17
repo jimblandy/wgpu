@@ -460,7 +460,7 @@ impl super::Device {
                     uniforms.push(super::PushConstantDesc {
                         location,
                         offset: item.offset,
-                        size_bytes: type_inner.size(naga_module.to_ctx()),
+                        size_bytes: type_inner.size(),
                         ty: type_inner.clone(),
                     });
                 }
