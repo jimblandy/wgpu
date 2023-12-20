@@ -158,7 +158,7 @@ cfg-if.workspace = true
 document-features.workspace = true
 log.workspace = true
 parking_lot.workspace = true
-profiling.workspace = true
+profiling = { workspace = true, features = ["profile-with-tracy"] }
 raw-window-handle = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive"], optional = true }
 smallvec.workspace = true

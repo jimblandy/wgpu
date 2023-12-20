@@ -37,6 +37,8 @@ web-time.workspace = true
 wgpu.workspace = true
 winit.workspace = true
 
+tracy-client = "0.16.4"
+
 [dev-dependencies]
 wgpu-test.workspace = true
 

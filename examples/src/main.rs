@@ -215,6 +215,8 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     print_examples();
 
+    tracy_client::Client::start();
+
     let Some(example) = get_example_name() else {
         print_unknown_example(None);
         return;
@@ -226,4 +228,8 @@ fn main() {
     };
 
     (found.function)();
+
+    unsafe {
+        tracy_client::sys::___tracy_shutdown_profiler();
+    }
 }
