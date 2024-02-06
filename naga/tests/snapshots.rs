@@ -349,14 +349,12 @@ fn check_targets(
     #[cfg(all(feature = "deserialize", feature = "msl-out"))]
     {
         if targets.contains(Targets::METAL) {
-            let mut pipeline_options = params.msl_pipeline.clone();
-            let old = std::mem::replace(
-                &mut pipeline_options.constants,
-                params.pipeline_constants.clone(),
-            );
-            if !old.is_empty() {
+            if !params.msl_pipeline.constants.is_empty() {
                 panic!("Supply pipeline constants via pipeline_constants instead of msl_pipeline.constants!");
             }
+            let mut pipeline_options = params.msl_pipeline.clone();
+            pipeline_options.constants = params.pipeline_constants.clone();
+
             write_output_msl(
                 input,
                 module,
