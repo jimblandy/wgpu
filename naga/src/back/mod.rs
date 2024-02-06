@@ -22,7 +22,7 @@ pub mod wgsl;
     feature = "spv-out",
     feature = "glsl-out"
 ))]
-pub mod pipeline_constants;
+mod pipeline_constants;
 
 const COMPONENTS: &[char] = &['x', 'y', 'z', 'w'];
 const INDENT: &str = "    ";
