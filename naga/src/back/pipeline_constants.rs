@@ -1,5 +1,5 @@
 use super::PipelineConstants;
-use crate::{Arena, Constant, Expression, Literal, Module, Scalar, Span, TypeInner};
+use crate::{Constant, Expression, Literal, Module, Scalar, Span, TypeInner};
 use std::borrow::Cow;
 use thiserror::Error;
 
@@ -22,9 +22,8 @@ pub(super) fn process_overrides<'a>(
     }
 
     let mut module = module.clone();
-    let overrides = std::mem::replace(&mut module.overrides, Arena::new());
 
-    for (_handle, override_, span) in overrides.drain() {
+    for (_handle, override_, span) in module.overrides.drain() {
         let key = if let Some(id) = override_.id {
             Cow::Owned(id.to_string())
         } else if let Some(ref name) = override_.name {

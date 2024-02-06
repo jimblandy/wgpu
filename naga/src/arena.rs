@@ -298,10 +298,11 @@ impl<T> Arena<T> {
     }
 
     /// Drains the arena, returning an iterator over the items stored.
-    pub fn drain(self) -> impl DoubleEndedIterator<Item = (Handle<T>, T, Span)> {
-        self.data
+    pub fn drain(&mut self) -> impl DoubleEndedIterator<Item = (Handle<T>, T, Span)> {
+        let arena = std::mem::take(self);
+        arena.data
             .into_iter()
-            .zip(self.span_info.into_iter())
+            .zip(arena.span_info.into_iter())
             .enumerate()
             .map(|(i, (v, span))| unsafe { (Handle::from_usize_unchecked(i), v, span) })
     }
