@@ -66,52 +66,52 @@ fn map_value_to_literal(value: f64, scalar: Scalar) -> Result<Literal, PipelineC
         }
         Scalar::I32 => {
             // https://webidl.spec.whatwg.org/#js-long
-            if value.is_finite() {
-                let value = value.abs().floor() * value.signum();
-                if value < f64::from(i32::MIN) || value > f64::from(i32::MAX) {
-                    Err(PipelineConstantError::DstRangeTooSmall)
-                } else {
-                    let value = value as i32;
-                    Ok(Literal::I32(value))
-                }
-            } else {
-                Err(PipelineConstantError::SrcNeedsToBeFinite)
+            if !value.is_finite() {
+                return Err(PipelineConstantError::SrcNeedsToBeFinite);
             }
+
+            let value = value.abs().floor() * value.signum();
+            if value < f64::from(i32::MIN) || value > f64::from(i32::MAX) {
+                return Err(PipelineConstantError::DstRangeTooSmall);
+            }
+
+            let value = value as i32;
+            Ok(Literal::I32(value))
         }
         Scalar::U32 => {
             // https://webidl.spec.whatwg.org/#js-unsigned-long
-            if value.is_finite() {
-                let value = value.abs().floor() * value.signum();
-                if value < f64::from(u32::MIN) || value > f64::from(u32::MAX) {
-                    Err(PipelineConstantError::DstRangeTooSmall)
-                } else {
-                    let value = value as u32;
-                    Ok(Literal::U32(value))
-                }
-            } else {
-                Err(PipelineConstantError::SrcNeedsToBeFinite)
+            if !value.is_finite() {
+                return Err(PipelineConstantError::SrcNeedsToBeFinite);
             }
+
+            let value = value.abs().floor() * value.signum();
+            if value < f64::from(u32::MIN) || value > f64::from(u32::MAX) {
+                return Err(PipelineConstantError::DstRangeTooSmall);
+            }
+
+            let value = value as u32;
+            Ok(Literal::U32(value))
         }
         Scalar::F32 => {
             // https://webidl.spec.whatwg.org/#js-float
-            if value.is_finite() {
-                let value = value as f32;
-                if value.is_finite() {
-                    Ok(Literal::F32(value))
-                } else {
-                    Err(PipelineConstantError::DstRangeTooSmall)
-                }
-            } else {
-                Err(PipelineConstantError::SrcNeedsToBeFinite)
+            if !value.is_finite() {
+                return Err(PipelineConstantError::SrcNeedsToBeFinite);
             }
+
+            let value = value as f32;
+            if !value.is_finite() {
+                return Err(PipelineConstantError::DstRangeTooSmall);
+            }
+
+            Ok(Literal::F32(value))
         }
         Scalar::F64 => {
             // https://webidl.spec.whatwg.org/#js-double
-            if value.is_finite() {
-                Ok(Literal::F64(value))
-            } else {
-                Err(PipelineConstantError::SrcNeedsToBeFinite)
+            if !value.is_finite() {
+                return Err(PipelineConstantError::SrcNeedsToBeFinite);
             }
+
+            Ok(Literal::F64(value))
         }
         _ => unreachable!(),
     }
