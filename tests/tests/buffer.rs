@@ -174,11 +174,7 @@ static MAP_OFFSET: GpuTestConfiguration = GpuTestConfiguration::new().run_async(
 /// 16 for that variable's group/index. Pipeline creation should fail.
 #[gpu_test]
 static MINIMUM_BUFFER_BINDING_SIZE_LAYOUT: GpuTestConfiguration = GpuTestConfiguration::new()
-    .parameters(
-        TestParameters::default()
-            .test_features_limits()
-            .skip(FailureCase::always()), // https://github.com/gfx-rs/wgpu/issues/5219
-    )
+    .parameters(TestParameters::default().test_features_limits())
     .run_sync(|ctx| {
         // Create a shader module that statically uses a storage buffer.
         let shader_module = ctx
@@ -242,11 +238,7 @@ static MINIMUM_BUFFER_BINDING_SIZE_LAYOUT: GpuTestConfiguration = GpuTestConfigu
 /// binding. Command recording should fail.
 #[gpu_test]
 static MINIMUM_BUFFER_BINDING_SIZE_DISPATCH: GpuTestConfiguration = GpuTestConfiguration::new()
-    .parameters(
-        TestParameters::default()
-            .test_features_limits()
-            .skip(FailureCase::always()), // https://github.com/gfx-rs/wgpu/issues/5219
-    )
+    .parameters(TestParameters::default().test_features_limits())
     .run_sync(|ctx| {
         // This test tries to use a bindgroup layout with a
         // min_binding_size of 16 to an index whose WGSL type requires 32
