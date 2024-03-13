@@ -4,7 +4,8 @@ use crate::{
     valid::{Capabilities, ModuleInfo, ValidationError, ValidationFlags, Validator},
     Constant, Expression, Handle, Literal, Module, Override, Scalar, Span, TypeInner, WithSpan,
 };
-use std::{borrow::Cow, collections::HashSet};
+use bit_set::BitSet;
+use std::borrow::Cow;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -64,7 +65,7 @@ pub(super) fn process_overrides<'a>(
     // in a final fixup pass, guided by `adjusted_global_expressions`. We
     // add their handles to this set, so that the final fixup step can
     // leave them alone.
-    let mut adjusted_constant_initializers = HashSet::with_capacity(module.constants.len());
+    let mut adjusted_constant_initializers = BitSet::with_capacity(module.constants.len());
 
     let mut global_expression_kind_tracker = crate::proc::ExpressionKindTracker::new();
 
@@ -128,7 +129,7 @@ pub(super) fn process_overrides<'a>(
                 Expression::Constant(c_h)
             }
             Expression::Constant(c_h) => {
-                adjusted_constant_initializers.insert(c_h);
+                adjusted_constant_initializers.insert(c_h.index());
                 module.constants[c_h].init = adjusted_global_expressions[c_h.index()];
                 expr
             }
@@ -164,7 +165,7 @@ pub(super) fn process_overrides<'a>(
     for (_, c) in module
         .constants
         .iter_mut()
-        .filter(|&(c_h, _)| !adjusted_constant_initializers.contains(&c_h))
+        .filter(|&(c_h, _)| !adjusted_constant_initializers.contains(c_h.index()))
     {
         c.init = adjusted_global_expressions[c.init.index()];
     }
@@ -193,7 +194,7 @@ fn process_override(
     module: &mut Module,
     override_map: &mut Vec<Handle<Constant>>,
     adjusted_global_expressions: &[Handle<Expression>],
-    adjusted_constant_initializers: &mut HashSet<Handle<Constant>>,
+    adjusted_constant_initializers: &mut BitSet,
     global_expression_kind_tracker: &mut crate::proc::ExpressionKindTracker,
 ) -> Result<Handle<Constant>, PipelineConstantError> {
     // Determine which key to use for `override_` in `pipeline_constants`.
@@ -233,7 +234,7 @@ fn process_override(
     let h = module.constants.append(constant, span);
     debug_assert_eq!(old_h.index(), override_map.len());
     override_map.push(h);
-    adjusted_constant_initializers.insert(h);
+    adjusted_constant_initializers.insert(h.index());
     Ok(h)
 }
 
