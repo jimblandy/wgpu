@@ -541,7 +541,7 @@ struct ExpressionConstnessTracker {
 
 impl ExpressionConstnessTracker {
     fn from_arena(arena: &crate::Arena<crate::Expression>) -> Self {
-        let mut inner = bit_set::BitSet::new();
+        let mut inner = bit_set::BitSet::with_capacity(arena.len());
         for (handle, expr) in arena.iter() {
             let insert = match *expr {
                 crate::Expression::Literal(_)
