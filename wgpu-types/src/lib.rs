@@ -589,6 +589,11 @@ bitflags::bitflags! {
         /// This capability allows them to exist and to be indexed by dynamically uniform
         /// values.
         ///
+        /// Note that this feature does not imply that texture or storage buffer
+        /// arrays are actually supported. You must check for those features
+        /// (`BUFFER_BINDING_ARRAY`, etc.) specifically to determine whether
+        /// they are available.
+        ///
         /// Supported platforms:
         /// - Metal (with MSL 2.2+ on macOS 10.13+)
         /// - Vulkan
@@ -612,6 +617,11 @@ bitflags::bitflags! {
         /// ex. `texture_array[nonuniformEXT(vertex_data)]`
         ///
         /// WGSL and HLSL do not need any extension.
+        ///
+        /// Note that this feature does not imply that sampled texture or
+        /// storage buffer resource arrays are actually supported. You must
+        /// check for those features (`TEXTURE_BINDING_ARRAY`, etc.)
+        /// specifically to determine whether they are available.
         ///
         /// Supported platforms:
         /// - DX12
@@ -637,6 +647,11 @@ bitflags::bitflags! {
         /// ex. `texture_array[nonuniformEXT(vertex_data)]`
         ///
         /// WGSL and HLSL do not need any extension.
+        ///
+        /// Note that this feature does not imply that sampled texture or
+        /// storage buffer resource arrays are actually supported. You must
+        /// check for those features (`BUFFER_BINDING_ARRAY`, etc.) specifically
+        /// to determine whether they are available.
         ///
         /// Supported platforms:
         /// - DX12
