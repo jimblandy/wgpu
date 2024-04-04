@@ -827,6 +827,20 @@ struct CommandState {
 
 pub struct CommandEncoder {
     shared: Arc<AdapterShared>,
+
+    // The Metal [documentation] says,
+    //
+    //    Note
+    //
+    //    Each command queue is thread-safe and allows you to encode
+    //    commands in multiple command buffers simultaneously.
+    //
+    // So the `Mutex` here around the `metal::CommandQueue` is
+    // probably not necessary.
+    //
+    // Noted as #5494.
+    //
+    // [documentation]: https://developer.apple.com/documentation/metal/mtlcommandqueue
     raw_queue: Arc<Mutex<metal::CommandQueue>>,
     raw_cmd_buf: Option<metal::CommandBuffer>,
     state: CommandState,
