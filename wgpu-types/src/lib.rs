@@ -7121,6 +7121,31 @@ pub use send_sync::*;
 
 #[doc(hidden)]
 mod send_sync {
+    /// An empty trait that extends `Send` and `Sync`, but not on WebAssembly.
+    ///
+    /// To let programs run as web content, `wgpu`'s `web` backend creates WebGPU
+    /// DOM objects to underpin its own API: a Rust `wgpu::Device` refers to a
+    /// `GPUDevice` DOM object created by the browser; a `wgpu::Buffer` refers to
+    /// a `GPUBuffer`; and so on. The `web` backend uses the `web-sys` crate's
+    /// bindings to access the browser's web platform APIs.
+    ///
+    /// The web provides threads to WebAssembly code by creating web workers,
+    /// using a `SharedArrayBuffer` as a common wasm linear memory. But unlike
+    /// `SharedArrayBuffer`, the web platform does not allow WebGPU DOM objects
+    /// to be shared with/between workers, so the WebGPU DOM objects created via
+    /// `web-sys` are accessible only on the thread that created them.
+    /// Accordingly, `web-sys`'s types are `!Send` and `!Sync`.
+    ///
+    /// Because `wgpu` API types contain these `web-sys` values when using the
+    /// `web` backend, the `wgpu` types themselves must also be `!Send` and
+    /// `!Sync` in that case. However, for native use, we definitely want
+    /// `wgpu`'s types to be `Send` and `Sync`.
+    ///
+    /// To that end, we define this `WasmNotSendSync` trait, which extends `Send`
+    /// and `Sync` --- except when compiled for WebAssembly, in which case it
+    /// extends nothing. All `wgpu` API types extend this trait, ensuring that
+    /// they are `Send` and `Sync` in native builds, but unconstrained in wasm
+    /// builds.
     pub trait WasmNotSendSync: WasmNotSend + WasmNotSync {}
     impl<T: WasmNotSend + WasmNotSync> WasmNotSendSync for T {}
     #[cfg(any(
