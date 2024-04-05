@@ -8,14 +8,21 @@
  *  - Resource transitions are explicit.
  *  - All layouts are explicit. Binding model has compatibility.
  *
- * Types that implement `wgpu_hal` traits do not require additional
- * synchronization. It is safe to call any method that takes `&self`
- * on any thread on any object.
- *
  *  General design direction is to follow the majority by the following weights:
  *  - wgpu-core: 1.5
  *  - primary backends (Vulkan/Metal/DX12): 1.0 each
  *  - secondary backend (GLES): 0.5
+ *
+ * ## Synchronization
+ *
+ * Generally, types that implement `wgpu_hal` traits do not require
+ * additional synchronization. It is safe to call any method that
+ * takes `&self` on any thread on any object. The exceptions are as
+ * follows:
+ *
+ * - [`Device::map_buffer`]
+ *
+ * See each method's documentation for details.
  */
 
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
@@ -321,6 +328,24 @@ pub trait Device: WasmNotSendSync {
         desc: &BufferDescriptor,
     ) -> Result<<Self::A as Api>::Buffer, DeviceError>;
     unsafe fn destroy_buffer(&self, buffer: <Self::A as Api>::Buffer);
+
+    /// Map `buffer` for access by the CPU.
+    ///
+    /// ## Synchronization
+    ///
+    /// The caller must ensure that data races between the GPU and CPU
+    /// are not possible:
+    ///
+    /// - If commands that write to `buffer` have been enqueued,
+    ///   `buffer`'s contents must not be read or written by the CPU
+    ///   until those commands have completed.
+    ///
+    /// - New commands that read or write `buffer` must not be
+    ///   enqueued until the CPU has stopped writing to the buffer.
+    ///
+    /// The caller must ensure this ordering using operations that
+    /// synchronize between the CPU and GPU, like [`Queue::submit`] or
+    /// [`Device::wait`].
     //TODO: clarify if zero-sized mapping is allowed
     unsafe fn map_buffer(
         &self,
