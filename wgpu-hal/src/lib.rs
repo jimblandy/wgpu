@@ -69,7 +69,7 @@ pub mod gles;
 #[cfg(metal)]
 pub mod metal;
 /// Vulkan API internals.
-#[cfg(vulkan)]
+//#[cfg(vulkan)]
 pub mod vulkan;
 
 pub mod auxil;
