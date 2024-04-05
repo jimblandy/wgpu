@@ -8,6 +8,10 @@
  *  - Resource transitions are explicit.
  *  - All layouts are explicit. Binding model has compatibility.
  *
+ * Types that implement `wgpu_hal` traits do not require additional
+ * synchronization. It is safe to call any method that takes `&self`
+ * on any thread on any object.
+ *
  *  General design direction is to follow the majority by the following weights:
  *  - wgpu-core: 1.5
  *  - primary backends (Vulkan/Metal/DX12): 1.0 each
