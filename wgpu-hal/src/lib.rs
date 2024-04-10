@@ -198,6 +198,15 @@ pub trait Api: Clone + fmt::Debug + Sized {
 
     type Queue: Queue<A = Self>;
     type CommandEncoder: CommandEncoder<A = Self>;
+
+    /// This API's command buffer type.
+    ///
+    /// The only thing you can do with `CommandBuffer`s is build them
+    /// with a [`CommandEncoder`] and then pass them to
+    /// [`Queue::submit`] for execution, or destroy them by passing
+    /// them to [`CommandEncoder::reset_all`].
+    ///
+    /// [`CommandEncoder`]: Api::CommandEncoder
     type CommandBuffer: WasmNotSendSync + fmt::Debug;
 
     type Buffer: fmt::Debug + WasmNotSendSync + 'static;
@@ -440,11 +449,16 @@ pub trait Queue: WasmNotSendSync {
     /// Submits the command buffers for execution on GPU.
     ///
     /// Valid usage:
-    /// - all of the command buffers were created from command pools
-    ///   that are associated with this queue.
-    /// - all of the command buffers had `CommandBuffer::finish()` called.
-    /// - all surface textures that the command buffers write to must be
-    ///   passed to the surface_textures argument.
+    ///
+    /// - All of the [`CommandBuffer`][cb]s were created from
+    ///   [`CommandEncoder`][ce]s that are associated with this queue.
+    ///
+    /// - All of the [`SurfaceTexture`][st]s that the command buffers
+    ///   write to appear in the `surface_textures` argument.
+    ///
+    /// [cb]: Api::CommandBuffer
+    /// [ce]: Api::CommandEncoder
+    /// [st]: Api::SurfaceTexture
     unsafe fn submit(
         &self,
         command_buffers: &[&<Self::A as Api>::CommandBuffer],
@@ -459,7 +473,11 @@ pub trait Queue: WasmNotSendSync {
     unsafe fn get_timestamp_period(&self) -> f32;
 }
 
-/// Encoder and allocation pool for `CommandBuffer`.
+/// Encoder and allocation pool for `CommandBuffer`s.
+///
+/// A `CommandEncoder` not only constructs `CommandBuffer`s but also
+/// acts as the allocation pool that owns the buffers' underlying
+/// storage.
 ///
 /// The life cycle of a `CommandBuffer` is as follows:
 ///
@@ -472,14 +490,17 @@ pub trait Queue: WasmNotSendSync {
 ///
 /// - Call methods like `copy_buffer_to_buffer`, `begin_render_pass`,
 ///   etc. on a "recording" `CommandEncoder` to add commands to the
-///   list.
+///   list. (If an error occurs, you must call `discard_encoding`; see
+///   below.)
 ///
 /// - Call `end_encoding` on a recording `CommandEncoder` to close the
 ///   encoder and construct a fresh `CommandBuffer` consisting of the
 ///   list of commands recorded up to that point.
 ///
 /// - Call `discard_encoding` on a recording `CommandEncoder` to drop
-///   the commands recorded thus far and close the encoder.
+///   the commands recorded thus far and close the encoder. This is
+///   the only safe thing to do on a `CommandEncoder` if an error has
+///   occurred while recording commands.
 ///
 /// - Call `reset_all` on a closed `CommandEncoder`, passing all the
 ///   live `CommandBuffers` built from it. All the `CommandBuffer`s
@@ -497,6 +518,10 @@ pub trait Queue: WasmNotSendSync {
 ///   built it.
 ///
 /// - A `CommandEncoder` must not outlive its `Device`.
+///
+/// These constraints are the `CommandEncoder` user's responsibility,
+/// so that `CommandEncoder` implementations should not need to track
+/// their own state much.
 pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
     type A: Api;
 
@@ -510,6 +535,9 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
     unsafe fn begin_encoding(&mut self, label: Label) -> Result<(), DeviceError>;
 
     /// Discard the command list under construction, if any.
+    ///
+    /// If an error has occurred while recording commands, this
+    /// is the only safe thing to do with the encoder.
     ///
     /// This puts this `CommandEncoder` in the "closed" state.
     ///

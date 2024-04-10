@@ -377,6 +377,15 @@ fn map_buffer<A: HalApi>(
     Ok(mapping.ptr)
 }
 
+/// A pool of free [`wgpu_hal::CommandEncoder`]s.
+///
+/// Each encoder in this list is in the "closed" state.
+///
+/// Since a [`CommandEncoder`][ce] is itself a pool for allocating
+/// [`CommandBuffer`][cb]s, this is a pool of pools.
+///
+/// [ce]: wgpu_hal::CommandEncoder
+/// [cb]: wgpu_hal::Api::CommandBuffer
 pub(crate) struct CommandAllocator<A: HalApi> {
     free_encoders: Vec<A::CommandEncoder>,
 }
