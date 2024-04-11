@@ -261,9 +261,19 @@ impl<A: HalApi> CommandBufferMutable<A> {
 
 /// A buffer of commands to be submitted to the GPU for execution.
 ///
-/// Whereas WebGPU uses two separate types for command buffers and encoders,
-/// this type is a fusion of the two: `data` holds a `CommandEncoder` dedicated
-/// to this buffer.
+/// Whereas the WebGPU API uses two separate types for command buffers and
+/// encoders, this type is a fusion of the two:
+///
+/// - During command recording, `data`'s [`status`] is [`Recording`], and its
+///   [`encoder`] holds a [`CommandEncoder`] dedicated to this buffer's
+///   commands.
+///
+/// - When command recording is finished, [`status`] changes to [`Finished`],
+///   and no further recording is allowed.
+///
+/// [`status`]: CommandBufferMutable::status
+/// [`Recording`]: CommandEncoderStatus::Recording
+/// [`Finished`]: CommandEncoderStatus::Finished
 pub struct CommandBuffer<A: HalApi> {
     pub(crate) device: Arc<Device<A>>,
     limits: wgt::Limits,

@@ -381,6 +381,8 @@ fn map_buffer<A: HalApi>(
 ///
 /// Each encoder in this list is in the "closed" state.
 ///
+/// This is owned by the `Device`, and only disposed of along with it.
+///
 /// Since a [`CommandEncoder`][ce] is itself a pool for allocating
 /// [`CommandBuffer`][cb]s, this is a pool of pools.
 ///
@@ -391,6 +393,10 @@ pub(crate) struct CommandAllocator<A: HalApi> {
 }
 
 impl<A: HalApi> CommandAllocator<A> {
+    /// Return a fresh [`wgpu_hal::CommandEncoder`] in the "closed" state.
+    ///
+    /// If we have free encoders in the pool, take one of those. Otherwise,
+    /// create a new one on `device`.
     fn acquire_encoder(
         &mut self,
         device: &A::Device,
@@ -405,10 +411,14 @@ impl<A: HalApi> CommandAllocator<A> {
         }
     }
 
+    /// Add `encoder` back to the free pool.
     fn release_encoder(&mut self, encoder: A::CommandEncoder) {
         self.free_encoders.push(encoder);
     }
 
+    /// Free the pool of command encoders.
+    ///
+    /// This is only called when the `Device` is dropped.
     fn dispose(self, device: &A::Device) {
         resource_log!(
             "CommandAllocator::dispose encoders {}",

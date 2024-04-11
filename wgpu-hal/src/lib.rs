@@ -453,6 +453,11 @@ pub trait Queue: WasmNotSendSync {
     /// - All of the [`CommandBuffer`][cb]s were created from
     ///   [`CommandEncoder`][ce]s that are associated with this queue.
     ///
+    /// - All of those [`CommandBuffer`][cb]s must remain alive until
+    ///   the submitted commands have finished execution. (Since
+    ///   command buffers must not outlive their encoders, this
+    ///   implies that the encoders must remain alive as well.)
+    ///
     /// - All of the [`SurfaceTexture`][st]s that the command buffers
     ///   write to appear in the `surface_textures` argument.
     ///
