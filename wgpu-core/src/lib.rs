@@ -5,7 +5,7 @@
 //! ## Feature flags
 #![doc = document_features::document_features!()]
 //!
-#![allow(dead_code)]
+#![allow(unused_imports, unused_macros, unused_variables, unused_mut)]
 // When we have no backends, we end up with a lot of dead or otherwise unreachable code.
 #![cfg_attr(
     all(
@@ -50,36 +50,36 @@
     unused_qualifications
 )]
 
-pub mod any_surface;
-pub mod binding_model;
-pub mod command;
+mod any_surface;
+mod binding_model;
+mod command;
 mod conv;
-pub mod device;
-pub mod error;
-pub mod global;
-pub mod hal_api;
+mod device;
+mod error;
+mod global;
+mod hal_api;
 mod hash_utils;
-pub mod hub;
-pub mod id;
-pub mod identity;
+mod hub;
+mod id;
+mod identity;
 mod init_tracker;
-pub mod instance;
-pub mod pipeline;
+mod instance;
+mod pipeline;
 mod pool;
-pub mod present;
-pub mod registry;
-pub mod resource;
+mod present;
+mod registry;
+mod resource;
 mod snatch;
-pub mod storage;
+mod storage;
 mod track;
 // This is public for users who pre-compile shaders while still wanting to
 // preserve all run-time checks that `wgpu-core` does.
 // See <https://github.com/gfx-rs/wgpu/issues/3103>, after which this can be
 // made private again.
-pub mod validation;
+mod validation;
 
-pub use hal::{api, MAX_BIND_GROUPS, MAX_COLOR_ATTACHMENTS, MAX_VERTEX_BUFFERS};
-pub use naga;
+use hal::{api, MAX_BIND_GROUPS, MAX_COLOR_ATTACHMENTS, MAX_VERTEX_BUFFERS};
+use naga;
 
 use std::{borrow::Cow, os::raw::c_char};
 
@@ -93,8 +93,8 @@ type SubmissionIndex = hal::FenceValue;
 type Index = u32;
 type Epoch = u32;
 
-pub type RawString = *const c_char;
-pub type Label<'a> = Option<Cow<'a, str>>;
+type RawString = *const c_char;
+type Label<'a> = Option<Cow<'a, str>>;
 
 trait LabelHelpers<'a> {
     fn borrow_option(&'a self) -> Option<&'a str>;
@@ -113,15 +113,6 @@ impl<'a> LabelHelpers<'a> for Label<'a> {
     }
 }
 
-pub fn hal_label(opt: Option<&str>, flags: wgt::InstanceFlags) -> Option<&str> {
-    todo!()
-}
-
-const DOWNLEVEL_WARNING_MESSAGE: &str = "The underlying API or device in use does not \
-support enough features to be a fully compliant implementation of WebGPU. A subset of the features can still be used. \
-If you are running this program on native and not in a browser and wish to limit the features you use to the supported subset, \
-call Adapter::downlevel_properties or Device::downlevel_properties to get a listing of the features the current \
-platform supports.";
 const DOWNLEVEL_ERROR_MESSAGE: &str = "This is not an invalid use of WebGPU: the underlying API or device does not \
 support enough features to be a fully compliant implementation. A subset of the features can still be used. \
 If you are running this program on native and not in a browser and wish to work around this issue, call \
@@ -208,7 +199,7 @@ macro_rules! define_backend_caller {
         }
 
         // See note about rust-lang#52234 above.
-        #[doc(hidden)] pub use $private as $public;
+        #[doc(hidden)] use $private as $public;
     }
 }
 
@@ -308,16 +299,6 @@ macro_rules! resource_log {
     ($($arg:tt)+) => (log::trace!($($arg)+))
 }
 pub(crate) use resource_log;
-
-#[inline]
-pub(crate) fn get_lowest_common_denom(a: u32, b: u32) -> u32 {
-    todo!()
-}
-
-#[inline]
-pub(crate) fn get_greatest_common_divisor(mut a: u32, mut b: u32) -> u32 {
-    todo!()
-}
 
 #[test]
 fn test_lcd() {

@@ -19,7 +19,7 @@ use crate::{
     device::{DeviceError, MissingDownlevelFlags, WaitIdleError},
     global::Global,
     hal_api::HalApi,
-    hal_label, id,
+    id,
     init_tracker::TextureInitTracker,
     resource::{self, ResourceInfo},
     snatch::Snatchable,

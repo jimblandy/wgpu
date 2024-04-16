@@ -6,7 +6,6 @@ use crate::{
     api_log,
     command::CommandBuffer,
     device::DeviceError,
-    get_lowest_common_denom,
     global::Global,
     hal_api::HalApi,
     id::{BufferId, CommandEncoderId, DeviceId, TextureId},

@@ -10,7 +10,7 @@ use crate::{
     id::{AdapterId, DeviceId, Id, Marker, QueueId, SurfaceId},
     present::Presentation,
     resource::{Resource, ResourceInfo, ResourceType},
-    resource_log, LabelHelpers, DOWNLEVEL_WARNING_MESSAGE,
+    resource_log, LabelHelpers,
 };
 
 use parking_lot::Mutex;

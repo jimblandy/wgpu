@@ -11,7 +11,6 @@ use crate::{
         RenderPassContext, CLEANUP_WAIT_MS,
     },
     hal_api::HalApi,
-    hal_label,
     hub::Hub,
     init_tracker::{
         BufferInitTracker, BufferInitTrackerAction, MemoryInitKind, TextureInitRange,

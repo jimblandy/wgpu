@@ -8,10 +8,8 @@ use crate::{
     },
     conv,
     device::{life::ResourceMaps, DeviceError, WaitIdleError},
-    get_lowest_common_denom,
     global::Global,
     hal_api::HalApi,
-    hal_label,
     id::{self, DeviceId, QueueId},
     init_tracker::{has_copy_partial_init_tracker_coverage, TextureInitRange},
     resource::{

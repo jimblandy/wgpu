@@ -17,7 +17,7 @@ use crate::{
     error::{ErrorFormatter, PrettyError},
     global::Global,
     hal_api::HalApi,
-    hal_label, id,
+    id,
     id::DeviceId,
     init_tracker::MemoryInitKind,
     pipeline,
