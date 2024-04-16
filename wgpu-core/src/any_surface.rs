@@ -27,66 +27,24 @@ pub struct AnySurface {
 
 impl AnySurface {
     /// Construct an `AnySurface` that owns an `A::Surface`.
-    pub fn new<A: HalApi>(surface: A::Surface) -> AnySurface {
-        unsafe fn drop_glue<A: HalApi>(ptr: *mut ()) {
-            unsafe {
-                _ = Box::from_raw(ptr.cast::<A::Surface>());
-            }
-        }
-
-        let data = NonNull::from(Box::leak(Box::new(surface)));
-
-        AnySurface {
-            data: data.cast(),
-            vtable: &AnySurfaceVtable {
-                backend: A::VARIANT,
-                drop: drop_glue::<A>,
-            },
-        }
-    }
+    pub fn new<A: HalApi>(surface: A::Surface) -> AnySurface { todo!() }
 
     /// Get the backend this surface was created through.
-    pub fn backend(&self) -> Backend {
-        self.vtable.backend
-    }
+    pub fn backend(&self) -> Backend { todo!() }
 
     /// If `self` refers to an `A::Surface`, returns a reference to it.
-    pub fn downcast_ref<A: HalApi>(&self) -> Option<&A::Surface> {
-        if A::VARIANT != self.vtable.backend {
-            return None;
-        }
-
-        // SAFETY: We just checked the instance above implicitly by the backend
-        // that it was statically constructed through.
-        Some(unsafe { &*self.data.as_ptr().cast::<A::Surface>() })
-    }
+    pub fn downcast_ref<A: HalApi>(&self) -> Option<&A::Surface> { todo!() }
 
     /// If `self` is an `Arc<A::Surface>`, returns that.
-    pub fn take<A: HalApi>(self) -> Option<A::Surface> {
-        if A::VARIANT != self.vtable.backend {
-            return None;
-        }
-
-        // Disable drop glue, since we're returning the owned surface. The
-        // caller will be responsible for dropping it.
-        let this = ManuallyDrop::new(self);
-
-        // SAFETY: We just checked the instance above implicitly by the backend
-        // that it was statically constructed through.
-        Some(unsafe { *Box::from_raw(this.data.as_ptr().cast::<A::Surface>()) })
-    }
+    pub fn take<A: HalApi>(self) -> Option<A::Surface> { todo!() }
 }
 
 impl Drop for AnySurface {
-    fn drop(&mut self) {
-        unsafe { (self.vtable.drop)(self.data.as_ptr()) }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 impl fmt::Debug for AnySurface {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AnySurface<{}>", self.vtable.backend)
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { todo!() }
 }
 
 #[cfg(send_sync)]

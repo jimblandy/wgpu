@@ -17,9 +17,7 @@ impl BufferInitTracker {
     pub(crate) fn check_action<A: HalApi>(
         &self,
         action: &BufferInitTrackerAction<A>,
-    ) -> Option<BufferInitTrackerAction<A>> {
-        self.create_action(&action.buffer, action.range.clone(), action.kind)
-    }
+    ) -> Option<BufferInitTrackerAction<A>> { todo!() }
 
     /// Creates an action if it would have any effect on the initialization
     /// status and shrinks the range if possible.
@@ -28,12 +26,5 @@ impl BufferInitTracker {
         buffer: &Arc<Buffer<A>>,
         query_range: Range<wgt::BufferAddress>,
         kind: MemoryInitKind,
-    ) -> Option<BufferInitTrackerAction<A>> {
-        self.check(query_range)
-            .map(|range| BufferInitTrackerAction {
-                buffer: buffer.clone(),
-                range,
-                kind,
-            })
-    }
+    ) -> Option<BufferInitTrackerAction<A>> { todo!() }
 }

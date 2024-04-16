@@ -31,32 +31,15 @@ pub struct EntryMap {
 }
 
 impl PartialEq for EntryMap {
-    fn eq(&self, other: &Self) -> bool {
-        self.assert_sorted();
-        other.assert_sorted();
-
-        self.inner == other.inner
-    }
+    fn eq(&self, other: &Self) -> bool { todo!() }
 }
 
 impl Hash for EntryMap {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.assert_sorted();
-
-        // We don't need to hash the keys, since they are just extracted from the values.
-        //
-        // We know this is stable and will match the behavior of PartialEq as we ensure
-        // that the array is sorted.
-        for entry in self.inner.values() {
-            entry.hash(state);
-        }
-    }
+    fn hash<H: Hasher>(&self, state: &mut H) { todo!() }
 }
 
 impl EntryMap {
-    fn assert_sorted(&self) {
-        assert!(self.sorted);
-    }
+    fn assert_sorted(&self) { todo!() }
 
     /// Create a new [`BindGroupLayoutEntryMap`] from a slice of [`wgt::BindGroupLayoutEntry`]s.
     ///
@@ -65,65 +48,25 @@ impl EntryMap {
     pub fn from_entries(
         device_limits: &wgt::Limits,
         entries: &[wgt::BindGroupLayoutEntry],
-    ) -> Result<Self, binding_model::CreateBindGroupLayoutError> {
-        let mut inner = FastIndexMap::with_capacity_and_hasher(entries.len(), Default::default());
-        for entry in entries {
-            if entry.binding >= device_limits.max_bindings_per_bind_group {
-                return Err(
-                    binding_model::CreateBindGroupLayoutError::InvalidBindingIndex {
-                        binding: entry.binding,
-                        maximum: device_limits.max_bindings_per_bind_group,
-                    },
-                );
-            }
-            if inner.insert(entry.binding, *entry).is_some() {
-                return Err(binding_model::CreateBindGroupLayoutError::ConflictBinding(
-                    entry.binding,
-                ));
-            }
-        }
-        inner.sort_unstable_keys();
-
-        Ok(Self {
-            inner,
-            sorted: true,
-        })
-    }
+    ) -> Result<Self, binding_model::CreateBindGroupLayoutError> { todo!() }
 
     /// Get the count of [`wgt::BindGroupLayoutEntry`]s in this map.
-    pub fn len(&self) -> usize {
-        self.inner.len()
-    }
+    pub fn len(&self) -> usize { todo!() }
 
     /// Get the [`wgt::BindGroupLayoutEntry`] for the given binding index.
-    pub fn get(&self, binding: u32) -> Option<&wgt::BindGroupLayoutEntry> {
-        self.inner.get(&binding)
-    }
+    pub fn get(&self, binding: u32) -> Option<&wgt::BindGroupLayoutEntry> { todo!() }
 
     /// Iterator over all the binding indices in this map.
-    pub fn indices(&self) -> impl ExactSizeIterator<Item = u32> + '_ {
-        self.inner.keys().copied()
-    }
+    pub fn indices(&self) -> impl ExactSizeIterator<Item = u32> + '_ { std::iter::empty() }
 
     /// Iterator over all the [`wgt::BindGroupLayoutEntry`]s in this map.
-    pub fn values(&self) -> impl ExactSizeIterator<Item = &wgt::BindGroupLayoutEntry> + '_ {
-        self.inner.values()
-    }
+    pub fn values(&self) -> impl ExactSizeIterator<Item = &wgt::BindGroupLayoutEntry> + '_ { std::iter::empty() }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&u32, &wgt::BindGroupLayoutEntry)> + '_ {
-        self.inner.iter()
-    }
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&u32, &wgt::BindGroupLayoutEntry)> + '_ { std::iter::empty() }
 
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { todo!() }
 
-    pub fn contains_key(&self, key: u32) -> bool {
-        self.inner.contains_key(&key)
-    }
+    pub fn contains_key(&self, key: u32) -> bool { todo!() }
 
-    pub fn entry(&mut self, key: u32) -> indexmap::map::Entry<'_, u32, wgt::BindGroupLayoutEntry> {
-        self.sorted = false;
-        self.inner.entry(key)
-    }
+    pub fn entry(&mut self, key: u32) -> indexmap::map::Entry<'_, u32, wgt::BindGroupLayoutEntry> { todo!() }
 }

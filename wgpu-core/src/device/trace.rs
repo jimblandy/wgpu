@@ -15,21 +15,7 @@ pub(crate) fn new_render_bundle_encoder_descriptor<'a>(
     context: &'a super::RenderPassContext,
     depth_read_only: bool,
     stencil_read_only: bool,
-) -> crate::command::RenderBundleEncoderDescriptor<'a> {
-    crate::command::RenderBundleEncoderDescriptor {
-        label,
-        color_formats: Cow::Borrowed(&context.attachments.colors),
-        depth_stencil: context.attachments.depth_stencil.map(|format| {
-            wgt::RenderBundleDepthStencil {
-                format,
-                depth_read_only,
-                stencil_read_only,
-            }
-        }),
-        sample_count: context.sample_count,
-        multiview: context.multiview,
-    }
-}
+) -> crate::command::RenderBundleEncoderDescriptor<'a> { todo!() }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
@@ -196,40 +182,14 @@ pub struct Trace {
 
 #[cfg(feature = "trace")]
 impl Trace {
-    pub fn new(path: &std::path::Path) -> Result<Self, std::io::Error> {
-        log::info!("Tracing into '{:?}'", path);
-        let mut file = std::fs::File::create(path.join(FILE_NAME))?;
-        file.write_all(b"[\n")?;
-        Ok(Self {
-            path: path.to_path_buf(),
-            file,
-            config: ron::ser::PrettyConfig::default(),
-            binary_id: 0,
-        })
-    }
+    pub fn new(path: &std::path::Path) -> Result<Self, std::io::Error> { todo!() }
 
-    pub fn make_binary(&mut self, kind: &str, data: &[u8]) -> String {
-        self.binary_id += 1;
-        let name = format!("data{}.{}", self.binary_id, kind);
-        let _ = std::fs::write(self.path.join(&name), data);
-        name
-    }
+    pub fn make_binary(&mut self, kind: &str, data: &[u8]) -> String { todo!() }
 
-    pub(crate) fn add(&mut self, action: Action) {
-        match ron::ser::to_string_pretty(&action, self.config.clone()) {
-            Ok(string) => {
-                let _ = writeln!(self.file, "{},", string);
-            }
-            Err(e) => {
-                log::warn!("RON serialization failure: {:?}", e);
-            }
-        }
-    }
+    pub(crate) fn add(&mut self, action: Action) { todo!() }
 }
 
 #[cfg(feature = "trace")]
 impl Drop for Trace {
-    fn drop(&mut self) {
-        let _ = self.file.write_all(b"]");
-    }
+    fn drop(&mut self) { todo!() }
 }

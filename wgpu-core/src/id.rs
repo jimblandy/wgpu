@@ -35,46 +35,20 @@ pub struct RawId(NonZeroId);
 impl RawId {
     #[doc(hidden)]
     #[inline]
-    pub fn from_non_zero(non_zero: NonZeroId) -> Self {
-        Self(non_zero)
-    }
+    pub fn from_non_zero(non_zero: NonZeroId) -> Self { todo!() }
 
     #[doc(hidden)]
     #[inline]
-    pub fn into_non_zero(self) -> NonZeroId {
-        self.0
-    }
+    pub fn into_non_zero(self) -> NonZeroId { todo!() }
 
     /// Zip together an identifier and return its raw underlying representation.
-    pub fn zip(index: Index, epoch: Epoch, backend: Backend) -> RawId {
-        assert_eq!(0, epoch >> EPOCH_BITS);
-        assert_eq!(0, (index as IdType) >> INDEX_BITS);
-        let v = index as IdType
-            | ((epoch as IdType) << INDEX_BITS)
-            | ((backend as IdType) << BACKEND_SHIFT);
-        Self(NonZeroId::new(v).unwrap())
-    }
+    pub fn zip(index: Index, epoch: Epoch, backend: Backend) -> RawId { todo!() }
 
     /// Unzip a raw identifier into its components.
     #[allow(trivial_numeric_casts)]
-    pub fn unzip(self) -> (Index, Epoch, Backend) {
-        (
-            (self.0.get() as ZippedIndex) as Index,
-            (((self.0.get() >> INDEX_BITS) as ZippedIndex) & (EPOCH_MASK as ZippedIndex)) as Index,
-            self.backend(),
-        )
-    }
+    pub fn unzip(self) -> (Index, Epoch, Backend) { todo!() }
 
-    pub fn backend(self) -> Backend {
-        match self.0.get() >> (BACKEND_SHIFT) as u8 {
-            0 => Backend::Empty,
-            1 => Backend::Vulkan,
-            2 => Backend::Metal,
-            3 => Backend::Dx12,
-            4 => Backend::Gl,
-            _ => unreachable!(),
-        }
-    }
+    pub fn backend(self) -> Backend { todo!() }
 }
 
 /// Coerce a slice of identifiers into a slice of optional raw identifiers.
@@ -83,11 +57,7 @@ impl RawId {
 /// * `Option<T>` is guaranteed to be niche-filled to 0's.
 /// * The `T` in `Option<T>` can inhabit any representation except 0's, since
 ///   its underlying representation is `NonZero*`.
-pub fn as_option_slice<T: Marker>(ids: &[Id<T>]) -> &[Option<Id<T>>] {
-    // SAFETY: Any Id<T> is repr(transparent) over `Option<RawId>`, since both
-    // are backed by non-zero types.
-    unsafe { std::slice::from_raw_parts(ids.as_ptr().cast(), ids.len()) }
-}
+pub fn as_option_slice<T: Marker>(ids: &[Id<T>]) -> &[Option<Id<T>>] { todo!() }
 
 /// An identifier for a wgpu object.
 ///
@@ -132,18 +102,11 @@ enum SerialId {
 }
 
 impl From<RawId> for SerialId {
-    fn from(id: RawId) -> Self {
-        let (index, epoch, backend) = id.unzip();
-        Self::Id(index, epoch, backend)
-    }
+    fn from(id: RawId) -> Self { todo!() }
 }
 
 impl From<SerialId> for RawId {
-    fn from(id: SerialId) -> Self {
-        match id {
-            SerialId::Id(index, epoch, backend) => RawId::zip(index, epoch, backend),
-        }
-    }
+    fn from(id: SerialId) -> Self { todo!() }
 }
 
 impl<T> Id<T>
@@ -153,40 +116,26 @@ where
     /// # Safety
     ///
     /// The raw id must be valid for the type.
-    pub unsafe fn from_raw(raw: RawId) -> Self {
-        Self(raw, PhantomData)
-    }
+    pub unsafe fn from_raw(raw: RawId) -> Self { todo!() }
 
     /// Coerce the identifiers into its raw underlying representation.
-    pub fn into_raw(self) -> RawId {
-        self.0
-    }
+    pub fn into_raw(self) -> RawId { todo!() }
 
     #[allow(dead_code)]
-    pub(crate) fn dummy(index: u32) -> Self {
-        Id::zip(index, 1, Backend::Empty)
-    }
+    pub(crate) fn dummy(index: u32) -> Self { todo!() }
 
     #[allow(dead_code)]
-    pub(crate) fn is_valid(&self) -> bool {
-        self.backend() != Backend::Empty
-    }
+    pub(crate) fn is_valid(&self) -> bool { todo!() }
 
     /// Get the backend this identifier corresponds to.
     #[inline]
-    pub fn backend(self) -> Backend {
-        self.0.backend()
-    }
+    pub fn backend(self) -> Backend { todo!() }
 
     #[inline]
-    pub fn zip(index: Index, epoch: Epoch, backend: Backend) -> Self {
-        Id(RawId::zip(index, epoch, backend), PhantomData)
-    }
+    pub fn zip(index: Index, epoch: Epoch, backend: Backend) -> Self { todo!() }
 
     #[inline]
-    pub fn unzip(self) -> (Index, Epoch, Backend) {
-        self.0.unzip()
-    }
+    pub fn unzip(self) -> (Index, Epoch, Backend) { todo!() }
 }
 
 impl<T> Copy for Id<T> where T: Marker {}
@@ -196,28 +145,14 @@ where
     T: Marker,
 {
     #[inline]
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { todo!() }
 }
 
 impl<T> Debug for Id<T>
 where
     T: Marker,
 {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let (index, epoch, backend) = self.unzip();
-        let backend = match backend {
-            Backend::Empty => "_",
-            Backend::Vulkan => "vk",
-            Backend::Metal => "mtl",
-            Backend::Dx12 => "d3d12",
-            Backend::Gl => "gl",
-            Backend::BrowserWebGpu => "webgpu",
-        };
-        write!(formatter, "Id({index},{epoch},{backend})")?;
-        Ok(())
-    }
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result { todo!() }
 }
 
 impl<T> Hash for Id<T>
@@ -225,9 +160,7 @@ where
     T: Marker,
 {
     #[inline]
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) { todo!() }
 }
 
 impl<T> PartialEq for Id<T>
@@ -235,9 +168,7 @@ where
     T: Marker,
 {
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
+    fn eq(&self, other: &Self) -> bool { todo!() }
 }
 
 impl<T> Eq for Id<T> where T: Marker {}
@@ -247,9 +178,7 @@ where
     T: Marker,
 {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { todo!() }
 }
 
 impl<T> Ord for Id<T>
@@ -257,9 +186,7 @@ where
     T: Marker,
 {
     #[inline]
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
-    }
+    fn cmp(&self, other: &Self) -> Ordering { todo!() }
 }
 
 /// Marker trait used to determine which types uniquely identify a resource.
@@ -323,60 +250,19 @@ ids! {
 }
 
 impl CommandEncoderId {
-    pub fn into_command_buffer_id(self) -> CommandBufferId {
-        Id(self.0, PhantomData)
-    }
+    pub fn into_command_buffer_id(self) -> CommandBufferId { todo!() }
 }
 
 impl CommandBufferId {
-    pub fn into_command_encoder_id(self) -> CommandEncoderId {
-        Id(self.0, PhantomData)
-    }
+    pub fn into_command_encoder_id(self) -> CommandEncoderId { todo!() }
 }
 
 impl DeviceId {
-    pub fn into_queue_id(self) -> QueueId {
-        Id(self.0, PhantomData)
-    }
+    pub fn into_queue_id(self) -> QueueId { todo!() }
 }
 
 #[test]
-fn test_id_backend() {
-    for &b in &[
-        Backend::Empty,
-        Backend::Vulkan,
-        Backend::Metal,
-        Backend::Dx12,
-        Backend::Gl,
-    ] {
-        let id = crate::id::Id::<()>::zip(1, 0, b);
-        let (_id, _epoch, backend) = id.unzip();
-        assert_eq!(id.backend(), b);
-        assert_eq!(backend, b);
-    }
-}
+fn test_id_backend() { todo!() }
 
 #[test]
-fn test_id() {
-    let last_index = ((1u64 << INDEX_BITS) - 1) as Index;
-    let indexes = [1, last_index / 2 - 1, last_index / 2 + 1, last_index];
-    let epochs = [1, EPOCH_MASK / 2 - 1, EPOCH_MASK / 2 + 1, EPOCH_MASK];
-    let backends = [
-        Backend::Empty,
-        Backend::Vulkan,
-        Backend::Metal,
-        Backend::Dx12,
-        Backend::Gl,
-    ];
-    for &i in &indexes {
-        for &e in &epochs {
-            for &b in &backends {
-                let id = crate::id::Id::<()>::zip(i, e, b);
-                let (index, epoch, backend) = id.unzip();
-                assert_eq!(index, i);
-                assert_eq!(epoch, e);
-                assert_eq!(backend, b);
-            }
-        }
-    }
-}
+fn test_id() { todo!() }

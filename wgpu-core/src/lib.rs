@@ -5,7 +5,7 @@
 //! ## Feature flags
 #![doc = document_features::document_features!()]
 //!
-
+#![allow(dead_code)]
 // When we have no backends, we end up with a lot of dead or otherwise unreachable code.
 #![cfg_attr(
     all(
@@ -103,26 +103,18 @@ trait LabelHelpers<'a> {
 }
 impl<'a> LabelHelpers<'a> for Label<'a> {
     fn borrow_option(&'a self) -> Option<&'a str> {
-        self.as_ref().map(|cow| cow.as_ref())
+    todo!()
     }
     fn to_hal(&'a self, flags: wgt::InstanceFlags) -> Option<&'a str> {
-        if flags.contains(wgt::InstanceFlags::DISCARD_HAL_LABELS) {
-            return None;
-        }
-
-        self.as_ref().map(|cow| cow.as_ref())
+    todo!()
     }
     fn borrow_or_default(&'a self) -> &'a str {
-        self.borrow_option().unwrap_or_default()
+    todo!()
     }
 }
 
 pub fn hal_label(opt: Option<&str>, flags: wgt::InstanceFlags) -> Option<&str> {
-    if flags.contains(wgt::InstanceFlags::DISCARD_HAL_LABELS) {
-        return None;
-    }
-
-    opt
+    todo!()
 }
 
 const DOWNLEVEL_WARNING_MESSAGE: &str = "The underlying API or device in use does not \
@@ -284,23 +276,16 @@ define_backend_caller! { gfx_if_empty, gfx_if_empty_hidden, "empty" if all(
 macro_rules! gfx_select {
     // Simple two-component expression, like `self.0.method(..)`.
     ($id:expr => $c0:ident.$c1:tt.$method:ident $params:tt) => {
-        $crate::gfx_select!($id => {$c0.$c1}, $method $params)
+        todo!()
     };
 
     // Simple identifier-only expression, like `global.method(..)`.
     ($id:expr => $c0:ident.$method:ident $params:tt) => {
-        $crate::gfx_select!($id => {$c0}, $method $params)
+        todo!()
     };
 
     ($id:expr => {$($c:tt)*}, $method:ident $params:tt) => {
-        match $id.backend() {
-            wgt::Backend::Vulkan => $crate::gfx_if_vulkan!($($c)*.$method::<$crate::api::Vulkan> $params),
-            wgt::Backend::Metal => $crate::gfx_if_metal!($($c)*.$method::<$crate::api::Metal> $params),
-            wgt::Backend::Dx12 => $crate::gfx_if_dx12!($($c)*.$method::<$crate::api::Dx12> $params),
-            wgt::Backend::Gl => $crate::gfx_if_gles!($($c)*.$method::<$crate::api::Gles> $params),
-            wgt::Backend::Empty => $crate::gfx_if_empty!($($c)*.$method::<$crate::api::Empty> $params),
-            other => panic!("Unexpected backend {:?}", other),
-        }
+        todo!()
     };
 }
 
@@ -326,39 +311,20 @@ pub(crate) use resource_log;
 
 #[inline]
 pub(crate) fn get_lowest_common_denom(a: u32, b: u32) -> u32 {
-    let gcd = if a >= b {
-        get_greatest_common_divisor(a, b)
-    } else {
-        get_greatest_common_divisor(b, a)
-    };
-    a * b / gcd
+    todo!()
 }
 
 #[inline]
 pub(crate) fn get_greatest_common_divisor(mut a: u32, mut b: u32) -> u32 {
-    assert!(a >= b);
-    loop {
-        let c = a % b;
-        if c == 0 {
-            return b;
-        } else {
-            a = b;
-            b = c;
-        }
-    }
+    todo!()
 }
 
 #[test]
 fn test_lcd() {
-    assert_eq!(get_lowest_common_denom(2, 2), 2);
-    assert_eq!(get_lowest_common_denom(2, 3), 6);
-    assert_eq!(get_lowest_common_denom(6, 4), 12);
+    todo!()
 }
 
 #[test]
 fn test_gcd() {
-    assert_eq!(get_greatest_common_divisor(5, 1), 1);
-    assert_eq!(get_greatest_common_divisor(4, 2), 2);
-    assert_eq!(get_greatest_common_divisor(6, 4), 2);
-    assert_eq!(get_greatest_common_divisor(7, 7), 7);
+    todo!()
 }

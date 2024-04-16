@@ -18,11 +18,7 @@ pub(crate) struct CommandAllocator<A: HalApi> {
 }
 
 impl<A: HalApi> CommandAllocator<A> {
-    pub(crate) fn new() -> Self {
-        Self {
-            free_encoders: Mutex::new(Vec::new()),
-        }
-    }
+    pub(crate) fn new() -> Self { todo!() }
 
     /// Return a fresh [`wgpu_hal::CommandEncoder`] in the "closed" state.
     ///
@@ -32,33 +28,13 @@ impl<A: HalApi> CommandAllocator<A> {
         &self,
         device: &A::Device,
         queue: &A::Queue,
-    ) -> Result<A::CommandEncoder, hal::DeviceError> {
-        let mut free_encoders = self.free_encoders.lock();
-        match free_encoders.pop() {
-            Some(encoder) => Ok(encoder),
-            None => unsafe {
-                let hal_desc = hal::CommandEncoderDescriptor { label: None, queue };
-                device.create_command_encoder(&hal_desc)
-            },
-        }
-    }
+    ) -> Result<A::CommandEncoder, hal::DeviceError> { todo!() }
 
     /// Add `encoder` back to the free pool.
-    pub(crate) fn release_encoder(&self, encoder: A::CommandEncoder) {
-        let mut free_encoders = self.free_encoders.lock();
-        free_encoders.push(encoder);
-    }
+    pub(crate) fn release_encoder(&self, encoder: A::CommandEncoder) { todo!() }
 
     /// Free the pool of command encoders.
     ///
     /// This is only called when the `Device` is dropped.
-    pub(crate) fn dispose(&self, device: &A::Device) {
-        let mut free_encoders = self.free_encoders.lock();
-        resource_log!("CommandAllocator::dispose encoders {}", free_encoders.len());
-        for cmd_encoder in free_encoders.drain(..) {
-            unsafe {
-                device.destroy_command_encoder(cmd_encoder);
-            }
-        }
-    }
+    pub(crate) fn dispose(&self, device: &A::Device) { todo!() }
 }

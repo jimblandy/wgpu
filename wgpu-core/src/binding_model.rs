@@ -186,30 +186,7 @@ pub enum CreateBindGroupError {
 }
 
 impl PrettyError for CreateBindGroupError {
-    fn fmt_pretty(&self, fmt: &mut ErrorFormatter) {
-        fmt.error(self);
-        match *self {
-            Self::BindingZeroSize(id) => {
-                fmt.buffer_label(&id);
-            }
-            Self::BindingRangeTooLarge { buffer, .. } => {
-                fmt.buffer_label(&buffer);
-            }
-            Self::BindingSizeTooSmall { buffer, .. } => {
-                fmt.buffer_label(&buffer);
-            }
-            Self::InvalidBuffer(id) => {
-                fmt.buffer_label(&id);
-            }
-            Self::InvalidTextureView(id) => {
-                fmt.texture_view_label(&id);
-            }
-            Self::InvalidSampler(id) => {
-                fmt.sampler_label(&id);
-            }
-            _ => {}
-        };
-    }
+    fn fmt_pretty(&self, fmt: &mut ErrorFormatter) { todo!() }
 }
 
 #[derive(Clone, Debug, Error)]
@@ -241,25 +218,7 @@ pub enum BindingTypeMaxCountErrorKind {
 }
 
 impl BindingTypeMaxCountErrorKind {
-    fn to_config_str(&self) -> &'static str {
-        match self {
-            BindingTypeMaxCountErrorKind::DynamicUniformBuffers => {
-                "max_dynamic_uniform_buffers_per_pipeline_layout"
-            }
-            BindingTypeMaxCountErrorKind::DynamicStorageBuffers => {
-                "max_dynamic_storage_buffers_per_pipeline_layout"
-            }
-            BindingTypeMaxCountErrorKind::SampledTextures => {
-                "max_sampled_textures_per_shader_stage"
-            }
-            BindingTypeMaxCountErrorKind::Samplers => "max_samplers_per_shader_stage",
-            BindingTypeMaxCountErrorKind::StorageBuffers => "max_storage_buffers_per_shader_stage",
-            BindingTypeMaxCountErrorKind::StorageTextures => {
-                "max_storage_textures_per_shader_stage"
-            }
-            BindingTypeMaxCountErrorKind::UniformBuffers => "max_uniform_buffers_per_shader_stage",
-        }
-    }
+    fn to_config_str(&self) -> &'static str { todo!() }
 }
 
 #[derive(Debug, Default)]
@@ -270,56 +229,17 @@ pub(crate) struct PerStageBindingTypeCounter {
 }
 
 impl PerStageBindingTypeCounter {
-    pub(crate) fn add(&mut self, stage: wgt::ShaderStages, count: u32) {
-        if stage.contains(wgt::ShaderStages::VERTEX) {
-            self.vertex += count;
-        }
-        if stage.contains(wgt::ShaderStages::FRAGMENT) {
-            self.fragment += count;
-        }
-        if stage.contains(wgt::ShaderStages::COMPUTE) {
-            self.compute += count;
-        }
-    }
+    pub(crate) fn add(&mut self, stage: wgt::ShaderStages, count: u32) { todo!() }
 
-    pub(crate) fn max(&self) -> (BindingZone, u32) {
-        let max_value = self.vertex.max(self.fragment.max(self.compute));
-        let mut stage = wgt::ShaderStages::NONE;
-        if max_value == self.vertex {
-            stage |= wgt::ShaderStages::VERTEX
-        }
-        if max_value == self.fragment {
-            stage |= wgt::ShaderStages::FRAGMENT
-        }
-        if max_value == self.compute {
-            stage |= wgt::ShaderStages::COMPUTE
-        }
-        (BindingZone::Stage(stage), max_value)
-    }
+    pub(crate) fn max(&self) -> (BindingZone, u32) { todo!() }
 
-    pub(crate) fn merge(&mut self, other: &Self) {
-        self.vertex = self.vertex.max(other.vertex);
-        self.fragment = self.fragment.max(other.fragment);
-        self.compute = self.compute.max(other.compute);
-    }
+    pub(crate) fn merge(&mut self, other: &Self) { todo!() }
 
     pub(crate) fn validate(
         &self,
         limit: u32,
         kind: BindingTypeMaxCountErrorKind,
-    ) -> Result<(), BindingTypeMaxCountError> {
-        let (zone, count) = self.max();
-        if limit < count {
-            Err(BindingTypeMaxCountError {
-                kind,
-                zone,
-                limit,
-                count,
-            })
-        } else {
-            Ok(())
-        }
-    }
+    ) -> Result<(), BindingTypeMaxCountError> { todo!() }
 }
 
 #[derive(Debug, Default)]
@@ -334,95 +254,11 @@ pub(crate) struct BindingTypeMaxCountValidator {
 }
 
 impl BindingTypeMaxCountValidator {
-    pub(crate) fn add_binding(&mut self, binding: &wgt::BindGroupLayoutEntry) {
-        let count = binding.count.map_or(1, |count| count.get());
-        match binding.ty {
-            wgt::BindingType::Buffer {
-                ty: wgt::BufferBindingType::Uniform,
-                has_dynamic_offset,
-                ..
-            } => {
-                self.uniform_buffers.add(binding.visibility, count);
-                if has_dynamic_offset {
-                    self.dynamic_uniform_buffers += count;
-                }
-            }
-            wgt::BindingType::Buffer {
-                ty: wgt::BufferBindingType::Storage { .. },
-                has_dynamic_offset,
-                ..
-            } => {
-                self.storage_buffers.add(binding.visibility, count);
-                if has_dynamic_offset {
-                    self.dynamic_storage_buffers += count;
-                }
-            }
-            wgt::BindingType::Sampler { .. } => {
-                self.samplers.add(binding.visibility, count);
-            }
-            wgt::BindingType::Texture { .. } => {
-                self.sampled_textures.add(binding.visibility, count);
-            }
-            wgt::BindingType::StorageTexture { .. } => {
-                self.storage_textures.add(binding.visibility, count);
-            }
-            wgt::BindingType::AccelerationStructure => todo!(),
-        }
-    }
+    pub(crate) fn add_binding(&mut self, binding: &wgt::BindGroupLayoutEntry) { todo!() }
 
-    pub(crate) fn merge(&mut self, other: &Self) {
-        self.dynamic_uniform_buffers += other.dynamic_uniform_buffers;
-        self.dynamic_storage_buffers += other.dynamic_storage_buffers;
-        self.sampled_textures.merge(&other.sampled_textures);
-        self.samplers.merge(&other.samplers);
-        self.storage_buffers.merge(&other.storage_buffers);
-        self.storage_textures.merge(&other.storage_textures);
-        self.uniform_buffers.merge(&other.uniform_buffers);
-    }
+    pub(crate) fn merge(&mut self, other: &Self) { todo!() }
 
-    pub(crate) fn validate(&self, limits: &wgt::Limits) -> Result<(), BindingTypeMaxCountError> {
-        if limits.max_dynamic_uniform_buffers_per_pipeline_layout < self.dynamic_uniform_buffers {
-            return Err(BindingTypeMaxCountError {
-                kind: BindingTypeMaxCountErrorKind::DynamicUniformBuffers,
-                zone: BindingZone::Pipeline,
-                limit: limits.max_dynamic_uniform_buffers_per_pipeline_layout,
-                count: self.dynamic_uniform_buffers,
-            });
-        }
-        if limits.max_dynamic_storage_buffers_per_pipeline_layout < self.dynamic_storage_buffers {
-            return Err(BindingTypeMaxCountError {
-                kind: BindingTypeMaxCountErrorKind::DynamicStorageBuffers,
-                zone: BindingZone::Pipeline,
-                limit: limits.max_dynamic_storage_buffers_per_pipeline_layout,
-                count: self.dynamic_storage_buffers,
-            });
-        }
-        self.sampled_textures.validate(
-            limits.max_sampled_textures_per_shader_stage,
-            BindingTypeMaxCountErrorKind::SampledTextures,
-        )?;
-        self.storage_buffers.validate(
-            limits.max_storage_buffers_per_shader_stage,
-            BindingTypeMaxCountErrorKind::StorageBuffers,
-        )?;
-        self.samplers.validate(
-            limits.max_samplers_per_shader_stage,
-            BindingTypeMaxCountErrorKind::Samplers,
-        )?;
-        self.storage_buffers.validate(
-            limits.max_storage_buffers_per_shader_stage,
-            BindingTypeMaxCountErrorKind::StorageBuffers,
-        )?;
-        self.storage_textures.validate(
-            limits.max_storage_textures_per_shader_stage,
-            BindingTypeMaxCountErrorKind::StorageTextures,
-        )?;
-        self.uniform_buffers.validate(
-            limits.max_uniform_buffers_per_shader_stage,
-            BindingTypeMaxCountErrorKind::UniformBuffers,
-        )?;
-        Ok(())
-    }
+    pub(crate) fn validate(&self, limits: &wgt::Limits) -> Result<(), BindingTypeMaxCountError> { todo!() }
 }
 
 /// Bindable resource and the slot to bind it to.
@@ -482,23 +318,7 @@ pub struct BindGroupLayout<A: HalApi> {
 }
 
 impl<A: HalApi> Drop for BindGroupLayout<A> {
-    fn drop(&mut self) {
-        if matches!(self.origin, bgl::Origin::Pool) {
-            self.device.bgl_pool.remove(&self.entries);
-        }
-        if let Some(raw) = self.raw.take() {
-            #[cfg(feature = "trace")]
-            if let Some(t) = self.device.trace.lock().as_mut() {
-                t.add(trace::Action::DestroyBindGroupLayout(self.info.id()));
-            }
-
-            resource_log!("Destroy raw BindGroupLayout {:?}", self.info.label());
-            unsafe {
-                use hal::Device;
-                self.device.raw().destroy_bind_group_layout(raw);
-            }
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 impl<A: HalApi> Resource for BindGroupLayout<A> {
@@ -506,22 +326,14 @@ impl<A: HalApi> Resource for BindGroupLayout<A> {
 
     type Marker = crate::id::markers::BindGroupLayout;
 
-    fn as_info(&self) -> &ResourceInfo<Self> {
-        &self.info
-    }
+    fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
-    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> {
-        &mut self.info
-    }
+    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
 
-    fn label(&self) -> String {
-        self.label.clone()
-    }
+    fn label(&self) -> String { todo!() }
 }
 impl<A: HalApi> BindGroupLayout<A> {
-    pub(crate) fn raw(&self) -> &A::BindGroupLayout {
-        self.raw.as_ref().unwrap()
-    }
+    pub(crate) fn raw(&self) -> &A::BindGroupLayout { todo!() }
 }
 
 #[derive(Clone, Debug, Error)]
@@ -557,12 +369,7 @@ pub enum CreatePipelineLayoutError {
 }
 
 impl PrettyError for CreatePipelineLayoutError {
-    fn fmt_pretty(&self, fmt: &mut ErrorFormatter) {
-        fmt.error(self);
-        if let Self::InvalidBindGroupLayout(id) = *self {
-            fmt.bind_group_layout_label(&id);
-        };
-    }
+    fn fmt_pretty(&self, fmt: &mut ErrorFormatter) { todo!() }
 }
 
 #[derive(Clone, Debug, Error)]
@@ -629,34 +436,13 @@ pub struct PipelineLayout<A: HalApi> {
 }
 
 impl<A: HalApi> Drop for PipelineLayout<A> {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw.take() {
-            resource_log!("Destroy raw PipelineLayout {:?}", self.info.label());
-
-            #[cfg(feature = "trace")]
-            if let Some(t) = self.device.trace.lock().as_mut() {
-                t.add(trace::Action::DestroyPipelineLayout(self.info.id()));
-            }
-
-            unsafe {
-                use hal::Device;
-                self.device.raw().destroy_pipeline_layout(raw);
-            }
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 impl<A: HalApi> PipelineLayout<A> {
-    pub(crate) fn raw(&self) -> &A::PipelineLayout {
-        self.raw.as_ref().unwrap()
-    }
+    pub(crate) fn raw(&self) -> &A::PipelineLayout { todo!() }
 
-    pub(crate) fn get_binding_maps(&self) -> ArrayVec<&bgl::EntryMap, { hal::MAX_BIND_GROUPS }> {
-        self.bind_group_layouts
-            .iter()
-            .map(|bgl| &bgl.entries)
-            .collect()
-    }
+    pub(crate) fn get_binding_maps(&self) -> ArrayVec<&bgl::EntryMap, { hal::MAX_BIND_GROUPS }> { todo!() }
 
     /// Validate push constants match up with expected ranges.
     pub(crate) fn validate_push_constant_ranges(
@@ -664,77 +450,7 @@ impl<A: HalApi> PipelineLayout<A> {
         stages: wgt::ShaderStages,
         offset: u32,
         end_offset: u32,
-    ) -> Result<(), PushConstantUploadError> {
-        // Don't need to validate size against the push constant size limit here,
-        // as push constant ranges are already validated to be within bounds,
-        // and we validate that they are within the ranges.
-
-        if offset % wgt::PUSH_CONSTANT_ALIGNMENT != 0 {
-            return Err(PushConstantUploadError::Unaligned(offset));
-        }
-
-        // Push constant validation looks very complicated on the surface, but
-        // the problem can be range-reduced pretty well.
-        //
-        // Push constants require (summarized from the vulkan spec):
-        // 1. For each byte in the range and for each shader stage in stageFlags,
-        //    there must be a push constant range in the layout that includes that
-        //    byte and that stage.
-        // 2. For each byte in the range and for each push constant range that overlaps that byte,
-        //    `stage` must include all stages in that push constant range’s `stage`.
-        //
-        // However there are some additional constraints that help us:
-        // 3. All push constant ranges are the only range that can access that stage.
-        //    i.e. if one range has VERTEX, no other range has VERTEX
-        //
-        // Therefore we can simplify the checks in the following ways:
-        // - Because 3 guarantees that the push constant range has a unique stage,
-        //   when we check for 1, we can simply check that our entire updated range
-        //   is within a push constant range. i.e. our range for a specific stage cannot
-        //   intersect more than one push constant range.
-        let mut used_stages = wgt::ShaderStages::NONE;
-        for (idx, range) in self.push_constant_ranges.iter().enumerate() {
-            // contains not intersects due to 2
-            if stages.contains(range.stages) {
-                if !(range.range.start <= offset && end_offset <= range.range.end) {
-                    return Err(PushConstantUploadError::TooLarge {
-                        offset,
-                        end_offset,
-                        idx,
-                        range: range.clone(),
-                    });
-                }
-                used_stages |= range.stages;
-            } else if stages.intersects(range.stages) {
-                // Will be caught by used stages check below, but we can do this because of 1
-                // and is more helpful to the user.
-                return Err(PushConstantUploadError::PartialRangeMatch {
-                    actual: stages,
-                    idx,
-                    matched: range.stages,
-                });
-            }
-
-            // The push constant range intersects range we are uploading
-            if offset < range.range.end && range.range.start < end_offset {
-                // But requires stages we don't provide
-                if !stages.contains(range.stages) {
-                    return Err(PushConstantUploadError::MissingStages {
-                        actual: stages,
-                        idx,
-                        missing: stages,
-                    });
-                }
-            }
-        }
-        if used_stages != stages {
-            return Err(PushConstantUploadError::UnmatchedStages {
-                actual: stages,
-                unmatched: stages - used_stages,
-            });
-        }
-        Ok(())
-    }
+    ) -> Result<(), PushConstantUploadError> { todo!() }
 }
 
 impl<A: HalApi> Resource for PipelineLayout<A> {
@@ -742,13 +458,9 @@ impl<A: HalApi> Resource for PipelineLayout<A> {
 
     type Marker = crate::id::markers::PipelineLayout;
 
-    fn as_info(&self) -> &ResourceInfo<Self> {
-        &self.info
-    }
+    fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
-    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> {
-        &mut self.info
-    }
+    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
 }
 
 #[repr(C)]
@@ -835,18 +547,7 @@ pub struct BindGroupDynamicBindingData {
 pub(crate) fn buffer_binding_type_alignment(
     limits: &wgt::Limits,
     binding_type: wgt::BufferBindingType,
-) -> (u32, &'static str) {
-    match binding_type {
-        wgt::BufferBindingType::Uniform => (
-            limits.min_uniform_buffer_offset_alignment,
-            "min_uniform_buffer_offset_alignment",
-        ),
-        wgt::BufferBindingType::Storage { .. } => (
-            limits.min_storage_buffer_offset_alignment,
-            "min_storage_buffer_offset_alignment",
-        ),
-    }
-}
+) -> (u32, &'static str) { todo!() }
 
 #[derive(Debug)]
 pub struct BindGroup<A: HalApi> {
@@ -864,82 +565,17 @@ pub struct BindGroup<A: HalApi> {
 }
 
 impl<A: HalApi> Drop for BindGroup<A> {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw.take() {
-            resource_log!("Destroy raw BindGroup {:?}", self.info.label());
-
-            #[cfg(feature = "trace")]
-            if let Some(t) = self.device.trace.lock().as_mut() {
-                t.add(trace::Action::DestroyBindGroup(self.info.id()));
-            }
-
-            unsafe {
-                use hal::Device;
-                self.device.raw().destroy_bind_group(raw);
-            }
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 impl<A: HalApi> BindGroup<A> {
-    pub(crate) fn raw(&self, guard: &SnatchGuard) -> Option<&A::BindGroup> {
-        // Clippy insist on writing it this way. The idea is to return None
-        // if any of the raw buffer is not valid anymore.
-        for buffer in &self.used_buffer_ranges {
-            let _ = buffer.buffer.raw(guard)?;
-        }
-        for texture in &self.used_texture_ranges {
-            let _ = texture.texture.raw(guard)?;
-        }
-        self.raw.get(guard)
-    }
+    pub(crate) fn raw(&self, guard: &SnatchGuard) -> Option<&A::BindGroup> { todo!() }
     pub(crate) fn validate_dynamic_bindings(
         &self,
         bind_group_index: u32,
         offsets: &[wgt::DynamicOffset],
         limits: &wgt::Limits,
-    ) -> Result<(), BindError> {
-        if self.dynamic_binding_info.len() != offsets.len() {
-            return Err(BindError::MismatchedDynamicOffsetCount {
-                group: bind_group_index,
-                expected: self.dynamic_binding_info.len(),
-                actual: offsets.len(),
-            });
-        }
-
-        for (idx, (info, &offset)) in self
-            .dynamic_binding_info
-            .iter()
-            .zip(offsets.iter())
-            .enumerate()
-        {
-            let (alignment, limit_name) = buffer_binding_type_alignment(limits, info.binding_type);
-            if offset as wgt::BufferAddress % alignment as u64 != 0 {
-                return Err(BindError::UnalignedDynamicBinding {
-                    group: bind_group_index,
-                    binding: info.binding_idx,
-                    idx,
-                    offset,
-                    alignment,
-                    limit_name,
-                });
-            }
-
-            if offset as wgt::BufferAddress > info.maximum_dynamic_offset {
-                return Err(BindError::DynamicBindingOutOfBounds {
-                    group: bind_group_index,
-                    binding: info.binding_idx,
-                    idx,
-                    offset,
-                    buffer_size: info.buffer_size,
-                    binding_range: info.binding_range.clone(),
-                    maximum_dynamic_offset: info.maximum_dynamic_offset,
-                });
-            }
-        }
-
-        Ok(())
-    }
+    ) -> Result<(), BindError> { todo!() }
 }
 
 impl<A: HalApi> Resource for BindGroup<A> {
@@ -947,13 +583,9 @@ impl<A: HalApi> Resource for BindGroup<A> {
 
     type Marker = crate::id::markers::BindGroup;
 
-    fn as_info(&self) -> &ResourceInfo<Self> {
-        &self.info
-    }
+    fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
-    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> {
-        &mut self.info
-    }
+    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
 }
 
 #[derive(Clone, Debug, Error)]

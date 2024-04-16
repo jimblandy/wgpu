@@ -56,13 +56,7 @@ pub(crate) struct AttachmentData<T> {
 }
 impl<T: PartialEq> Eq for AttachmentData<T> {}
 impl<T> AttachmentData<T> {
-    pub(crate) fn map<U, F: Fn(&T) -> U>(&self, fun: F) -> AttachmentData<U> {
-        AttachmentData {
-            colors: self.colors.iter().map(|c| c.as_ref().map(&fun)).collect(),
-            resolves: self.resolves.iter().map(&fun).collect(),
-            depth_stencil: self.depth_stencil.as_ref().map(&fun),
-        }
-    }
+    pub(crate) fn map<U, F: Fn(&T) -> U>(&self, fun: F) -> AttachmentData<U> { todo!() }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -120,48 +114,7 @@ impl RenderPassContext {
         &self,
         other: &Self,
         ty: RenderPassCompatibilityCheckType,
-    ) -> Result<(), RenderPassCompatibilityError> {
-        if self.attachments.colors != other.attachments.colors {
-            let indices = self
-                .attachments
-                .colors
-                .iter()
-                .zip(&other.attachments.colors)
-                .enumerate()
-                .filter_map(|(idx, (left, right))| (left != right).then_some(idx))
-                .collect();
-            return Err(RenderPassCompatibilityError::IncompatibleColorAttachment {
-                indices,
-                expected: self.attachments.colors.iter().cloned().collect(),
-                actual: other.attachments.colors.iter().cloned().collect(),
-                ty,
-            });
-        }
-        if self.attachments.depth_stencil != other.attachments.depth_stencil {
-            return Err(
-                RenderPassCompatibilityError::IncompatibleDepthStencilAttachment {
-                    expected: self.attachments.depth_stencil,
-                    actual: other.attachments.depth_stencil,
-                    ty,
-                },
-            );
-        }
-        if self.sample_count != other.sample_count {
-            return Err(RenderPassCompatibilityError::IncompatibleSampleCount {
-                expected: self.sample_count,
-                actual: other.sample_count,
-                ty,
-            });
-        }
-        if self.multiview != other.multiview {
-            return Err(RenderPassCompatibilityError::IncompatibleMultiview {
-                expected: self.multiview,
-                actual: other.multiview,
-                ty,
-            });
-        }
-        Ok(())
-    }
+    ) -> Result<(), RenderPassCompatibilityError> { todo!() }
 }
 
 pub type BufferMapPendingClosure = (BufferMapOperation, BufferAccessResult);
@@ -174,33 +127,9 @@ pub struct UserClosures {
 }
 
 impl UserClosures {
-    fn extend(&mut self, other: Self) {
-        self.mappings.extend(other.mappings);
-        self.submissions.extend(other.submissions);
-        self.device_lost_invocations
-            .extend(other.device_lost_invocations);
-    }
+    fn extend(&mut self, other: Self) { todo!() }
 
-    fn fire(self) {
-        // Note: this logic is specifically moved out of `handle_mapping()` in order to
-        // have nothing locked by the time we execute users callback code.
-
-        // Mappings _must_ be fired before submissions, as the spec requires all mapping callbacks that are registered before
-        // a on_submitted_work_done callback to be fired before the on_submitted_work_done callback.
-        for (mut operation, status) in self.mappings {
-            if let Some(callback) = operation.callback.take() {
-                callback.call(status);
-            }
-        }
-        for closure in self.submissions {
-            closure.call();
-        }
-        for invocation in self.device_lost_invocations {
-            invocation
-                .closure
-                .call(invocation.reason, invocation.message);
-        }
-    }
+    fn fire(self) { todo!() }
 }
 
 #[cfg(send_sync)]
@@ -214,11 +143,7 @@ pub struct DeviceLostClosureRust {
 }
 
 impl Drop for DeviceLostClosureRust {
-    fn drop(&mut self) {
-        if !self.consumed {
-            panic!("DeviceLostClosureRust must be consumed before it is dropped.");
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 #[repr(C)]
@@ -232,11 +157,7 @@ pub struct DeviceLostClosureC {
 unsafe impl Send for DeviceLostClosureC {}
 
 impl Drop for DeviceLostClosureC {
-    fn drop(&mut self) {
-        if !self.consumed {
-            panic!("DeviceLostClosureC must be consumed before it is dropped.");
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 pub struct DeviceLostClosure {
@@ -257,15 +178,7 @@ enum DeviceLostClosureInner {
 }
 
 impl DeviceLostClosure {
-    pub fn from_rust(callback: DeviceLostCallback) -> Self {
-        let inner = DeviceLostClosureRust {
-            callback,
-            consumed: false,
-        };
-        Self {
-            inner: DeviceLostClosureInner::Rust { inner },
-        }
-    }
+    pub fn from_rust(callback: DeviceLostCallback) -> Self { todo!() }
 
     /// # Safety
     ///
@@ -274,41 +187,9 @@ impl DeviceLostClosure {
     ///
     /// - Both pointers must point to `'static` data, as the callback may happen at
     ///   an unspecified time.
-    pub unsafe fn from_c(mut closure: DeviceLostClosureC) -> Self {
-        // Build an inner with the values from closure, ensuring that
-        // inner.consumed is false.
-        let inner = DeviceLostClosureC {
-            callback: closure.callback,
-            user_data: closure.user_data,
-            consumed: false,
-        };
+    pub unsafe fn from_c(mut closure: DeviceLostClosureC) -> Self { todo!() }
 
-        // Mark the original closure as consumed, so we can safely drop it.
-        closure.consumed = true;
-
-        Self {
-            inner: DeviceLostClosureInner::C { inner },
-        }
-    }
-
-    pub(crate) fn call(self, reason: DeviceLostReason, message: String) {
-        match self.inner {
-            DeviceLostClosureInner::Rust { mut inner } => {
-                inner.consumed = true;
-
-                (inner.callback)(reason, message)
-            }
-            // SAFETY: the contract of the call to from_c says that this unsafe is sound.
-            DeviceLostClosureInner::C { mut inner } => unsafe {
-                inner.consumed = true;
-
-                // Ensure message is structured as a null-terminated C string. It only
-                // needs to live as long as the callback invocation.
-                let message = std::ffi::CString::new(message).unwrap();
-                (inner.callback)(inner.user_data, reason as u8, message.as_ptr())
-            },
-        }
-    }
+    pub(crate) fn call(self, reason: DeviceLostReason, message: String) { todo!() }
 }
 
 fn map_buffer<A: HalApi>(
@@ -318,63 +199,7 @@ fn map_buffer<A: HalApi>(
     size: BufferAddress,
     kind: HostMap,
     snatch_guard: &SnatchGuard,
-) -> Result<ptr::NonNull<u8>, BufferAccessError> {
-    let raw_buffer = buffer
-        .raw(snatch_guard)
-        .ok_or(BufferAccessError::Destroyed)?;
-    let mapping = unsafe {
-        raw.map_buffer(raw_buffer, offset..offset + size)
-            .map_err(DeviceError::from)?
-    };
-
-    *buffer.sync_mapped_writes.lock() = match kind {
-        HostMap::Read if !mapping.is_coherent => unsafe {
-            raw.invalidate_mapped_ranges(raw_buffer, iter::once(offset..offset + size));
-            None
-        },
-        HostMap::Write if !mapping.is_coherent => Some(offset..offset + size),
-        _ => None,
-    };
-
-    assert_eq!(offset % wgt::COPY_BUFFER_ALIGNMENT, 0);
-    assert_eq!(size % wgt::COPY_BUFFER_ALIGNMENT, 0);
-    // Zero out uninitialized parts of the mapping. (Spec dictates all resources
-    // behave as if they were initialized with zero)
-    //
-    // If this is a read mapping, ideally we would use a `clear_buffer` command
-    // before reading the data from GPU (i.e. `invalidate_range`). However, this
-    // would require us to kick off and wait for a command buffer or piggy back
-    // on an existing one (the later is likely the only worthwhile option). As
-    // reading uninitialized memory isn't a particular important path to
-    // support, we instead just initialize the memory here and make sure it is
-    // GPU visible, so this happens at max only once for every buffer region.
-    //
-    // If this is a write mapping zeroing out the memory here is the only
-    // reasonable way as all data is pushed to GPU anyways.
-
-    // No need to flush if it is flushed later anyways.
-    let zero_init_needs_flush_now =
-        mapping.is_coherent && buffer.sync_mapped_writes.lock().is_none();
-    let mapped = unsafe { std::slice::from_raw_parts_mut(mapping.ptr.as_ptr(), size as usize) };
-
-    for uninitialized in buffer
-        .initialization_status
-        .write()
-        .drain(offset..(size + offset))
-    {
-        // The mapping's pointer is already offset, however we track the
-        // uninitialized range relative to the buffer's start.
-        let fill_range =
-            (uninitialized.start - offset) as usize..(uninitialized.end - offset) as usize;
-        mapped[fill_range].fill(0);
-
-        if zero_init_needs_flush_now {
-            unsafe { raw.flush_mapped_ranges(raw_buffer, iter::once(uninitialized)) };
-        }
-    }
-
-    Ok(mapping.ptr)
-}
+) -> Result<ptr::NonNull<u8>, BufferAccessError> { todo!() }
 
 #[derive(Clone, Debug, Error)]
 #[error("Device is invalid")]
@@ -398,13 +223,7 @@ pub enum DeviceError {
 }
 
 impl From<hal::DeviceError> for DeviceError {
-    fn from(error: hal::DeviceError) -> Self {
-        match error {
-            hal::DeviceError::Lost => DeviceError::Lost,
-            hal::DeviceError::OutOfMemory => DeviceError::OutOfMemory,
-            hal::DeviceError::ResourceCreationFailed => DeviceError::ResourceCreationFailed,
-        }
-    }
+    fn from(error: hal::DeviceError) -> Self { todo!() }
 }
 
 #[derive(Clone, Debug, Error)]
@@ -431,14 +250,5 @@ pub struct ImplicitPipelineIds<'a> {
 }
 
 impl ImplicitPipelineIds<'_> {
-    fn prepare<A: HalApi>(self, hub: &Hub<A>) -> ImplicitPipelineContext {
-        ImplicitPipelineContext {
-            root_id: hub.pipeline_layouts.prepare(self.root_id).into_id(),
-            group_ids: self
-                .group_ids
-                .iter()
-                .map(|id_in| hub.bind_group_layouts.prepare(*id_in).into_id())
-                .collect(),
-        }
-    }
+    fn prepare<A: HalApi>(self, hub: &Hub<A>) -> ImplicitPipelineContext { todo!() }
 }

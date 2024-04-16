@@ -57,48 +57,14 @@ impl IdentityValues {
     ///
     /// The backend is incorporated into the id, so that ids allocated with
     /// different `backend` values are always distinct.
-    pub fn alloc<T: Marker>(&mut self, backend: Backend) -> Id<T> {
-        assert!(
-            self.id_source != IdSource::External,
-            "Mix of internally allocated and externally provided IDs"
-        );
-        self.id_source = IdSource::Allocated;
+    pub fn alloc<T: Marker>(&mut self, backend: Backend) -> Id<T> { todo!() }
 
-        self.count += 1;
-        match self.free.pop() {
-            Some((index, epoch)) => Id::zip(index, epoch + 1, backend),
-            None => {
-                let index = self.next_index;
-                self.next_index += 1;
-                let epoch = 1;
-                Id::zip(index, epoch, backend)
-            }
-        }
-    }
-
-    pub fn mark_as_used<T: Marker>(&mut self, id: Id<T>) -> Id<T> {
-        assert!(
-            self.id_source != IdSource::Allocated,
-            "Mix of internally allocated and externally provided IDs"
-        );
-        self.id_source = IdSource::External;
-
-        self.count += 1;
-        id
-    }
+    pub fn mark_as_used<T: Marker>(&mut self, id: Id<T>) -> Id<T> { todo!() }
 
     /// Free `id`. It will never be returned from `alloc` again.
-    pub fn release<T: Marker>(&mut self, id: Id<T>) {
-        if let IdSource::Allocated = self.id_source {
-            let (index, epoch, _backend) = id.unzip();
-            self.free.push((index, epoch));
-        }
-        self.count -= 1;
-    }
+    pub fn release<T: Marker>(&mut self, id: Id<T>) { todo!() }
 
-    pub fn count(&self) -> usize {
-        self.count
-    }
+    pub fn count(&self) -> usize { todo!() }
 }
 
 #[derive(Debug)]
@@ -108,39 +74,14 @@ pub struct IdentityManager<T: Marker> {
 }
 
 impl<T: Marker> IdentityManager<T> {
-    pub fn process(&self, backend: Backend) -> Id<T> {
-        self.values.lock().alloc(backend)
-    }
-    pub fn mark_as_used(&self, id: Id<T>) -> Id<T> {
-        self.values.lock().mark_as_used(id)
-    }
-    pub fn free(&self, id: Id<T>) {
-        self.values.lock().release(id)
-    }
+    pub fn process(&self, backend: Backend) -> Id<T> { todo!() }
+    pub fn mark_as_used(&self, id: Id<T>) -> Id<T> { todo!() }
+    pub fn free(&self, id: Id<T>) { todo!() }
 }
 
 impl<T: Marker> IdentityManager<T> {
-    pub fn new() -> Self {
-        Self {
-            values: Mutex::new(IdentityValues {
-                free: Vec::new(),
-                next_index: 0,
-                count: 0,
-                id_source: IdSource::None,
-            }),
-            _phantom: PhantomData,
-        }
-    }
+    pub fn new() -> Self { todo!() }
 }
 
 #[test]
-fn test_epoch_end_of_life() {
-    use crate::id;
-    let man = IdentityManager::<id::markers::Buffer>::new();
-    let id1 = man.process(Backend::Empty);
-    assert_eq!(id1.unzip(), (0, 1, Backend::Empty));
-    man.free(id1);
-    let id2 = man.process(Backend::Empty);
-    // confirm that the epoch 1 is no longer re-used
-    assert_eq!(id2.unzip(), (0, 2, Backend::Empty));
-}
+fn test_epoch_end_of_life() { todo!() }

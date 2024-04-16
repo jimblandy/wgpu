@@ -109,25 +109,7 @@ pub enum RenderCommandError {
     Unimplemented(&'static str),
 }
 impl crate::error::PrettyError for RenderCommandError {
-    fn fmt_pretty(&self, fmt: &mut ErrorFormatter) {
-        fmt.error(self);
-        match *self {
-            Self::InvalidBindGroup(id) => {
-                fmt.bind_group_label(&id);
-            }
-            Self::InvalidPipeline(id) => {
-                fmt.render_pipeline_label(&id);
-            }
-            Self::UsageConflict(UsageConflict::TextureInvalid { id }) => {
-                fmt.texture_label(&id);
-            }
-            Self::UsageConflict(UsageConflict::BufferInvalid { id })
-            | Self::DestroyedBuffer(id) => {
-                fmt.buffer_label(&id);
-            }
-            _ => {}
-        };
-    }
+    fn fmt_pretty(&self, fmt: &mut ErrorFormatter) { todo!() }
 }
 
 #[derive(Clone, Copy, Debug, Default)]

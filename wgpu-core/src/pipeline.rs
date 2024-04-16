@@ -55,19 +55,7 @@ pub struct ShaderModule<A: HalApi> {
 }
 
 impl<A: HalApi> Drop for ShaderModule<A> {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw.take() {
-            resource_log!("Destroy raw ShaderModule {:?}", self.info.label());
-            #[cfg(feature = "trace")]
-            if let Some(t) = self.device.trace.lock().as_mut() {
-                t.add(trace::Action::DestroyShaderModule(self.info.id()));
-            }
-            unsafe {
-                use hal::Device;
-                self.device.raw().destroy_shader_module(raw);
-            }
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 impl<A: HalApi> Resource for ShaderModule<A> {
@@ -75,36 +63,21 @@ impl<A: HalApi> Resource for ShaderModule<A> {
 
     type Marker = crate::id::markers::ShaderModule;
 
-    fn as_info(&self) -> &ResourceInfo<Self> {
-        &self.info
-    }
+    fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
-    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> {
-        &mut self.info
-    }
+    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
 
-    fn label(&self) -> String {
-        self.label.clone()
-    }
+    fn label(&self) -> String { todo!() }
 }
 
 impl<A: HalApi> ShaderModule<A> {
-    pub(crate) fn raw(&self) -> &A::ShaderModule {
-        self.raw.as_ref().unwrap()
-    }
+    pub(crate) fn raw(&self) -> &A::ShaderModule { todo!() }
 
     pub(crate) fn finalize_entry_point_name(
         &self,
         stage_bit: wgt::ShaderStages,
         entry_point: Option<&str>,
-    ) -> Result<String, validation::StageError> {
-        match &self.interface {
-            Some(interface) => interface.finalize_entry_point_name(stage_bit, entry_point),
-            None => entry_point
-                .map(|ep| ep.to_string())
-                .ok_or(validation::StageError::NoEntryPointFound),
-        }
-    }
+    ) -> Result<String, validation::StageError> { todo!() }
 }
 
 #[derive(Clone, Debug)]
@@ -115,67 +88,25 @@ pub struct ShaderError<E> {
 }
 #[cfg(feature = "wgsl")]
 impl fmt::Display for ShaderError<naga::front::wgsl::ParseError> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = self.label.as_deref().unwrap_or_default();
-        let string = self.inner.emit_to_string(&self.source);
-        write!(f, "\nShader '{label}' parsing {string}")
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { todo!() }
 }
 #[cfg(feature = "glsl")]
 impl fmt::Display for ShaderError<naga::front::glsl::ParseError> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = self.label.as_deref().unwrap_or_default();
-        let string = self.inner.emit_to_string(&self.source);
-        write!(f, "\nShader '{label}' parsing {string}")
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { todo!() }
 }
 #[cfg(feature = "spirv")]
 impl fmt::Display for ShaderError<naga::front::spv::Error> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = self.label.as_deref().unwrap_or_default();
-        let string = self.inner.emit_to_string(&self.source);
-        write!(f, "\nShader '{label}' parsing {string}")
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { todo!() }
 }
 impl fmt::Display for ShaderError<naga::WithSpan<naga::valid::ValidationError>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use codespan_reporting::{
-            diagnostic::{Diagnostic, Label},
-            files::SimpleFile,
-            term,
-        };
-
-        let label = self.label.as_deref().unwrap_or_default();
-        let files = SimpleFile::new(label, &self.source);
-        let config = term::Config::default();
-        let mut writer = term::termcolor::NoColor::new(Vec::new());
-
-        let diagnostic = Diagnostic::error().with_labels(
-            self.inner
-                .spans()
-                .map(|&(span, ref desc)| {
-                    Label::primary((), span.to_range().unwrap()).with_message(desc.to_owned())
-                })
-                .collect(),
-        );
-
-        term::emit(&mut writer, &config, &files, &diagnostic).expect("cannot write error");
-
-        write!(
-            f,
-            "\nShader validation {}",
-            String::from_utf8_lossy(&writer.into_inner())
-        )
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { todo!() }
 }
 impl<E> Error for ShaderError<E>
 where
     ShaderError<E>: fmt::Display,
     E: Error + 'static,
 {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&self.inner)
-    }
+    fn source(&self) -> Option<&(dyn Error + 'static)> { todo!() }
 }
 
 //Note: `Clone` would require `WithSpan: Clone`.
@@ -210,14 +141,7 @@ pub enum CreateShaderModuleError {
 }
 
 impl CreateShaderModuleError {
-    pub fn location(&self, source: &str) -> Option<naga::SourceLocation> {
-        match *self {
-            #[cfg(feature = "wgsl")]
-            CreateShaderModuleError::Parsing(ref err) => err.inner.location(source),
-            CreateShaderModuleError::Validation(ref err) => err.inner.location(source),
-            _ => None,
-        }
-    }
+    pub fn location(&self, source: &str) -> Option<naga::SourceLocation> { todo!() }
 }
 
 /// Describes a programmable pipeline stage.
@@ -298,21 +222,7 @@ pub struct ComputePipeline<A: HalApi> {
 }
 
 impl<A: HalApi> Drop for ComputePipeline<A> {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw.take() {
-            resource_log!("Destroy raw ComputePipeline {:?}", self.info.label());
-
-            #[cfg(feature = "trace")]
-            if let Some(t) = self.device.trace.lock().as_mut() {
-                t.add(trace::Action::DestroyComputePipeline(self.info.id()));
-            }
-
-            unsafe {
-                use hal::Device;
-                self.device.raw().destroy_compute_pipeline(raw);
-            }
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 impl<A: HalApi> Resource for ComputePipeline<A> {
@@ -320,19 +230,13 @@ impl<A: HalApi> Resource for ComputePipeline<A> {
 
     type Marker = crate::id::markers::ComputePipeline;
 
-    fn as_info(&self) -> &ResourceInfo<Self> {
-        &self.info
-    }
+    fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
-    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> {
-        &mut self.info
-    }
+    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
 }
 
 impl<A: HalApi> ComputePipeline<A> {
-    pub(crate) fn raw(&self) -> &A::ComputePipeline {
-        self.raw.as_ref().unwrap()
-    }
+    pub(crate) fn raw(&self) -> &A::ComputePipeline { todo!() }
 }
 
 /// Describes how the vertex buffer is interpreted.
@@ -523,13 +427,7 @@ pub struct VertexStep {
 }
 
 impl Default for VertexStep {
-    fn default() -> Self {
-        Self {
-            stride: 0,
-            last_stride: 0,
-            mode: wgt::VertexStepMode::Vertex,
-        }
-    }
+    fn default() -> Self { todo!() }
 }
 
 #[derive(Debug)]
@@ -548,21 +446,7 @@ pub struct RenderPipeline<A: HalApi> {
 }
 
 impl<A: HalApi> Drop for RenderPipeline<A> {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw.take() {
-            resource_log!("Destroy raw RenderPipeline {:?}", self.info.label());
-
-            #[cfg(feature = "trace")]
-            if let Some(t) = self.device.trace.lock().as_mut() {
-                t.add(trace::Action::DestroyRenderPipeline(self.info.id()));
-            }
-
-            unsafe {
-                use hal::Device;
-                self.device.raw().destroy_render_pipeline(raw);
-            }
-        }
-    }
+    fn drop(&mut self) { todo!() }
 }
 
 impl<A: HalApi> Resource for RenderPipeline<A> {
@@ -570,17 +454,11 @@ impl<A: HalApi> Resource for RenderPipeline<A> {
 
     type Marker = crate::id::markers::RenderPipeline;
 
-    fn as_info(&self) -> &ResourceInfo<Self> {
-        &self.info
-    }
+    fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
-    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> {
-        &mut self.info
-    }
+    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
 }
 
 impl<A: HalApi> RenderPipeline<A> {
-    pub(crate) fn raw(&self) -> &A::RenderPipeline {
-        self.raw.as_ref().unwrap()
-    }
+    pub(crate) fn raw(&self) -> &A::RenderPipeline { todo!() }
 }

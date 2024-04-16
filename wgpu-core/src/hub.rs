@@ -138,9 +138,7 @@ pub struct HubReport {
 }
 
 impl HubReport {
-    pub fn is_empty(&self) -> bool {
-        self.adapters.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { todo!() }
 }
 
 #[allow(rustdoc::private_intra_doc_links)]
@@ -189,104 +187,16 @@ pub struct Hub<A: HalApi> {
 }
 
 impl<A: HalApi> Hub<A> {
-    fn new() -> Self {
-        Self {
-            adapters: Registry::new(A::VARIANT),
-            devices: Registry::new(A::VARIANT),
-            queues: Registry::new(A::VARIANT),
-            pipeline_layouts: Registry::new(A::VARIANT),
-            shader_modules: Registry::new(A::VARIANT),
-            bind_group_layouts: Registry::new(A::VARIANT),
-            bind_groups: Registry::new(A::VARIANT),
-            command_buffers: Registry::new(A::VARIANT),
-            render_bundles: Registry::new(A::VARIANT),
-            render_pipelines: Registry::new(A::VARIANT),
-            compute_pipelines: Registry::new(A::VARIANT),
-            query_sets: Registry::new(A::VARIANT),
-            buffers: Registry::new(A::VARIANT),
-            staging_buffers: Registry::new(A::VARIANT),
-            textures: Registry::new(A::VARIANT),
-            texture_views: Registry::new(A::VARIANT),
-            samplers: Registry::new(A::VARIANT),
-        }
-    }
+    fn new() -> Self { todo!() }
 
     //TODO: instead of having a hacky `with_adapters` parameter,
     // we should have `clear_device(device_id)` that specifically destroys
     // everything related to a logical device.
-    pub(crate) fn clear(&self, surface_guard: &Storage<Surface>, with_adapters: bool) {
-        use hal::Surface;
+    pub(crate) fn clear(&self, surface_guard: &Storage<Surface>, with_adapters: bool) { todo!() }
 
-        let mut devices = self.devices.write();
-        for element in devices.map.iter() {
-            if let Element::Occupied(ref device, _) = *element {
-                device.prepare_to_die();
-            }
-        }
+    pub(crate) fn surface_unconfigure(&self, device: &Device<A>, surface: &A::Surface) { todo!() }
 
-        self.command_buffers.write().map.clear();
-        self.samplers.write().map.clear();
-        self.texture_views.write().map.clear();
-        self.textures.write().map.clear();
-        self.buffers.write().map.clear();
-        self.bind_groups.write().map.clear();
-        self.shader_modules.write().map.clear();
-        self.bind_group_layouts.write().map.clear();
-        self.pipeline_layouts.write().map.clear();
-        self.compute_pipelines.write().map.clear();
-        self.render_pipelines.write().map.clear();
-        self.query_sets.write().map.clear();
-
-        for element in surface_guard.map.iter() {
-            if let Element::Occupied(ref surface, _epoch) = *element {
-                if let Some(ref mut present) = surface.presentation.lock().take() {
-                    if let Some(device) = present.device.downcast_ref::<A>() {
-                        let suf = A::get_surface(surface);
-                        unsafe {
-                            suf.unwrap().unconfigure(device.raw());
-                            //TODO: we could destroy the surface here
-                        }
-                    }
-                }
-            }
-        }
-
-        self.queues.write().map.clear();
-        devices.map.clear();
-
-        if with_adapters {
-            drop(devices);
-            self.adapters.write().map.clear();
-        }
-    }
-
-    pub(crate) fn surface_unconfigure(&self, device: &Device<A>, surface: &A::Surface) {
-        unsafe {
-            use hal::Surface;
-            surface.unconfigure(device.raw());
-        }
-    }
-
-    pub fn generate_report(&self) -> HubReport {
-        HubReport {
-            adapters: self.adapters.generate_report(),
-            devices: self.devices.generate_report(),
-            queues: self.queues.generate_report(),
-            pipeline_layouts: self.pipeline_layouts.generate_report(),
-            shader_modules: self.shader_modules.generate_report(),
-            bind_group_layouts: self.bind_group_layouts.generate_report(),
-            bind_groups: self.bind_groups.generate_report(),
-            command_buffers: self.command_buffers.generate_report(),
-            render_bundles: self.render_bundles.generate_report(),
-            render_pipelines: self.render_pipelines.generate_report(),
-            compute_pipelines: self.compute_pipelines.generate_report(),
-            query_sets: self.query_sets.generate_report(),
-            buffers: self.buffers.generate_report(),
-            textures: self.textures.generate_report(),
-            texture_views: self.texture_views.generate_report(),
-            samplers: self.samplers.generate_report(),
-        }
-    }
+    pub fn generate_report(&self) -> HubReport { todo!() }
 }
 
 pub struct Hubs {
@@ -303,18 +213,5 @@ pub struct Hubs {
 }
 
 impl Hubs {
-    pub(crate) fn new() -> Self {
-        Self {
-            #[cfg(vulkan)]
-            vulkan: Hub::new(),
-            #[cfg(metal)]
-            metal: Hub::new(),
-            #[cfg(dx12)]
-            dx12: Hub::new(),
-            #[cfg(gles)]
-            gl: Hub::new(),
-            #[cfg(all(not(vulkan), not(metal), not(dx12), not(gles)))]
-            empty: Hub::new(),
-        }
-    }
+    pub(crate) fn new() -> Self { todo!() }
 }

@@ -25,41 +25,27 @@ pub type PreHashedMap<K, V> =
 pub struct PreHashedKey<K>(u64, std::marker::PhantomData<fn() -> K>);
 
 impl<K> std::fmt::Debug for PreHashedKey<K> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("PreHashedKey").field(&self.0).finish()
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { todo!() }
 }
 
 impl<K> Copy for PreHashedKey<K> {}
 
 impl<K> Clone for PreHashedKey<K> {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { todo!() }
 }
 
 impl<K> PartialEq for PreHashedKey<K> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
+    fn eq(&self, other: &Self) -> bool { todo!() }
 }
 
 impl<K> Eq for PreHashedKey<K> {}
 
 impl<K> std::hash::Hash for PreHashedKey<K> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) { todo!() }
 }
 
 impl<K: std::hash::Hash> PreHashedKey<K> {
-    pub fn from_key(key: &K) -> Self {
-        use std::hash::Hasher;
-
-        let mut hasher = rustc_hash::FxHasher::default();
-        key.hash(&mut hasher);
-        Self(hasher.finish(), std::marker::PhantomData)
-    }
+    pub fn from_key(key: &K) -> Self { todo!() }
 }
 
 /// A hasher which does nothing. Useful for when you want to use a map with pre-hashed keys.
@@ -72,15 +58,7 @@ pub struct IdentityHasher {
 }
 
 impl std::hash::Hasher for IdentityHasher {
-    fn write(&mut self, bytes: &[u8]) {
-        self.hash = u64::from_ne_bytes(
-            bytes
-                .try_into()
-                .expect("identity hasher must be given exactly 8 bytes"),
-        );
-    }
+    fn write(&mut self, bytes: &[u8]) { todo!() }
 
-    fn finish(&self) -> u64 {
-        self.hash
-    }
+    fn finish(&self) -> u64 { todo!() }
 }

@@ -22,54 +22,29 @@ pub(super) struct ResourceMetadata<T: Resource> {
 }
 
 impl<T: Resource> ResourceMetadata<T> {
-    pub(super) fn new() -> Self {
-        Self {
-            owned: BitVec::default(),
-            resources: Vec::new(),
-        }
-    }
+    pub(super) fn new() -> Self { todo!() }
 
     /// Returns the number of indices we can accommodate.
-    pub(super) fn size(&self) -> usize {
-        self.owned.len()
-    }
+    pub(super) fn size(&self) -> usize { todo!() }
 
-    pub(super) fn set_size(&mut self, size: usize) {
-        self.resources.resize(size, None);
-        resize_bitvec(&mut self.owned, size);
-    }
+    pub(super) fn set_size(&mut self, size: usize) { todo!() }
 
-    pub(super) fn clear(&mut self) {
-        self.resources.clear();
-        self.owned.clear();
-    }
+    pub(super) fn clear(&mut self) { todo!() }
 
     /// Ensures a given index is in bounds for all arrays and does
     /// sanity checks of the presence of a refcount.
     ///
     /// In release mode this function is completely empty and is removed.
     #[cfg_attr(not(feature = "strict_asserts"), allow(unused_variables))]
-    pub(super) fn tracker_assert_in_bounds(&self, index: usize) {
-        strict_assert!(index < self.owned.len());
-        strict_assert!(index < self.resources.len());
-        strict_assert!(if self.contains(index) {
-            self.resources[index].is_some()
-        } else {
-            true
-        });
-    }
+    pub(super) fn tracker_assert_in_bounds(&self, index: usize) { todo!() }
 
     /// Returns true if the tracker owns no resources.
     ///
     /// This is a O(n) operation.
-    pub(super) fn is_empty(&self) -> bool {
-        !self.owned.any()
-    }
+    pub(super) fn is_empty(&self) -> bool { todo!() }
 
     /// Returns true if the set contains the resource with the given index.
-    pub(super) fn contains(&self, index: usize) -> bool {
-        self.owned[index]
-    }
+    pub(super) fn contains(&self, index: usize) -> bool { todo!() }
 
     /// Returns true if the set contains the resource with the given index.
     ///
@@ -78,9 +53,7 @@ impl<T: Resource> ResourceMetadata<T> {
     /// The given `index` must be in bounds for this `ResourceMetadata`'s
     /// existing tables. See `tracker_assert_in_bounds`.
     #[inline(always)]
-    pub(super) unsafe fn contains_unchecked(&self, index: usize) -> bool {
-        unsafe { self.owned.get(index).unwrap_unchecked() }
-    }
+    pub(super) unsafe fn contains_unchecked(&self, index: usize) -> bool { todo!() }
 
     /// Insert a resource into the set.
     ///
@@ -92,12 +65,7 @@ impl<T: Resource> ResourceMetadata<T> {
     /// The given `index` must be in bounds for this `ResourceMetadata`'s
     /// existing tables. See `tracker_assert_in_bounds`.
     #[inline(always)]
-    pub(super) unsafe fn insert(&mut self, index: usize, resource: Arc<T>) {
-        self.owned.set(index, true);
-        unsafe {
-            *self.resources.get_unchecked_mut(index) = Some(resource);
-        }
-    }
+    pub(super) unsafe fn insert(&mut self, index: usize, resource: Arc<T>) { todo!() }
 
     /// Get the resource with the given index.
     ///
@@ -106,14 +74,7 @@ impl<T: Resource> ResourceMetadata<T> {
     /// The given `index` must be in bounds for this `ResourceMetadata`'s
     /// existing tables. See `tracker_assert_in_bounds`.
     #[inline(always)]
-    pub(super) unsafe fn get_resource_unchecked(&self, index: usize) -> &Arc<T> {
-        unsafe {
-            self.resources
-                .get_unchecked(index)
-                .as_ref()
-                .unwrap_unchecked()
-        }
-    }
+    pub(super) unsafe fn get_resource_unchecked(&self, index: usize) -> &Arc<T> { todo!() }
 
     /// Get the reference count of the resource with the given index.
     ///
@@ -122,51 +83,19 @@ impl<T: Resource> ResourceMetadata<T> {
     /// The given `index` must be in bounds for this `ResourceMetadata`'s
     /// existing tables. See `tracker_assert_in_bounds`.
     #[inline(always)]
-    pub(super) unsafe fn get_ref_count_unchecked(&self, index: usize) -> usize {
-        unsafe { Arc::strong_count(self.get_resource_unchecked(index)) }
-    }
+    pub(super) unsafe fn get_ref_count_unchecked(&self, index: usize) -> usize { todo!() }
 
     /// Returns an iterator over the resources owned by `self`.
-    pub(super) fn owned_resources(&self) -> impl Iterator<Item = Arc<T>> + '_ {
-        if !self.owned.is_empty() {
-            self.tracker_assert_in_bounds(self.owned.len() - 1)
-        };
-        iterate_bitvec_indices(&self.owned).map(move |index| {
-            let resource = unsafe { self.resources.get_unchecked(index) };
-            resource.as_ref().unwrap().clone()
-        })
-    }
+    pub(super) fn owned_resources(&self) -> impl Iterator<Item = Arc<T>> + '_ { std::iter::empty() }
 
     /// Returns an iterator over the resources owned by `self`.
-    pub(super) fn drain_resources(&mut self) -> Vec<Arc<T>> {
-        if !self.owned.is_empty() {
-            self.tracker_assert_in_bounds(self.owned.len() - 1)
-        };
-        let mut resources = Vec::new();
-        iterate_bitvec_indices(&self.owned).for_each(|index| {
-            let resource = unsafe { self.resources.get_unchecked(index) };
-            resources.push(resource.as_ref().unwrap().clone());
-        });
-        self.owned.clear();
-        self.resources.clear();
-        resources
-    }
+    pub(super) fn drain_resources(&mut self) -> Vec<Arc<T>> { todo!() }
 
     /// Returns an iterator over the indices of all resources owned by `self`.
-    pub(super) fn owned_indices(&self) -> impl Iterator<Item = usize> + '_ {
-        if !self.owned.is_empty() {
-            self.tracker_assert_in_bounds(self.owned.len() - 1)
-        };
-        iterate_bitvec_indices(&self.owned)
-    }
+    pub(super) fn owned_indices(&self) -> impl Iterator<Item = usize> + '_ { std::iter::empty() }
 
     /// Remove the resource with the given index from the set.
-    pub(super) unsafe fn remove(&mut self, index: usize) {
-        unsafe {
-            *self.resources.get_unchecked_mut(index) = None;
-        }
-        self.owned.set(index, false);
-    }
+    pub(super) unsafe fn remove(&mut self, index: usize) { todo!() }
 }
 
 /// A source of resource metadata.
@@ -187,53 +116,13 @@ impl<T: Resource> ResourceMetadataProvider<'_, T> {
     /// - The index must be in bounds of the metadata tracker if this uses an indirect source.
     /// - info must be Some if this uses a Resource source.
     #[inline(always)]
-    pub(super) unsafe fn get_own(self, index: usize) -> Arc<T> {
-        match self {
-            ResourceMetadataProvider::Direct { resource } => resource.into_owned(),
-            ResourceMetadataProvider::Indirect { metadata } => {
-                metadata.tracker_assert_in_bounds(index);
-                {
-                    let resource = unsafe { metadata.resources.get_unchecked(index) };
-                    unsafe { resource.clone().unwrap_unchecked() }
-                }
-            }
-        }
-    }
+    pub(super) unsafe fn get_own(self, index: usize) -> Arc<T> { todo!() }
 }
 
 /// Resizes the given bitvec to the given size. I'm not sure why this is hard to do but it is.
-fn resize_bitvec<B: bit_vec::BitBlock>(vec: &mut BitVec<B>, size: usize) {
-    let owned_size_to_grow = size.checked_sub(vec.len());
-    if let Some(delta) = owned_size_to_grow {
-        if delta != 0 {
-            vec.grow(delta, false);
-        }
-    } else {
-        vec.truncate(size);
-    }
-}
+fn resize_bitvec<B: bit_vec::BitBlock>(vec: &mut BitVec<B>, size: usize) { todo!() }
 
 /// Produces an iterator that yields the indexes of all bits that are set in the bitvec.
 ///
 /// Will skip entire usize's worth of bits if they are all false.
-fn iterate_bitvec_indices(ownership: &BitVec<usize>) -> impl Iterator<Item = usize> + '_ {
-    const BITS_PER_BLOCK: usize = mem::size_of::<usize>() * 8;
-
-    let size = ownership.len();
-
-    ownership
-        .blocks()
-        .enumerate()
-        .filter(|&(_, word)| word != 0)
-        .flat_map(move |(word_index, mut word)| {
-            let bit_start = word_index * BITS_PER_BLOCK;
-            let bit_end = (bit_start + BITS_PER_BLOCK).min(size);
-
-            (bit_start..bit_end).filter(move |_| {
-                let active = word & 0b1 != 0;
-                word >>= 1;
-
-                active
-            })
-        })
-}
+fn iterate_bitvec_indices(ownership: &BitVec<usize>) -> impl Iterator<Item = usize> + '_ { std::iter::empty() }
