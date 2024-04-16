@@ -8,8 +8,6 @@ use crate::{
     },
     command::{
         bind::Binder,
-        end_pipeline_statistics_query,
-        memory_init::{fixup_discarded_surfaces, SurfacesInDiscardState},
         BasePass, BasePassRef, BindGroupStateChange, CommandBuffer, CommandEncoderError,
         CommandEncoderStatus, MapPassErr, PassErrorScope, QueryUseError, StateChange,
     },
@@ -97,21 +95,6 @@ pub struct ComputePass {
     base: BasePass<ComputeCommand>,
     parent_id: id::CommandEncoderId,
     timestamp_writes: Option<ComputePassTimestampWrites>,
-
-    // Resource binding dedupe state.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    current_bind_groups: BindGroupStateChange,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    current_pipeline: StateChange<id::ComputePipelineId>,
-}
-
-impl ComputePass {
-    pub fn new(parent_id: id::CommandEncoderId, desc: &ComputePassDescriptor) -> Self { todo!() }
-
-    pub fn parent_id(&self) -> id::CommandEncoderId { todo!() }
-
-    #[cfg(feature = "trace")]
-    pub fn into_command(self) -> crate::device::trace::Command { todo!() }
 }
 
 impl fmt::Debug for ComputePass {
@@ -141,63 +124,11 @@ pub struct ComputePassDescriptor<'a> {
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum DispatchError {
-    #[error("Compute pipeline must be set")]
-    MissingPipeline,
-    #[error("Incompatible bind group at index {index} in the current compute pipeline")]
-    IncompatibleBindGroup { index: u32, diff: Vec<String> },
-    #[error(
-        "Each current dispatch group size dimension ({current:?}) must be less or equal to {limit}"
-    )]
-    InvalidGroupSize { current: [u32; 3], limit: u32 },
-    #[error(transparent)]
-    BindingSizeTooSmall(#[from] LateMinBufferBindingSizeMismatch),
 }
 
 /// Error encountered when performing a compute pass.
 #[derive(Clone, Debug, Error)]
 pub enum ComputePassErrorInner {
-    #[error(transparent)]
-    Device(#[from] DeviceError),
-    #[error(transparent)]
-    Encoder(#[from] CommandEncoderError),
-    #[error("Bind group at index {0:?} is invalid")]
-    InvalidBindGroup(usize),
-    #[error("Device {0:?} is invalid")]
-    InvalidDevice(DeviceId),
-    #[error("Bind group index {index} is greater than the device's requested `max_bind_group` limit {max}")]
-    BindGroupIndexOutOfRange { index: u32, max: u32 },
-    #[error("Compute pipeline {0:?} is invalid")]
-    InvalidPipeline(id::ComputePipelineId),
-    #[error("QuerySet {0:?} is invalid")]
-    InvalidQuerySet(id::QuerySetId),
-    #[error("Indirect buffer {0:?} is invalid or destroyed")]
-    InvalidIndirectBuffer(id::BufferId),
-    #[error("Indirect buffer uses bytes {offset}..{end_offset} which overruns indirect buffer of size {buffer_size}")]
-    IndirectBufferOverrun {
-        offset: u64,
-        end_offset: u64,
-        buffer_size: u64,
-    },
-    #[error("Buffer {0:?} is invalid or destroyed")]
-    InvalidBuffer(id::BufferId),
-    #[error(transparent)]
-    ResourceUsageConflict(#[from] UsageConflict),
-    #[error(transparent)]
-    MissingBufferUsage(#[from] MissingBufferUsageError),
-    #[error("Cannot pop debug group, because number of pushed debug groups is zero")]
-    InvalidPopDebugGroup,
-    #[error(transparent)]
-    Dispatch(#[from] DispatchError),
-    #[error(transparent)]
-    Bind(#[from] BindError),
-    #[error(transparent)]
-    PushConstants(#[from] PushConstantUploadError),
-    #[error(transparent)]
-    QueryUse(#[from] QueryUseError),
-    #[error(transparent)]
-    MissingFeatures(#[from] MissingFeatures),
-    #[error(transparent)]
-    MissingDownlevelFlags(#[from] MissingDownlevelFlags),
 }
 
 impl PrettyError for ComputePassErrorInner {
@@ -223,45 +154,7 @@ where
     fn map_pass_err(self, scope: PassErrorScope) -> Result<T, ComputePassError> { todo!() }
 }
 
-struct State<'a, A: HalApi> {
-    binder: Binder<A>,
-    pipeline: Option<id::ComputePipelineId>,
-    scope: UsageScope<'a, A>,
-    debug_scope_depth: u32,
-}
-
-impl<'a, A: HalApi> State<'a, A> {
-    fn is_ready(&self) -> Result<(), DispatchError> { todo!() }
-
-    // `extra_buffer` is there to represent the indirect buffer that is also
-    // part of the usage scope.
-    fn flush_states(
-        &mut self,
-        raw_encoder: &mut A::CommandEncoder,
-        base_trackers: &mut Tracker<A>,
-        bind_group_guard: &Storage<BindGroup<A>>,
-        indirect_buffer: Option<TrackerIndex>,
-        snatch_guard: &SnatchGuard,
-    ) -> Result<(), UsageConflict> { todo!() }
-}
-
 // Common routines between render/compute
-
-impl Global {
-    pub fn command_encoder_run_compute_pass<A: HalApi>(
-        &self,
-        encoder_id: id::CommandEncoderId,
-        pass: &ComputePass,
-    ) -> Result<(), ComputePassError> { todo!() }
-
-    #[doc(hidden)]
-    pub fn command_encoder_run_compute_pass_impl<A: HalApi>(
-        &self,
-        encoder_id: id::CommandEncoderId,
-        base: BasePassRef<ComputeCommand>,
-        timestamp_writes: Option<&ComputePassTimestampWrites>,
-    ) -> Result<(), ComputePassError> { todo!() }
-}
 
 pub mod compute_ffi {
     use super::{ComputeCommand, ComputePass};

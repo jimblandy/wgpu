@@ -89,7 +89,7 @@ use crate::{
     conv,
     device::{
         AttachmentData, Device, DeviceError, MissingDownlevelFlags,
-        RenderPassCompatibilityCheckType, RenderPassContext, SHADER_STAGE_COUNT,
+        RenderPassCompatibilityCheckType, RenderPassContext,
     },
     error::{ErrorFormatter, PrettyError},
     hal_api::HalApi,
@@ -112,27 +112,6 @@ use thiserror::Error;
 use hal::CommandEncoder as _;
 
 use super::ArcRenderCommand;
-
-/// https://gpuweb.github.io/gpuweb/#dom-gpurendercommandsmixin-draw
-fn validate_draw<A: HalApi>(
-    vertex: &[Option<VertexState<A>>],
-    step: &[VertexStep],
-    first_vertex: u32,
-    vertex_count: u32,
-    first_instance: u32,
-    instance_count: u32,
-) -> Result<(), DrawError> { todo!() }
-
-// See https://gpuweb.github.io/gpuweb/#dom-gpurendercommandsmixin-drawindexed
-fn validate_indexed_draw<A: HalApi>(
-    vertex: &[Option<VertexState<A>>],
-    step: &[VertexStep],
-    index_state: &IndexState<A>,
-    first_index: u32,
-    index_count: u32,
-    first_instance: u32,
-    instance_count: u32,
-) -> Result<(), DrawError> { todo!() }
 
 /// Describes a [`RenderBundleEncoder`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -171,54 +150,6 @@ pub struct RenderBundleEncoder {
     pub(crate) context: RenderPassContext,
     pub(crate) is_depth_read_only: bool,
     pub(crate) is_stencil_read_only: bool,
-
-    // Resource binding dedupe state.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    current_bind_groups: BindGroupStateChange,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    current_pipeline: StateChange<id::RenderPipelineId>,
-}
-
-impl RenderBundleEncoder {
-    pub fn new(
-        desc: &RenderBundleEncoderDescriptor,
-        parent_id: id::DeviceId,
-        base: Option<BasePass<RenderCommand>>,
-    ) -> Result<Self, CreateRenderBundleError> { todo!() }
-
-    pub fn dummy(parent_id: id::DeviceId) -> Self { todo!() }
-
-    #[cfg(feature = "trace")]
-    pub(crate) fn to_base_pass(&self) -> BasePass<RenderCommand> { todo!() }
-
-    pub fn parent(&self) -> id::DeviceId { todo!() }
-
-    /// Convert this encoder's commands into a [`RenderBundle`].
-    ///
-    /// We want executing a [`RenderBundle`] to be quick, so we take
-    /// this opportunity to clean up the [`RenderBundleEncoder`]'s
-    /// command stream and gather metadata about it that will help
-    /// keep [`ExecuteBundle`] simple and fast. We remove redundant
-    /// commands (along with their side data), note resource usage,
-    /// and accumulate buffer and texture initialization actions.
-    ///
-    /// [`ExecuteBundle`]: RenderCommand::ExecuteBundle
-    pub(crate) fn finish<A: HalApi>(
-        self,
-        desc: &RenderBundleDescriptor,
-        device: &Arc<Device<A>>,
-        hub: &Hub<A>,
-    ) -> Result<RenderBundle<A>, RenderBundleError> { todo!() }
-
-    fn check_valid_to_use(&self, device_id: id::DeviceId) -> Result<(), RenderBundleErrorInner> { todo!() }
-
-    pub fn set_index_buffer(
-        &mut self,
-        buffer_id: id::BufferId,
-        index_format: wgt::IndexFormat,
-        offset: wgt::BufferAddress,
-        size: Option<wgt::BufferSize>,
-    ) { todo!() }
 }
 
 /// Error type returned from `RenderBundleEncoder::new` if the sample count is invalid.
@@ -227,44 +158,23 @@ impl RenderBundleEncoder {
 pub enum CreateRenderBundleError {
     #[error(transparent)]
     ColorAttachment(#[from] ColorAttachmentError),
-    #[error("Invalid number of samples {0}")]
-    InvalidSampleCount(u32),
 }
 
 /// Error type returned from `RenderBundleEncoder::new` if the sample count is invalid.
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum ExecutionError {
-    #[error("Buffer {0:?} is destroyed")]
-    DestroyedBuffer(id::BufferId),
-    #[error("BindGroup {0:?} is invalid")]
-    InvalidBindGroup(id::BindGroupId),
-    #[error("Using {0} in a render bundle is not implemented")]
-    Unimplemented(&'static str),
 }
 impl PrettyError for ExecutionError {
     fn fmt_pretty(&self, fmt: &mut ErrorFormatter) { todo!() }
 }
-
-pub type RenderBundleDescriptor<'a> = wgt::RenderBundleDescriptor<Label<'a>>;
 
 //Note: here, `RenderBundle` is just wrapping a raw stream of render commands.
 // The plan is to back it by an actual Vulkan secondary buffer, D3D12 Bundle,
 // or Metal indirect command buffer.
 #[derive(Debug)]
 pub struct RenderBundle<A: HalApi> {
-    // Normalized command stream. It can be executed verbatim,
-    // without re-binding anything on the pipeline change.
-    base: BasePass<ArcRenderCommand<A>>,
-    pub(super) is_depth_read_only: bool,
-    pub(super) is_stencil_read_only: bool,
-    pub(crate) device: Arc<Device<A>>,
-    pub(crate) used: RenderBundleScope<A>,
-    pub(super) buffer_memory_init_actions: Vec<BufferInitTrackerAction<A>>,
-    pub(super) texture_memory_init_actions: Vec<TextureInitTrackerAction<A>>,
-    pub(super) context: RenderPassContext,
-    pub(crate) info: ResourceInfo<RenderBundle<A>>,
-    discard_hal_labels: bool,
+    marker: std::marker::PhantomData<A>,
 }
 
 impl<A: HalApi> Drop for RenderBundle<A> {
@@ -275,23 +185,6 @@ impl<A: HalApi> Drop for RenderBundle<A> {
 unsafe impl<A: HalApi> Send for RenderBundle<A> {}
 #[cfg(send_sync)]
 unsafe impl<A: HalApi> Sync for RenderBundle<A> {}
-
-impl<A: HalApi> RenderBundle<A> {
-    /// Actually encode the contents into a native command buffer.
-    ///
-    /// This is partially duplicating the logic of `command_encoder_run_render_pass`.
-    /// However the point of this function is to be lighter, since we already had
-    /// a chance to go through the commands in `render_bundle_encoder_finish`.
-    ///
-    /// Note that the function isn't expected to fail, generally.
-    /// All the validation has already been done by this point.
-    /// The only failure condition is if some of the used buffers are destroyed.
-    pub(super) unsafe fn execute(
-        &self,
-        raw: &mut A::CommandEncoder,
-        snatch_guard: &SnatchGuard,
-    ) -> Result<(), ExecutionError> { todo!() }
-}
 
 impl<A: HalApi> Resource for RenderBundle<A> {
     const TYPE: ResourceType = "RenderBundle";
@@ -310,21 +203,7 @@ impl<A: HalApi> Resource for RenderBundle<A> {
 /// a `SetIndexBuffer` command if one is necessary.
 #[derive(Debug)]
 struct IndexState<A: HalApi> {
-    buffer: Arc<Buffer<A>>,
-    format: wgt::IndexFormat,
-    range: Range<wgt::BufferAddress>,
-    is_dirty: bool,
-}
-
-impl<A: HalApi> IndexState<A> {
-    /// Return the number of entries in the current index buffer.
-    ///
-    /// Panic if no index buffer has been set.
-    fn limit(&self) -> u64 { todo!() }
-
-    /// Generate a `SetIndexBuffer` command to prepare for an indexed draw
-    /// command, if needed.
-    fn flush(&mut self) -> Option<ArcRenderCommand<A>> { todo!() }
+    marker: std::marker::PhantomData<A>,
 }
 
 /// The state of a single vertex buffer slot during render bundle encoding.
@@ -338,163 +217,20 @@ impl<A: HalApi> IndexState<A> {
 /// [`flush`]: IndexState::flush
 #[derive(Debug)]
 struct VertexState<A: HalApi> {
-    buffer: Arc<Buffer<A>>,
-    range: Range<wgt::BufferAddress>,
-    is_dirty: bool,
-}
-
-impl<A: HalApi> VertexState<A> {
-    fn new(buffer: Arc<Buffer<A>>, range: Range<wgt::BufferAddress>) -> Self { todo!() }
-
-    /// Generate a `SetVertexBuffer` command for this slot, if necessary.
-    ///
-    /// `slot` is the index of the vertex buffer slot that `self` tracks.
-    fn flush(&mut self, slot: u32) -> Option<ArcRenderCommand<A>> { todo!() }
+    marker: std::marker::PhantomData<A>,
 }
 
 /// A bind group that has been set at a particular index during render bundle encoding.
 #[derive(Debug)]
 struct BindState<A: HalApi> {
-    /// The id of the bind group set at this index.
-    bind_group: Arc<BindGroup<A>>,
-
-    /// The layout of `group`.
-    layout: Arc<BindGroupLayout<A>>,
-
-    /// The range of dynamic offsets for this bind group, in the original
-    /// command stream's `BassPass::dynamic_offsets` array.
-    dynamic_offsets: Range<usize>,
-
-    /// True if this index's contents have been changed since the last time we
-    /// generated a `SetBindGroup` command.
-    is_dirty: bool,
-}
-
-/// The bundle's current pipeline, and some cached information needed for validation.
-struct PipelineState<A: HalApi> {
-    /// The pipeline
-    pipeline: Arc<RenderPipeline<A>>,
-
-    /// How this pipeline's vertex shader traverses each vertex buffer, indexed
-    /// by vertex buffer slot number.
-    steps: Vec<VertexStep>,
-
-    /// Ranges of push constants this pipeline uses, copied from the pipeline
-    /// layout.
-    push_constant_ranges: ArrayVec<wgt::PushConstantRange, { SHADER_STAGE_COUNT }>,
-
-    /// The number of bind groups this pipeline uses.
-    used_bind_groups: usize,
-}
-
-impl<A: HalApi> PipelineState<A> {
-    fn new(pipeline: &Arc<RenderPipeline<A>>) -> Self { todo!() }
-
-    /// Return a sequence of commands to zero the push constant ranges this
-    /// pipeline uses. If no initialization is necessary, return `None`.
-    fn zero_push_constants(&self) -> Option<impl Iterator<Item = ArcRenderCommand<A>>> { Some(std::iter::empty()) }
-}
-
-/// State for analyzing and cleaning up bundle command streams.
-///
-/// To minimize state updates, [`RenderBundleEncoder::finish`]
-/// actually just applies commands like [`SetBindGroup`] and
-/// [`SetIndexBuffer`] to the simulated state stored here, and then
-/// calls the `flush_foo` methods before draw calls to produce the
-/// update commands we actually need.
-///
-/// [`SetBindGroup`]: RenderCommand::SetBindGroup
-/// [`SetIndexBuffer`]: RenderCommand::SetIndexBuffer
-struct State<A: HalApi> {
-    /// Resources used by this bundle. This will become [`RenderBundle::used`].
-    trackers: RenderBundleScope<A>,
-
-    /// The currently set pipeline, if any.
-    pipeline: Option<PipelineState<A>>,
-
-    /// The bind group set at each index, if any.
-    bind: ArrayVec<Option<BindState<A>>, { hal::MAX_BIND_GROUPS }>,
-
-    /// The state of each vertex buffer slot.
-    vertex: ArrayVec<Option<VertexState<A>>, { hal::MAX_VERTEX_BUFFERS }>,
-
-    /// The current index buffer, if one has been set. We flush this state
-    /// before indexed draw commands.
-    index: Option<IndexState<A>>,
-
-    /// Dynamic offset values used by the cleaned-up command sequence.
-    ///
-    /// This becomes the final [`RenderBundle`]'s [`BasePass`]'s
-    /// [`dynamic_offsets`] list.
-    ///
-    /// [`dynamic_offsets`]: BasePass::dynamic_offsets
-    flat_dynamic_offsets: Vec<wgt::DynamicOffset>,
-}
-
-impl<A: HalApi> State<A> {
-    /// Return the id of the current pipeline, if any.
-    fn pipeline_id(&self) -> Option<id::RenderPipelineId> { todo!() }
-
-    /// Return the current pipeline state. Return an error if none is set.
-    fn pipeline(&self, scope: PassErrorScope) -> Result<&PipelineState<A>, RenderBundleError> { todo!() }
-
-    /// Mark all non-empty bind group table entries from `index` onwards as dirty.
-    fn invalidate_bind_group_from(&mut self, index: usize) { todo!() }
-
-    fn set_bind_group(
-        &mut self,
-        slot: u32,
-        bind_group: &Arc<BindGroup<A>>,
-        layout: &Arc<BindGroupLayout<A>>,
-        dynamic_offsets: Range<usize>,
-    ) { todo!() }
-
-    /// Determine which bind group slots need to be re-set after a pipeline change.
-    ///
-    /// Given that we are switching from the current pipeline state to `new`,
-    /// whose layout is `layout`, mark all the bind group slots that we need to
-    /// emit new `SetBindGroup` commands for as dirty.
-    ///
-    /// According to `wgpu_hal`'s rules:
-    ///
-    /// - If the layout of any bind group slot changes, then that slot and
-    ///   all following slots must have their bind groups re-established.
-    ///
-    /// - Changing the push constant ranges at all requires re-establishing
-    ///   all bind groups.
-    fn invalidate_bind_groups(&mut self, new: &PipelineState<A>, layout: &PipelineLayout<A>) { todo!() }
-
-    /// Set the bundle's current index buffer and its associated parameters.
-    fn set_index_buffer(
-        &mut self,
-        buffer: Arc<Buffer<A>>,
-        format: wgt::IndexFormat,
-        range: Range<wgt::BufferAddress>,
-    ) { todo!() }
-
-    /// Generate a `SetIndexBuffer` command to prepare for an indexed draw
-    /// command, if needed.
-    fn flush_index(&mut self) -> Option<ArcRenderCommand<A>> { todo!() }
-
-    fn flush_vertices(&mut self) -> impl Iterator<Item = ArcRenderCommand<A>> + '_ { std::iter::empty() }
-
-    /// Generate `SetBindGroup` commands for any bind groups that need to be updated.
-    fn flush_binds(
-        &mut self,
-        used_bind_groups: usize,
-        dynamic_offsets: &[wgt::DynamicOffset],
-    ) -> impl Iterator<Item = ArcRenderCommand<A>> + '_ { std::iter::empty() }
+    marker: std::marker::PhantomData<A>,
 }
 
 /// Error encountered when finishing recording a render bundle.
 #[derive(Clone, Debug, Error)]
 pub(super) enum RenderBundleErrorInner {
-    #[error("Resource is not valid to use with this render bundle because the resource and the bundle come from different devices")]
-    NotValidToUse,
     #[error(transparent)]
     Device(#[from] DeviceError),
-    #[error(transparent)]
-    RenderCommand(RenderCommandError),
     #[error(transparent)]
     Draw(#[from] DrawError),
     #[error(transparent)]

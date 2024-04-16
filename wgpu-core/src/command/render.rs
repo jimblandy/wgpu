@@ -6,8 +6,6 @@ use crate::{
     command::{
         self,
         bind::Binder,
-        end_occlusion_query, end_pipeline_statistics_query,
-        memory_init::{fixup_discarded_surfaces, SurfacesInDiscardState},
         BasePass, BasePassRef, BindGroupStateChange, CommandBuffer, CommandEncoderError,
         CommandEncoderStatus, DrawError, ExecutionError, MapPassErr, PassErrorScope, QueryUseError,
         RenderCommand, RenderCommandError, StateChange,
@@ -100,10 +98,6 @@ pub struct PassChannel<V> {
     pub read_only: bool,
 }
 
-impl<V> PassChannel<V> {
-    fn hal_ops(&self) -> hal::AttachmentOps { todo!() }
-}
-
 /// Describes a color attachment to a render pass.
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq)]
@@ -128,21 +122,6 @@ pub struct RenderPassDepthStencilAttachment {
     pub depth: PassChannel<f32>,
     /// What operations will be performed on the stencil part of the attachment.
     pub stencil: PassChannel<u32>,
-}
-
-impl RenderPassDepthStencilAttachment {
-    /// Validate the given aspects' read-only flags against their load
-    /// and store ops.
-    ///
-    /// When an aspect is read-only, its load and store ops must be
-    /// `LoadOp::Load` and `StoreOp::Store`.
-    ///
-    /// On success, return a pair `(depth, stencil)` indicating
-    /// whether the depth and stencil passes are read-only.
-    fn depth_stencil_read_only(
-        &self,
-        aspects: hal::FormatAspects,
-    ) -> Result<(bool, bool), RenderPassErrorInner> { todo!() }
 }
 
 /// Location to write a timestamp to (beginning or end of the pass).
@@ -190,29 +169,6 @@ pub struct RenderPass {
     depth_stencil_target: Option<RenderPassDepthStencilAttachment>,
     timestamp_writes: Option<RenderPassTimestampWrites>,
     occlusion_query_set_id: Option<id::QuerySetId>,
-
-    // Resource binding dedupe state.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    current_bind_groups: BindGroupStateChange,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    current_pipeline: StateChange<id::RenderPipelineId>,
-}
-
-impl RenderPass {
-    pub fn new(parent_id: id::CommandEncoderId, desc: &RenderPassDescriptor) -> Self { todo!() }
-
-    pub fn parent_id(&self) -> id::CommandEncoderId { todo!() }
-
-    #[cfg(feature = "trace")]
-    pub fn into_command(self) -> crate::device::trace::Command { todo!() }
-
-    pub fn set_index_buffer(
-        &mut self,
-        buffer_id: id::BufferId,
-        index_format: IndexFormat,
-        offset: BufferAddress,
-        size: Option<BufferSize>,
-    ) { todo!() }
 }
 
 impl fmt::Debug for RenderPass {
@@ -221,86 +177,23 @@ impl fmt::Debug for RenderPass {
 
 #[derive(Debug, PartialEq)]
 enum OptionalState {
-    Unused,
-    Required,
-    Set,
-}
-
-impl OptionalState {
-    fn require(&mut self, require: bool) { todo!() }
 }
 
 #[derive(Debug, Default)]
 struct IndexState {
-    bound_buffer_view: Option<(id::BufferId, Range<BufferAddress>)>,
-    format: Option<IndexFormat>,
-    pipeline_format: Option<IndexFormat>,
-    limit: u64,
-}
-
-impl IndexState {
-    fn update_limit(&mut self) { todo!() }
-
-    fn reset(&mut self) { todo!() }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct VertexBufferState {
-    total_size: BufferAddress,
-    step: pipeline::VertexStep,
-    bound: bool,
-}
-
-impl VertexBufferState {
-    const EMPTY: Self = Self {
-        total_size: 0,
-        step: pipeline::VertexStep {
-            stride: 0,
-            last_stride: 0,
-            mode: VertexStepMode::Vertex,
-        },
-        bound: false,
-    };
 }
 
 #[derive(Debug, Default)]
 struct VertexState {
-    inputs: ArrayVec<VertexBufferState, { hal::MAX_VERTEX_BUFFERS }>,
-    /// Length of the shortest vertex rate vertex buffer
-    vertex_limit: u64,
-    /// Buffer slot which the shortest vertex rate vertex buffer is bound to
-    vertex_limit_slot: u32,
-    /// Length of the shortest instance rate vertex buffer
-    instance_limit: u64,
-    /// Buffer slot which the shortest instance rate vertex buffer is bound to
-    instance_limit_slot: u32,
-    /// Total amount of buffers required by the pipeline.
-    buffers_required: u32,
-}
-
-impl VertexState {
-    fn update_limits(&mut self) { todo!() }
-
-    fn reset(&mut self) { todo!() }
 }
 
 #[derive(Debug)]
 struct State<A: HalApi> {
-    pipeline_flags: PipelineFlags,
-    binder: Binder<A>,
-    blend_constant: OptionalState,
-    stencil_reference: u32,
-    pipeline: Option<id::RenderPipelineId>,
-    index: IndexState,
-    vertex: VertexState,
-    debug_scope_depth: u32,
-}
-
-impl<A: HalApi> State<A> {
-    fn is_ready(&self, indexed: bool) -> Result<(), DrawError> { todo!() }
-
-    /// Reset the `RenderBundle`-related states.
-    fn reset_bundle(&mut self) { todo!() }
+    marker: PhantomData<A>,
 }
 
 /// Describes an attachment location in words.
@@ -308,8 +201,6 @@ impl<A: HalApi> State<A> {
 /// Can be used as "the {loc} has..." or "{loc} has..."
 #[derive(Debug, Copy, Clone)]
 pub enum AttachmentErrorLocation {
-    Color { index: usize, resolve: bool },
-    Depth,
 }
 
 impl fmt::Display for AttachmentErrorLocation {
@@ -319,136 +210,11 @@ impl fmt::Display for AttachmentErrorLocation {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum ColorAttachmentError {
-    #[error("Attachment format {0:?} is not a color format")]
-    InvalidFormat(wgt::TextureFormat),
-    #[error("The number of color attachments {given} exceeds the limit {limit}")]
-    TooMany { given: usize, limit: usize },
-    #[error("The total number of bytes per sample in color attachments {total} exceeds the limit {limit}")]
-    TooManyBytesPerSample { total: u32, limit: u32 },
 }
 
 /// Error encountered when performing a render pass.
 #[derive(Clone, Debug, Error)]
 pub enum RenderPassErrorInner {
-    #[error(transparent)]
-    Device(DeviceError),
-    #[error(transparent)]
-    ColorAttachment(#[from] ColorAttachmentError),
-    #[error(transparent)]
-    Encoder(#[from] CommandEncoderError),
-    #[error("Attachment texture view {0:?} is invalid")]
-    InvalidAttachment(id::TextureViewId),
-    #[error("Attachment texture view {0:?} is invalid")]
-    InvalidResolveTarget(id::TextureViewId),
-    #[error("The format of the depth-stencil attachment ({0:?}) is not a depth-stencil format")]
-    InvalidDepthStencilAttachmentFormat(wgt::TextureFormat),
-    #[error("The format of the {location} ({format:?}) is not resolvable")]
-    UnsupportedResolveTargetFormat {
-        location: AttachmentErrorLocation,
-        format: wgt::TextureFormat,
-    },
-    #[error("No color attachments or depth attachments were provided, at least one attachment of any kind must be provided")]
-    MissingAttachments,
-    #[error("The {location} is not renderable:")]
-    TextureViewIsNotRenderable {
-        location: AttachmentErrorLocation,
-        #[source]
-        reason: TextureViewNotRenderableReason,
-    },
-    #[error("Attachments have differing sizes: the {expected_location} has extent {expected_extent:?} but is followed by the {actual_location} which has {actual_extent:?}")]
-    AttachmentsDimensionMismatch {
-        expected_location: AttachmentErrorLocation,
-        expected_extent: wgt::Extent3d,
-        actual_location: AttachmentErrorLocation,
-        actual_extent: wgt::Extent3d,
-    },
-    #[error("Attachments have differing sample counts: the {expected_location} has count {expected_samples:?} but is followed by the {actual_location} which has count {actual_samples:?}")]
-    AttachmentSampleCountMismatch {
-        expected_location: AttachmentErrorLocation,
-        expected_samples: u32,
-        actual_location: AttachmentErrorLocation,
-        actual_samples: u32,
-    },
-    #[error("The resolve source, {location}, must be multi-sampled (has {src} samples) while the resolve destination must not be multisampled (has {dst} samples)")]
-    InvalidResolveSampleCounts {
-        location: AttachmentErrorLocation,
-        src: u32,
-        dst: u32,
-    },
-    #[error(
-        "Resource source, {location}, format ({src:?}) must match the resolve destination format ({dst:?})"
-    )]
-    MismatchedResolveTextureFormat {
-        location: AttachmentErrorLocation,
-        src: wgt::TextureFormat,
-        dst: wgt::TextureFormat,
-    },
-    #[error("Surface texture is dropped before the render pass is finished")]
-    SurfaceTextureDropped,
-    #[error("Not enough memory left for render pass")]
-    OutOfMemory,
-    #[error("The bind group at index {0:?} is invalid")]
-    InvalidBindGroup(usize),
-    #[error("Unable to clear non-present/read-only depth")]
-    InvalidDepthOps,
-    #[error("Unable to clear non-present/read-only stencil")]
-    InvalidStencilOps,
-    #[error("Setting `values_offset` to be `None` is only for internal use in render bundles")]
-    InvalidValuesOffset,
-    #[error(transparent)]
-    MissingFeatures(#[from] MissingFeatures),
-    #[error(transparent)]
-    MissingDownlevelFlags(#[from] MissingDownlevelFlags),
-    #[error("Indirect draw uses bytes {offset}..{end_offset} {} which overruns indirect buffer of size {buffer_size}",
-        count.map_or_else(String::new, |v| format!("(using count {v})")))]
-    IndirectBufferOverrun {
-        count: Option<NonZeroU32>,
-        offset: u64,
-        end_offset: u64,
-        buffer_size: u64,
-    },
-    #[error("Indirect draw uses bytes {begin_count_offset}..{end_count_offset} which overruns indirect buffer of size {count_buffer_size}")]
-    IndirectCountBufferOverrun {
-        begin_count_offset: u64,
-        end_count_offset: u64,
-        count_buffer_size: u64,
-    },
-    #[error("Cannot pop debug group, because number of pushed debug groups is zero")]
-    InvalidPopDebugGroup,
-    #[error(transparent)]
-    ResourceUsageConflict(#[from] UsageConflict),
-    #[error("Render bundle has incompatible targets, {0}")]
-    IncompatibleBundleTargets(#[from] RenderPassCompatibilityError),
-    #[error(
-        "Render bundle has incompatible read-only flags: \
-             bundle has flags depth = {bundle_depth} and stencil = {bundle_stencil}, \
-             while the pass has flags depth = {pass_depth} and stencil = {pass_stencil}. \
-             Read-only renderpasses are only compatible with read-only bundles for that aspect."
-    )]
-    IncompatibleBundleReadOnlyDepthStencil {
-        pass_depth: bool,
-        pass_stencil: bool,
-        bundle_depth: bool,
-        bundle_stencil: bool,
-    },
-    #[error(transparent)]
-    RenderCommand(#[from] RenderCommandError),
-    #[error(transparent)]
-    Draw(#[from] DrawError),
-    #[error(transparent)]
-    Bind(#[from] BindError),
-    #[error(transparent)]
-    QueryUse(#[from] QueryUseError),
-    #[error("Multiview layer count must match")]
-    MultiViewMismatch,
-    #[error(
-        "Multiview pass texture views with more than one array layer must have D2Array dimension"
-    )]
-    MultiViewDimensionMismatch,
-    #[error("QuerySet {0:?} is invalid")]
-    InvalidQuerySet(id::QuerySetId),
-    #[error("missing occlusion query set")]
-    MissingOcclusionQuerySet,
 }
 
 impl PrettyError for RenderPassErrorInner {
@@ -486,84 +252,7 @@ where
     fn map_pass_err(self, scope: PassErrorScope) -> Result<T, RenderPassError> { todo!() }
 }
 
-struct RenderAttachment<'a, A: HalApi> {
-    texture: Arc<Texture<A>>,
-    selector: &'a TextureSelector,
-    usage: hal::TextureUses,
-}
-
-impl<A: HalApi> TextureView<A> {
-    fn to_render_attachment(&self, usage: hal::TextureUses) -> RenderAttachment<A> { todo!() }
-}
-
-const MAX_TOTAL_ATTACHMENTS: usize = hal::MAX_COLOR_ATTACHMENTS + hal::MAX_COLOR_ATTACHMENTS + 1;
-type AttachmentDataVec<T> = ArrayVec<T, MAX_TOTAL_ATTACHMENTS>;
-
-struct RenderPassInfo<'a, 'd, A: HalApi> {
-    context: RenderPassContext,
-    usage_scope: UsageScope<'d, A>,
-    /// All render attachments, including depth/stencil
-    render_attachments: AttachmentDataVec<RenderAttachment<'a, A>>,
-    is_depth_read_only: bool,
-    is_stencil_read_only: bool,
-    extent: wgt::Extent3d,
-    _phantom: PhantomData<A>,
-
-    pending_discard_init_fixups: SurfacesInDiscardState<A>,
-    divergent_discarded_depth_stencil_aspect: Option<(wgt::TextureAspect, &'a TextureView<A>)>,
-    multiview: Option<NonZeroU32>,
-}
-
-impl<'a, 'd, A: HalApi> RenderPassInfo<'a, 'd, A> {
-    fn add_pass_texture_init_actions<V>(
-        channel: &PassChannel<V>,
-        texture_memory_actions: &mut CommandBufferTextureMemoryActions<A>,
-        view: &TextureView<A>,
-        pending_discard_init_fixups: &mut SurfacesInDiscardState<A>,
-    ) { todo!() }
-
-    fn start(
-        device: &'d Device<A>,
-        label: Option<&str>,
-        color_attachments: &[Option<RenderPassColorAttachment>],
-        depth_stencil_attachment: Option<&RenderPassDepthStencilAttachment>,
-        timestamp_writes: Option<&RenderPassTimestampWrites>,
-        occlusion_query_set: Option<id::QuerySetId>,
-        trackers: &mut Tracker<A>,
-        texture_memory_actions: &mut CommandBufferTextureMemoryActions<A>,
-        pending_query_resets: &mut QueryResetMap<A>,
-        view_guard: &'a Storage<TextureView<A>>,
-        query_set_guard: &'a Storage<QuerySet<A>>,
-        snatch_guard: &SnatchGuard<'a>,
-    ) -> Result<Self, RenderPassErrorInner> { todo!() }
-
-    fn finish(
-        mut self,
-        raw: &mut A::CommandEncoder,
-        snatch_guard: &SnatchGuard,
-    ) -> Result<(UsageScope<'d, A>, SurfacesInDiscardState<A>), RenderPassErrorInner> { todo!() }
-}
-
 // Common routines between render/compute
-
-impl Global {
-    pub fn command_encoder_run_render_pass<A: HalApi>(
-        &self,
-        encoder_id: id::CommandEncoderId,
-        pass: &RenderPass,
-    ) -> Result<(), RenderPassError> { todo!() }
-
-    #[doc(hidden)]
-    pub fn command_encoder_run_render_pass_impl<A: HalApi>(
-        &self,
-        encoder_id: id::CommandEncoderId,
-        base: BasePassRef<RenderCommand>,
-        color_attachments: &[Option<RenderPassColorAttachment>],
-        depth_stencil_attachment: Option<&RenderPassDepthStencilAttachment>,
-        timestamp_writes: Option<&RenderPassTimestampWrites>,
-        occlusion_query_set_id: Option<id::QuerySetId>,
-    ) -> Result<(), RenderPassError> { todo!() }
-}
 
 pub mod render_ffi {
     use super::{

@@ -12,7 +12,6 @@ mod transfer;
 use std::slice;
 use std::sync::Arc;
 
-pub(crate) use self::clear::clear_texture;
 pub use self::{
     bundle::*, clear::ClearError, compute::*, draw::*, query::*, render::*, transfer::*,
 };

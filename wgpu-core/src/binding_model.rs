@@ -1,9 +1,8 @@
-#![allow(dead_code)]
 #[cfg(feature = "trace")]
 use crate::device::trace;
 use crate::{
     device::{
-        bgl, Device, DeviceError, MissingDownlevelFlags, MissingFeatures, SHADER_STAGE_COUNT,
+        bgl, Device, DeviceError, MissingDownlevelFlags, MissingFeatures,
     },
     error::{ErrorFormatter, PrettyError},
     hal_api::HalApi,
@@ -250,6 +249,7 @@ pub struct BindGroupDynamicBindingData {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // JIMB
 pub struct BindGroup<A: HalApi> {
     pub(crate) raw: Snatchable<A::BindGroup>,
     pub(crate) device: Arc<Device<A>>,
@@ -268,16 +268,6 @@ impl<A: HalApi> Drop for BindGroup<A> {
     fn drop(&mut self) { todo!() }
 }
 
-impl<A: HalApi> BindGroup<A> {
-    pub(crate) fn raw(&self, guard: &SnatchGuard) -> Option<&A::BindGroup> { todo!() }
-    pub(crate) fn validate_dynamic_bindings(
-        &self,
-        bind_group_index: u32,
-        offsets: &[wgt::DynamicOffset],
-        limits: &wgt::Limits,
-    ) -> Result<(), BindError> { todo!() }
-}
-
 impl<A: HalApi> Resource for BindGroup<A> {
     const TYPE: ResourceType = "BindGroup";
 
@@ -291,10 +281,6 @@ impl<A: HalApi> Resource for BindGroup<A> {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum GetBindGroupLayoutError {
-    #[error("Pipeline is invalid")]
-    InvalidPipeline,
-    #[error("Invalid group index {0}")]
-    InvalidGroupIndex(u32),
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]

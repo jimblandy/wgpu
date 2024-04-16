@@ -3,7 +3,6 @@ use crate::device::trace::Action;
 use crate::{
     api_log,
     command::{
-        extract_texture_selector, validate_linear_texture_data, validate_texture_copy_range,
         ClearError, CommandAllocator, CommandBuffer, CopySide, ImageCopyTexture, TransferError,
     },
     conv,
@@ -31,6 +30,7 @@ use thiserror::Error;
 
 use super::Device;
 
+#[allow(dead_code)] // JIMB
 pub struct Queue<A: HalApi> {
     pub(crate) device: Option<Arc<Device<A>>>,
     pub(crate) raw: Option<A::Queue>,
@@ -51,13 +51,6 @@ impl<A: HalApi> Drop for Queue<A> {
     fn drop(&mut self) { todo!() }
 }
 
-/// Number of command buffers that we generate from the same pool
-/// for the write_xxx commands, before the pool is recycled.
-///
-/// If we don't stop at some point, the pool will grow forever,
-/// without a concrete moment of when it can be cleared.
-const WRITE_COMMAND_BUFFERS_PER_POOL: usize = 64;
-
 #[repr(C)]
 pub struct SubmittedWorkDoneClosureC {
     pub callback: unsafe extern "C" fn(user_data: *mut u8),
@@ -68,34 +61,6 @@ pub struct SubmittedWorkDoneClosureC {
 unsafe impl Send for SubmittedWorkDoneClosureC {}
 
 pub struct SubmittedWorkDoneClosure {
-    // We wrap this so creating the enum in the C variant can be unsafe,
-    // allowing our call function to be safe.
-    inner: SubmittedWorkDoneClosureInner,
-}
-
-#[cfg(send_sync)]
-type SubmittedWorkDoneCallback = Box<dyn FnOnce() + Send + 'static>;
-#[cfg(not(send_sync))]
-type SubmittedWorkDoneCallback = Box<dyn FnOnce() + 'static>;
-
-enum SubmittedWorkDoneClosureInner {
-    Rust { callback: SubmittedWorkDoneCallback },
-    C { inner: SubmittedWorkDoneClosureC },
-}
-
-impl SubmittedWorkDoneClosure {
-    pub fn from_rust(callback: SubmittedWorkDoneCallback) -> Self { todo!() }
-
-    /// # Safety
-    ///
-    /// - The callback pointer must be valid to call with the provided `user_data`
-    ///   pointer.
-    ///
-    /// - Both pointers must point to `'static` data, as the callback may happen at
-    ///   an unspecified time.
-    pub unsafe fn from_c(inner: SubmittedWorkDoneClosureC) -> Self { todo!() }
-
-    pub(crate) fn call(self) { todo!() }
 }
 
 #[repr(C)]
@@ -119,6 +84,7 @@ pub struct WrappedSubmissionIndex {
 /// - `LifetimeTracker::free_resources`: resources to be freed in the next
 ///   `maintain` call, no longer used anywhere
 #[derive(Debug)]
+#[allow(dead_code)] // JIMB
 pub enum TempResource<A: HalApi> {
     Buffer(Arc<Buffer<A>>),
     StagingBuffer(Arc<StagingBuffer<A>>),
@@ -130,16 +96,7 @@ pub enum TempResource<A: HalApi> {
 /// A series of [`CommandBuffers`] that have been submitted to a
 /// queue, and the [`wgpu_hal::CommandEncoder`] that built them.
 pub(crate) struct EncoderInFlight<A: HalApi> {
-    raw: A::CommandEncoder,
-    cmd_buffers: Vec<A::CommandBuffer>,
-}
-
-impl<A: HalApi> EncoderInFlight<A> {
-    /// Free all of our command buffers.
-    ///
-    /// Return the command encoder, fully reset and ready to be
-    /// reused.
-    pub(crate) unsafe fn land(mut self) -> A::CommandEncoder { todo!() }
+    marker: std::marker::PhantomData<A>,
 }
 
 /// A private command encoder for writes made directly on the device
@@ -163,6 +120,7 @@ impl<A: HalApi> EncoderInFlight<A> {
 ///
 /// All uses of [`StagingBuffer`]s end up here.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) struct PendingWrites<A: HalApi> {
     pub command_encoder: A::CommandEncoder,
 
@@ -179,40 +137,6 @@ pub(crate) struct PendingWrites<A: HalApi> {
     pub executing_command_buffers: Vec<A::CommandBuffer>,
 }
 
-impl<A: HalApi> PendingWrites<A> {
-    pub fn new(command_encoder: A::CommandEncoder) -> Self { todo!() }
-
-    pub fn dispose(mut self, device: &A::Device) { todo!() }
-
-    pub fn consume_temp(&mut self, resource: TempResource<A>) { todo!() }
-
-    fn consume(&mut self, buffer: Arc<StagingBuffer<A>>) { todo!() }
-
-    fn pre_submit(&mut self) -> Result<Option<&A::CommandBuffer>, DeviceError> { todo!() }
-
-    #[must_use]
-    fn post_submit(
-        &mut self,
-        command_allocator: &CommandAllocator<A>,
-        device: &A::Device,
-        queue: &A::Queue,
-    ) -> Option<EncoderInFlight<A>> { todo!() }
-
-    pub fn activate(&mut self) -> &mut A::CommandEncoder { todo!() }
-
-    pub fn deactivate(&mut self) { todo!() }
-}
-
-fn prepare_staging_buffer<A: HalApi>(
-    device: &Arc<Device<A>>,
-    size: wgt::BufferAddress,
-    instance_flags: wgt::InstanceFlags,
-) -> Result<(StagingBuffer<A>, *mut u8), DeviceError> { todo!() }
-
-impl<A: HalApi> StagingBuffer<A> {
-    unsafe fn flush(&self, device: &A::Device) -> Result<(), DeviceError> { todo!() }
-}
-
 #[derive(Clone, Debug, Error)]
 #[error("Queue is invalid")]
 pub struct InvalidQueue;
@@ -220,127 +144,12 @@ pub struct InvalidQueue;
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum QueueWriteError {
-    #[error(
-        "Device of queue ({:?}) does not match device of write recipient ({:?})",
-        queue_device_id,
-        target_device_id
-    )]
-    DeviceMismatch {
-        queue_device_id: DeviceId,
-        target_device_id: DeviceId,
-    },
-    #[error(transparent)]
-    Queue(#[from] DeviceError),
-    #[error(transparent)]
-    Transfer(#[from] TransferError),
-    #[error(transparent)]
-    MemoryInitFailure(#[from] ClearError),
 }
 
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum QueueSubmitError {
-    #[error(transparent)]
-    Queue(#[from] DeviceError),
-    #[error("Buffer {0:?} is destroyed")]
-    DestroyedBuffer(id::BufferId),
-    #[error("Texture {0:?} is destroyed")]
-    DestroyedTexture(id::TextureId),
-    #[error(transparent)]
-    Unmap(#[from] BufferAccessError),
-    #[error("Buffer {0:?} is still mapped")]
-    BufferStillMapped(id::BufferId),
-    #[error("Surface output was dropped before the command buffer got submitted")]
-    SurfaceOutputDropped,
-    #[error("Surface was unconfigured before the command buffer got submitted")]
-    SurfaceUnconfigured,
-    #[error("GPU got stuck :(")]
-    StuckGpu,
 }
 
 //TODO: move out common parts of write_xxx.
 
-impl Global {
-    pub fn queue_write_buffer<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-        buffer_id: id::BufferId,
-        buffer_offset: wgt::BufferAddress,
-        data: &[u8],
-    ) -> Result<(), QueueWriteError> { todo!() }
-
-    pub fn queue_create_staging_buffer<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-        buffer_size: wgt::BufferSize,
-        id_in: Option<id::StagingBufferId>,
-    ) -> Result<(id::StagingBufferId, *mut u8), QueueWriteError> { todo!() }
-
-    pub fn queue_write_staging_buffer<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-        buffer_id: id::BufferId,
-        buffer_offset: wgt::BufferAddress,
-        staging_buffer_id: id::StagingBufferId,
-    ) -> Result<(), QueueWriteError> { todo!() }
-
-    pub fn queue_validate_write_buffer<A: HalApi>(
-        &self,
-        _queue_id: QueueId,
-        buffer_id: id::BufferId,
-        buffer_offset: u64,
-        buffer_size: u64,
-    ) -> Result<(), QueueWriteError> { todo!() }
-
-    fn queue_validate_write_buffer_impl<A: HalApi>(
-        &self,
-        buffer: &Buffer<A>,
-        buffer_id: id::BufferId,
-        buffer_offset: u64,
-        buffer_size: u64,
-    ) -> Result<(), TransferError> { todo!() }
-
-    fn queue_write_staging_buffer_impl<A: HalApi>(
-        &self,
-        device: &Device<A>,
-        pending_writes: &mut PendingWrites<A>,
-        staging_buffer: &StagingBuffer<A>,
-        buffer_id: id::BufferId,
-        buffer_offset: u64,
-    ) -> Result<(), QueueWriteError> { todo!() }
-
-    pub fn queue_write_texture<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-        destination: &ImageCopyTexture,
-        data: &[u8],
-        data_layout: &wgt::ImageDataLayout,
-        size: &wgt::Extent3d,
-    ) -> Result<(), QueueWriteError> { todo!() }
-
-    #[cfg(webgl)]
-    pub fn queue_copy_external_image_to_texture<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-        source: &wgt::ImageCopyExternalImage,
-        destination: crate::command::ImageCopyTextureTagged,
-        size: wgt::Extent3d,
-    ) -> Result<(), QueueWriteError> { todo!() }
-
-    pub fn queue_submit<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-        command_buffer_ids: &[id::CommandBufferId],
-    ) -> Result<WrappedSubmissionIndex, QueueSubmitError> { todo!() }
-
-    pub fn queue_get_timestamp_period<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-    ) -> Result<f32, InvalidQueue> { todo!() }
-
-    pub fn queue_on_submitted_work_done<A: HalApi>(
-        &self,
-        queue_id: QueueId,
-        closure: SubmittedWorkDoneClosure,
-    ) -> Result<(), InvalidQueue> { todo!() }
-}

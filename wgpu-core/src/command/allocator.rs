@@ -14,27 +14,5 @@ use parking_lot::Mutex;
 /// [ce]: wgpu_hal::CommandEncoder
 /// [cb]: wgpu_hal::Api::CommandBuffer
 pub(crate) struct CommandAllocator<A: HalApi> {
-    free_encoders: Mutex<Vec<A::CommandEncoder>>,
-}
-
-impl<A: HalApi> CommandAllocator<A> {
-    pub(crate) fn new() -> Self { todo!() }
-
-    /// Return a fresh [`wgpu_hal::CommandEncoder`] in the "closed" state.
-    ///
-    /// If we have free encoders in the pool, take one of those. Otherwise,
-    /// create a new one on `device`.
-    pub(crate) fn acquire_encoder(
-        &self,
-        device: &A::Device,
-        queue: &A::Queue,
-    ) -> Result<A::CommandEncoder, hal::DeviceError> { todo!() }
-
-    /// Add `encoder` back to the free pool.
-    pub(crate) fn release_encoder(&self, encoder: A::CommandEncoder) { todo!() }
-
-    /// Free the pool of command encoders.
-    ///
-    /// This is only called when the `Device` is dropped.
-    pub(crate) fn dispose(&self, device: &A::Device) { todo!() }
+    marker: std::marker::PhantomData<A>,
 }

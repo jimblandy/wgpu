@@ -9,14 +9,6 @@ use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-struct AnyDeviceVtable {
-    // We oppurtunistically store the backend here, since we now it will be used
-    // with backend selection and it can be stored in static memory.
-    backend: Backend,
-    // Drop glue which knows how to drop the stored data.
-    drop: unsafe fn(*mut ()),
-}
-
 /// A pointer to a `Device<A>`, for any backend `A`.
 ///
 /// Any `AnyDevice` is just like an `Arc<Device<A>>`, except that the `A` type
@@ -24,20 +16,9 @@ struct AnyDeviceVtable {
 /// particular backend with the \[`downcast_ref`\] or \[`downcast_clone`\]
 /// methods.
 pub struct AnyDevice {
-    data: NonNull<()>,
-    vtable: &'static AnyDeviceVtable,
 }
 
 impl AnyDevice {
-    /// Return an `AnyDevice` that holds an owning `Arc` pointer to `device`.
-    pub fn new<A: HalApi>(device: Arc<Device<A>>) -> AnyDevice { todo!() }
-
-    /// If `self` is an `Arc<Device<A>>`, return a reference to the
-    /// device.
-    pub fn downcast_ref<A: HalApi>(&self) -> Option<&Device<A>> { todo!() }
-
-    /// If `self` is an `Arc<Device<A>>`, return a clone of that.
-    pub fn downcast_clone<A: HalApi>(&self) -> Option<Arc<Device<A>>> { todo!() }
 }
 
 impl Drop for AnyDevice {

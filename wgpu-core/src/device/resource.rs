@@ -8,7 +8,7 @@ use crate::{
         life::{LifetimeTracker, WaitIdleError},
         queue::PendingWrites,
         AttachmentData, DeviceLostInvocation, MissingDownlevelFlags, MissingFeatures,
-        RenderPassContext, CLEANUP_WAIT_MS,
+        RenderPassContext, 
     },
     hal_api::HalApi,
     hub::Hub,
@@ -59,8 +59,7 @@ use std::{
 use super::{
     life::{self, ResourceMaps},
     queue::{self, Queue},
-    DeviceDescriptor, DeviceError, ImplicitPipelineContext, UserClosures, ENTRYPOINT_FAILURE_ERROR,
-    IMPLICIT_BIND_GROUP_LAYOUT_ERROR_LABEL, ZERO_BUFFER_SIZE,
+    DeviceDescriptor, DeviceError, ImplicitPipelineContext, UserClosures,
 };
 
 /// Structure describing a logical device. Some members are internally mutable,
