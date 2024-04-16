@@ -5,7 +5,7 @@
 //! ## Feature flags
 #![doc = document_features::document_features!()]
 //!
-#![allow(unused_imports, unused_macros, unused_variables, unused_mut)]
+#![allow(dead_code, unused_imports, unused_macros, unused_variables, unused_mut)]
 // When we have no backends, we end up with a lot of dead or otherwise unreachable code.
 #![cfg_attr(
     all(

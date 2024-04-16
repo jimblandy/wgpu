@@ -81,7 +81,7 @@ index format changes.
 #[cfg(feature = "trace")]
 use crate::device::trace;
 use crate::{
-    binding_model::{buffer_binding_type_alignment, BindGroup, BindGroupLayout, PipelineLayout},
+    binding_model::{BindGroup, BindGroupLayout, PipelineLayout},
     command::{
         BasePass, BindGroupStateChange, ColorAttachmentError, DrawError, MapPassErr,
         PassErrorScope, RenderCommand, RenderCommandError, StateChange,

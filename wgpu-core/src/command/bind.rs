@@ -70,6 +70,7 @@ struct LateBufferBinding {
 
 #[derive(Debug)]
 pub(super) struct EntryPayload<A: HalApi> {
+    marker: std::marker::PhantomData<A>,
     pub(super) group: Option<Arc<BindGroup<A>>>,
     pub(super) dynamic_offsets: Vec<wgt::DynamicOffset>,
     late_buffer_bindings: Vec<LateBufferBinding>,
