@@ -200,14 +200,6 @@ impl<A: HalApi> Hub<A> {
 }
 
 pub struct Hubs {
-    #[cfg(vulkan)]
-    pub(crate) vulkan: Hub<hal::api::Vulkan>,
-    #[cfg(metal)]
-    pub(crate) metal: Hub<hal::api::Metal>,
-    #[cfg(dx12)]
-    pub(crate) dx12: Hub<hal::api::Dx12>,
-    #[cfg(gles)]
-    pub(crate) gl: Hub<hal::api::Gles>,
     #[cfg(all(not(vulkan), not(metal), not(dx12), not(gles)))]
     pub(crate) empty: Hub<hal::api::Empty>,
 }

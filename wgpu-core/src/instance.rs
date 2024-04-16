@@ -39,14 +39,6 @@ fn downlevel_default_limits_less_than_default_limits() { todo!() }
 pub struct Instance {
     #[allow(dead_code)]
     pub name: String,
-    #[cfg(vulkan)]
-    pub vulkan: Option<HalInstance<hal::api::Vulkan>>,
-    #[cfg(metal)]
-    pub metal: Option<HalInstance<hal::api::Metal>>,
-    #[cfg(dx12)]
-    pub dx12: Option<HalInstance<hal::api::Dx12>>,
-    #[cfg(gles)]
-    pub gl: Option<HalInstance<hal::api::Gles>>,
     pub flags: wgt::InstanceFlags,
 }
 

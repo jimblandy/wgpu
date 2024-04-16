@@ -1,6 +1,6 @@
 //! RenderDoc integration - <https://renderdoc.org/>
 
-use std::{ffi, os, ptr};
+use std::{ffi, ptr};
 
 /// The dynamically loaded RenderDoc API function table
 #[repr(C)]
@@ -104,35 +104,5 @@ impl Default for RenderDoc {
             };
         }
         unsafe { Self::new() }
-    }
-}
-/// A implementation specific handle
-pub type Handle = *mut os::raw::c_void;
-
-impl RenderDoc {
-    /// Start a RenderDoc frame capture
-    pub unsafe fn start_frame_capture(&self, device_handle: Handle, window_handle: Handle) -> bool {
-        match *self {
-            Self::Available { api: ref entry } => {
-                unsafe { entry.api.StartFrameCapture.unwrap()(device_handle, window_handle) };
-                true
-            }
-            Self::NotAvailable { ref reason } => {
-                log::warn!("Could not start RenderDoc frame capture: {}", reason);
-                false
-            }
-        }
-    }
-
-    /// End a RenderDoc frame capture
-    pub unsafe fn end_frame_capture(&self, device_handle: Handle, window_handle: Handle) {
-        match *self {
-            Self::Available { api: ref entry } => {
-                unsafe { entry.api.EndFrameCapture.unwrap()(device_handle, window_handle) };
-            }
-            Self::NotAvailable { ref reason } => {
-                log::warn!("Could not end RenderDoc frame capture: {}", reason)
-            }
-        };
     }
 }

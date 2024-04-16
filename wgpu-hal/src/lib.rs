@@ -158,32 +158,12 @@
     clippy::pattern_type_mismatch,
 )]
 
-/// DirectX12 API internals.
-#[cfg(dx12)]
-pub mod dx12;
 /// A dummy API implementation.
 pub mod empty;
-/// GLES API internals.
-#[cfg(gles)]
-pub mod gles;
-/// Metal API internals.
-#[cfg(metal)]
-pub mod metal;
-/// Vulkan API internals.
-#[cfg(vulkan)]
-pub mod vulkan;
 
 pub mod auxil;
 pub mod api {
-    #[cfg(dx12)]
-    pub use super::dx12::Api as Dx12;
     pub use super::empty::Api as Empty;
-    #[cfg(gles)]
-    pub use super::gles::Api as Gles;
-    #[cfg(metal)]
-    pub use super::metal::Api as Metal;
-    #[cfg(vulkan)]
-    pub use super::vulkan::Api as Vulkan;
 }
 
 use std::{
