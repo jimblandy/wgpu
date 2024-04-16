@@ -517,12 +517,6 @@ pub struct RenderBundleError {
     inner: RenderBundleErrorInner,
 }
 
-impl RenderBundleError {
-    pub(crate) const INVALID_DEVICE: Self = RenderBundleError {
-        scope: PassErrorScope::Bundle,
-        inner: RenderBundleErrorInner::Device(DeviceError::Invalid),
-    };
-}
 impl PrettyError for RenderBundleError {
     fn fmt_pretty(&self, fmt: &mut ErrorFormatter) { todo!() }
 }

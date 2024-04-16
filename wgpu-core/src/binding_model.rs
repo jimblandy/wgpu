@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #[cfg(feature = "trace")]
 use crate::device::trace;
 use crate::{

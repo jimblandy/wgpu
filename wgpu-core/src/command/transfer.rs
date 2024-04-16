@@ -25,7 +25,7 @@ use wgt::{BufferAddress, BufferUsages, Extent3d, TextureUsages};
 
 use std::{iter, sync::Arc};
 
-use super::{memory_init::CommandBufferTextureMemoryActions, ClearError, CommandEncoder};
+use super::{memory_init::CommandBufferTextureMemoryActions, ClearError};
 
 pub type ImageCopyBuffer = wgt::ImageCopyBuffer<BufferId>;
 pub type ImageCopyTexture = wgt::ImageCopyTexture<TextureId>;
@@ -202,7 +202,6 @@ pub(crate) fn validate_texture_copy_range(
 
 fn handle_texture_init<A: HalApi>(
     init_kind: MemoryInitKind,
-    encoder: &mut CommandEncoder<A>,
     trackers: &mut Tracker<A>,
     texture_memory_actions: &mut CommandBufferTextureMemoryActions<A>,
     device: &Device<A>,
@@ -217,7 +216,6 @@ fn handle_texture_init<A: HalApi>(
 /// Ensure the source texture of a transfer is in the right initialization
 /// state, and record the state for after the transfer operation.
 fn handle_src_texture_init<A: HalApi>(
-    encoder: &mut CommandEncoder<A>,
     trackers: &mut Tracker<A>,
     texture_memory_actions: &mut CommandBufferTextureMemoryActions<A>,
     device: &Device<A>,
@@ -232,7 +230,6 @@ fn handle_src_texture_init<A: HalApi>(
 /// Ensure the destination texture of a transfer is in the right initialization
 /// state, and record the state for after the transfer operation.
 fn handle_dst_texture_init<A: HalApi>(
-    encoder: &mut CommandEncoder<A>,
     trackers: &mut Tracker<A>,
     texture_memory_actions: &mut CommandBufferTextureMemoryActions<A>,
     device: &Device<A>,

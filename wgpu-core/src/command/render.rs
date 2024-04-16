@@ -48,7 +48,7 @@ use std::sync::Arc;
 use std::{borrow::Cow, fmt, iter, marker::PhantomData, mem, num::NonZeroU32, ops::Range, str};
 
 use super::{
-    memory_init::TextureSurfaceDiscard, CommandBufferTextureMemoryActions, CommandEncoder,
+    memory_init::TextureSurfaceDiscard, CommandBufferTextureMemoryActions,
     QueryResetMap,
 };
 
@@ -529,7 +529,6 @@ impl<'a, 'd, A: HalApi> RenderPassInfo<'a, 'd, A> {
         depth_stencil_attachment: Option<&RenderPassDepthStencilAttachment>,
         timestamp_writes: Option<&RenderPassTimestampWrites>,
         occlusion_query_set: Option<id::QuerySetId>,
-        encoder: &mut CommandEncoder<A>,
         trackers: &mut Tracker<A>,
         texture_memory_actions: &mut CommandBufferTextureMemoryActions<A>,
         pending_query_resets: &mut QueryResetMap<A>,

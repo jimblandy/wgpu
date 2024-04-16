@@ -71,7 +71,7 @@ env_logger = "0.11"
 # This _cannot_ have a version specified. If it does, crates.io will look
 # for a version of the package on crates when we publish naga. Path dependencies
 # are allowed through though.
-hlsl-snapshots = { path = "./hlsl-snapshots" }
+# hlsl-snapshots = { path = "./hlsl-snapshots" }
 # Require at least version 0.7.1 of ron, this version changed how floating points are
 # serialized by forcing them to always have the decimal part, this makes it backwards
 # incompatible with our tests because we do a syntactic diff and not a semantic one.

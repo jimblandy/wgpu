@@ -1,11 +1,10 @@
+#![allow(unused_imports, unused_macros, unused_variables, unused_mut)]
 //! This library safely implements WebGPU on native platforms.
 //! It is designed for integration into browsers, as well as wrapping
 //! into other language-specific user-friendly libraries.
 //!
 //! ## Feature flags
-#![doc = document_features::document_features!()]
 //!
-#![allow(dead_code, unused_imports, unused_macros, unused_variables, unused_mut)]
 // When we have no backends, we end up with a lot of dead or otherwise unreachable code.
 #![cfg_attr(
     all(

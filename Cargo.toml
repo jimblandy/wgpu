@@ -1,41 +1,22 @@
 [workspace]
 resolver = "2"
 members = [
-    "cts_runner",
-    "deno_webgpu",
-
     # default members
     "d3d12",
-    "examples/",
-    "naga-cli",
     "naga",
-    "naga/fuzz",
-    "naga/hlsl-snapshots",
-    "player",
-    "tests",
     "wgpu-core",
     "wgpu-hal",
-    "wgpu-info",
     "wgpu-macros",
     "wgpu-types",
-    "wgpu",
 ]
 exclude = []
 default-members = [
     "d3d12",
-    "examples/",
-    "naga-cli",
     "naga",
-    "naga/fuzz",
-    "naga/hlsl-snapshots",
-    "player",
-    "tests",
     "wgpu-core",
     "wgpu-hal",
-    "wgpu-info",
     "wgpu-macros",
     "wgpu-types",
-    "wgpu",
 ]
 
 [workspace.package]

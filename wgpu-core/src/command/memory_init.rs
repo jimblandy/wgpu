@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    clear::clear_texture, BakedCommands, ClearError, DestroyedBufferError, DestroyedTextureError,
+    clear::clear_texture, ClearError,
 };
 
 /// Surface that was discarded by `StoreOp::Discard` of a preceding renderpass.
@@ -78,24 +78,3 @@ pub(crate) fn fixup_discarded_surfaces<
     device: &Device<A>,
     snatch_guard: &SnatchGuard<'_>,
 ) { todo!() }
-
-impl<A: HalApi> BakedCommands<A> {
-    // inserts all buffer initializations that are going to be needed for
-    // executing the commands and updates resource init states accordingly
-    pub(crate) fn initialize_buffer_memory(
-        &mut self,
-        device_tracker: &mut Tracker<A>,
-        snatch_guard: &SnatchGuard<'_>,
-    ) -> Result<(), DestroyedBufferError> { todo!() }
-
-    // inserts all texture initializations that are going to be needed for
-    // executing the commands and updates resource init states accordingly any
-    // textures that are left discarded by this command buffer will be marked as
-    // uninitialized
-    pub(crate) fn initialize_texture_memory(
-        &mut self,
-        device_tracker: &mut Tracker<A>,
-        device: &Device<A>,
-        snatch_guard: &SnatchGuard<'_>,
-    ) -> Result<(), DestroyedTextureError> { todo!() }
-}
