@@ -87,59 +87,9 @@ use super::{
 /// Important:
 /// When locking pending_writes please check that trackers is not locked
 /// trackers should be locked only when needed for the shortest time possible
-#[allow(dead_code)] // JIMB
+#[allow(dead_code)] // JIMB 0.76s
 pub struct Device<A: HalApi> {
-    raw: Option<A::Device>,
-    pub(crate) adapter: Arc<Adapter<A>>,
-    pub(crate) queue: OnceCell<Weak<Queue<A>>>,
-    queue_to_drop: OnceCell<A::Queue>,
-    pub(crate) zero_buffer: Option<A::Buffer>,
-    pub(crate) info: ResourceInfo<Device<A>>,
-
-    pub(crate) command_allocator: command::CommandAllocator<A>,
-    //Note: The submission index here corresponds to the last submission that is done.
-    pub(crate) active_submission_index: AtomicU64, //SubmissionIndex,
-    // NOTE: if both are needed, the `snatchable_lock` must be consistently acquired before the
-    // `fence` lock to avoid deadlocks.
-    pub(crate) fence: RwLock<Option<A::Fence>>,
-    pub(crate) snatchable_lock: SnatchLock,
-
-    /// Is this device valid? Valid is closely associated with "lose the device",
-    /// which can be triggered by various methods, including at the end of device
-    /// destroy, and by any GPU errors that cause us to no longer trust the state
-    /// of the device. Ideally we would like to fold valid into the storage of
-    /// the device itself (for example as an Error enum), but unfortunately we
-    /// need to continue to be able to retrieve the device in poll_devices to
-    /// determine if it can be dropped. If our internal accesses of devices were
-    /// done through ref-counted references and external accesses checked for
-    /// Error enums, we wouldn't need this. For now, we need it. All the call
-    /// sites where we check it are areas that should be revisited if we start
-    /// using ref-counted references for internal access.
-    pub(crate) valid: AtomicBool,
-
-    /// All live resources allocated with this [`Device`].
-    ///
-    /// Has to be locked temporarily only (locked last)
-    /// and never before pending_writes
-    pub(crate) trackers: Mutex<Tracker<A>>,
-    pub(crate) tracker_indices: TrackerIndexAllocators,
-    // Life tracker should be locked right after the device and before anything else.
-    life_tracker: Mutex<LifetimeTracker<A>>,
-    /// Temporary storage for resource management functions. Cleared at the end
-    /// of every call (unless an error occurs).
-    pub(crate) temp_suspected: Mutex<Option<ResourceMaps<A>>>,
-    /// Pool of bind group layouts, allowing deduplication.
-    pub(crate) bgl_pool: ResourcePool<bgl::EntryMap, BindGroupLayout<A>>,
-    pub(crate) alignments: hal::Alignments,
-    pub(crate) limits: wgt::Limits,
-    pub(crate) features: wgt::Features,
-    pub(crate) downlevel: wgt::DownlevelCapabilities,
-    pub(crate) instance_flags: wgt::InstanceFlags,
-    pub(crate) pending_writes: Mutex<Option<PendingWrites<A>>>,
-    pub(crate) deferred_destroy: Mutex<Vec<DeferredDestroy<A>>>,
-    #[cfg(feature = "trace")]
-    pub(crate) trace: Mutex<Option<trace::Trace>>,
-    pub(crate) usage_scopes: UsageScopePool<A>,
+    marker: std::marker::PhantomData<A>,
 }
 
 #[allow(dead_code)] // JIMB
