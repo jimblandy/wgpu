@@ -1,4 +1,4 @@
-#![allow(unused_imports, unused_macros, unused_variables, unused_mut)]
+#![allow(unused_imports, unused_macros, unused_variables, unused_mut, improper_ctypes_definitions)]
 //! This library safely implements WebGPU on native platforms.
 //! It is designed for integration into browsers, as well as wrapping
 //! into other language-specific user-friendly libraries.

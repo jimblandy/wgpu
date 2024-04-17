@@ -104,9 +104,9 @@ pub struct PassChannel<V> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RenderPassColorAttachment {
     /// The view to use as an attachment.
-    pub view: id::TextureViewId,
+    pub view: (),
     /// The view that will receive the resolved output if multisampling is used.
-    pub resolve_target: Option<id::TextureViewId>,
+    pub resolve_target: Option<()>,
     /// What operations will be performed on this color attachment.
     pub channel: PassChannel<Color>,
 }
@@ -117,7 +117,7 @@ pub struct RenderPassColorAttachment {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RenderPassDepthStencilAttachment {
     /// The view to use as an attachment.
-    pub view: id::TextureViewId,
+    pub view: (),
     /// What operations will be performed on the depth part of the attachment.
     pub depth: PassChannel<f32>,
     /// What operations will be performed on the stencil part of the attachment.
@@ -140,7 +140,7 @@ pub enum RenderPassTimestampLocation {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RenderPassTimestampWrites {
     /// The query set to write the timestamp to.
-    pub query_set: id::QuerySetId,
+    pub query_set: (),
     /// The index of the query set at which a start timestamp of this pass is written, if any.
     pub beginning_of_pass_write_index: Option<u32>,
     /// The index of the query set at which an end timestamp of this pass is written, if any.
@@ -158,17 +158,17 @@ pub struct RenderPassDescriptor<'a> {
     /// Defines where and when timestamp values will be written for this pass.
     pub timestamp_writes: Option<&'a RenderPassTimestampWrites>,
     /// Defines where the occlusion query results will be stored for this pass.
-    pub occlusion_query_set: Option<id::QuerySetId>,
+    pub occlusion_query_set: Option<()>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct RenderPass {
     base: BasePass<RenderCommand>,
-    parent_id: id::CommandEncoderId,
+    parent_id: (),
     color_targets: ArrayVec<Option<RenderPassColorAttachment>, { hal::MAX_COLOR_ATTACHMENTS }>,
     depth_stencil_target: Option<RenderPassDepthStencilAttachment>,
     timestamp_writes: Option<RenderPassTimestampWrites>,
-    occlusion_query_set_id: Option<id::QuerySetId>,
+    occlusion_query_set_id: Option<()>,
 }
 
 impl fmt::Debug for RenderPass {
@@ -271,7 +271,7 @@ pub mod render_ffi {
     pub unsafe extern "C" fn wgpu_render_pass_set_bind_group(
         pass: &mut RenderPass,
         index: u32,
-        bind_group_id: id::BindGroupId,
+        bind_group_id: (),
         offsets: *const DynamicOffset,
         offset_length: usize,
     ) { todo!() }
@@ -279,14 +279,14 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_set_pipeline(
         pass: &mut RenderPass,
-        pipeline_id: id::RenderPipelineId,
+        pipeline_id: (),
     ) { todo!() }
 
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_set_vertex_buffer(
         pass: &mut RenderPass,
         slot: u32,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
         size: Option<BufferSize>,
     ) { todo!() }
@@ -294,7 +294,7 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_set_index_buffer(
         pass: &mut RenderPass,
-        buffer: id::BufferId,
+        buffer: (),
         index_format: IndexFormat,
         offset: BufferAddress,
         size: Option<BufferSize>,
@@ -361,21 +361,21 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_draw_indirect(
         pass: &mut RenderPass,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
     ) { todo!() }
 
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_draw_indexed_indirect(
         pass: &mut RenderPass,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
     ) { todo!() }
 
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_multi_draw_indirect(
         pass: &mut RenderPass,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
         count: u32,
     ) { todo!() }
@@ -383,7 +383,7 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_multi_draw_indexed_indirect(
         pass: &mut RenderPass,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
         count: u32,
     ) { todo!() }
@@ -391,9 +391,9 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_multi_draw_indirect_count(
         pass: &mut RenderPass,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
-        count_buffer_id: id::BufferId,
+        count_buffer_id: (),
         count_buffer_offset: BufferAddress,
         max_count: u32,
     ) { todo!() }
@@ -401,9 +401,9 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_multi_draw_indexed_indirect_count(
         pass: &mut RenderPass,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
-        count_buffer_id: id::BufferId,
+        count_buffer_id: (),
         count_buffer_offset: BufferAddress,
         max_count: u32,
     ) { todo!() }
@@ -436,7 +436,7 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_write_timestamp(
         pass: &mut RenderPass,
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     ) { todo!() }
 
@@ -452,7 +452,7 @@ pub mod render_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_pass_begin_pipeline_statistics_query(
         pass: &mut RenderPass,
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     ) { todo!() }
 
@@ -466,7 +466,7 @@ pub mod render_ffi {
     #[no_mangle]
     pub unsafe extern "C" fn wgpu_render_pass_execute_bundles(
         pass: &mut RenderPass,
-        render_bundle_ids: *const id::RenderBundleId,
+        render_bundle_ids: *const (),
         render_bundle_ids_length: usize,
     ) { todo!() }
 }

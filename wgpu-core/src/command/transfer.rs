@@ -8,9 +8,8 @@ use crate::{
     error::{ErrorFormatter, PrettyError},
     global::Global,
     hal_api::HalApi,
-    id::{BufferId, CommandEncoderId, DeviceId, TextureId},
     init_tracker::{
-        has_copy_partial_init_tracker_coverage, MemoryInitKind, TextureInitRange,
+        MemoryInitKind, TextureInitRange,
         TextureInitTrackerAction,
     },
     resource::{Resource, Texture, TextureErrorDimension},
@@ -27,8 +26,8 @@ use std::{iter, sync::Arc};
 
 use super::{memory_init::CommandBufferTextureMemoryActions, ClearError};
 
-pub type ImageCopyBuffer = wgt::ImageCopyBuffer<BufferId>;
-pub type ImageCopyTexture = wgt::ImageCopyTexture<TextureId>;
+pub type ImageCopyBuffer = wgt::ImageCopyBuffer<()>;
+pub type ImageCopyTexture = wgt::ImageCopyTexture<()>;
 
 #[derive(Clone, Copy, Debug)]
 pub enum CopySide {

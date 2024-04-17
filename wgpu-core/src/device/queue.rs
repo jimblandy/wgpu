@@ -9,8 +9,8 @@ use crate::{
     device::{life::ResourceMaps, DeviceError, WaitIdleError},
     global::Global,
     hal_api::HalApi,
-    id::{self, DeviceId, QueueId},
-    init_tracker::{has_copy_partial_init_tracker_coverage, TextureInitRange},
+    id::{self},
+    init_tracker::{TextureInitRange},
     resource::{
         Buffer, BufferAccessError, BufferMapState, DestroyedBuffer, DestroyedTexture, Resource,
         ResourceInfo, ResourceType, StagingBuffer, Texture, TextureInner,
@@ -66,7 +66,7 @@ pub struct SubmittedWorkDoneClosure {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct WrappedSubmissionIndex {
-    pub queue_id: QueueId,
+    pub queue_id: (),
     pub index: SubmissionIndex,
 }
 
@@ -130,8 +130,8 @@ pub(crate) struct PendingWrites<A: HalApi> {
     pub is_recording: bool,
 
     pub temp_resources: Vec<TempResource<A>>,
-    pub dst_buffers: FastHashMap<id::BufferId, Arc<Buffer<A>>>,
-    pub dst_textures: FastHashMap<id::TextureId, Arc<Texture<A>>>,
+    pub dst_buffers: FastHashMap<(), Arc<Buffer<A>>>,
+    pub dst_textures: FastHashMap<(), Arc<Texture<A>>>,
 
     /// All command buffers allocated from `command_encoder`.
     pub executing_command_buffers: Vec<A::CommandBuffer>,

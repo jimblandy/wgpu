@@ -50,18 +50,18 @@ pub enum RenderCommand {
     SetBindGroup {
         index: u32,
         num_dynamic_offsets: usize,
-        bind_group_id: id::BindGroupId,
+        bind_group_id: (),
     },
-    SetPipeline(id::RenderPipelineId),
+    SetPipeline(()),
     SetIndexBuffer {
-        buffer_id: id::BufferId,
+        buffer_id: (),
         index_format: wgt::IndexFormat,
         offset: BufferAddress,
         size: Option<BufferSize>,
     },
     SetVertexBuffer {
         slot: u32,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
         size: Option<BufferSize>,
     },
@@ -116,16 +116,16 @@ pub enum RenderCommand {
         first_instance: u32,
     },
     MultiDrawIndirect {
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
         /// Count of `None` represents a non-multi call.
         count: Option<NonZeroU32>,
         indexed: bool,
     },
     MultiDrawIndirectCount {
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
-        count_buffer_id: id::BufferId,
+        count_buffer_id: (),
         count_buffer_offset: BufferAddress,
         max_count: u32,
         indexed: bool,
@@ -140,7 +140,7 @@ pub enum RenderCommand {
         len: usize,
     },
     WriteTimestamp {
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     },
     BeginOcclusionQuery {
@@ -148,11 +148,11 @@ pub enum RenderCommand {
     },
     EndOcclusionQuery,
     BeginPipelineStatisticsQuery {
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     },
     EndPipelineStatisticsQuery,
-    ExecuteBundle(id::RenderBundleId),
+    ExecuteBundle(()),
 }
 
 /// Equivalent to `RenderCommand` with the Ids resolved into resource Arcs.

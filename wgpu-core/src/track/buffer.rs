@@ -10,7 +10,6 @@ use std::{borrow::Cow, marker::PhantomData, sync::Arc};
 use super::{PendingTransition, ResourceTracker, TrackerIndex};
 use crate::{
     hal_api::HalApi,
-    id::BufferId,
     resource::{Buffer, Resource},
     snatch::SnatchGuard,
     storage::Storage,
@@ -63,7 +62,7 @@ impl<A: HalApi> BufferBindGroupState<A> {
     pub fn add_single<'a>(
         &self,
         storage: &'a Storage<Buffer<A>>,
-        id: BufferId,
+        id: (),
         state: BufferUses,
     ) -> Option<&'a Arc<Buffer<A>>> { todo!() }
 }
@@ -131,7 +130,7 @@ impl<A: HalApi> BufferUsageScope<A> {
     pub fn merge_single<'a>(
         &mut self,
         storage: &'a Storage<Buffer<A>>,
-        id: BufferId,
+        id: (),
         new_state: BufferUses,
     ) -> Result<&'a Arc<Buffer<A>>, UsageConflict> { todo!() }
 }

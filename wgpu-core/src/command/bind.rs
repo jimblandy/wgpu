@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::{
     binding_model::{BindGroup, LateMinBufferBindingSizeMismatch, PipelineLayout},
     hal_api::HalApi,
-    id::BindGroupId,
     pipeline::LateSizedBufferGroup,
     resource::Resource,
 };

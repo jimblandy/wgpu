@@ -3,6 +3,7 @@ use crate::{hal_api::HalApi, resource::Buffer};
 use std::{ops::Range, sync::Arc};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // JIMB
 pub(crate) struct BufferInitTrackerAction<A: HalApi> {
     pub buffer: Arc<Buffer<A>>,
     pub range: Range<wgt::BufferAddress>,
@@ -10,21 +11,3 @@ pub(crate) struct BufferInitTrackerAction<A: HalApi> {
 }
 
 pub(crate) type BufferInitTracker = InitTracker<wgt::BufferAddress>;
-
-impl BufferInitTracker {
-    /// Checks if an action has/requires any effect on the initialization status
-    /// and shrinks its range if possible.
-    pub(crate) fn check_action<A: HalApi>(
-        &self,
-        action: &BufferInitTrackerAction<A>,
-    ) -> Option<BufferInitTrackerAction<A>> { todo!() }
-
-    /// Creates an action if it would have any effect on the initialization
-    /// status and shrinks the range if possible.
-    pub(crate) fn create_action<A: HalApi>(
-        &self,
-        buffer: &Arc<Buffer<A>>,
-        query_range: Range<wgt::BufferAddress>,
-        kind: MemoryInitKind,
-    ) -> Option<BufferInitTrackerAction<A>> { todo!() }
-}

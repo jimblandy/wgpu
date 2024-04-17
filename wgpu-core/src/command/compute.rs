@@ -16,7 +16,6 @@ use crate::{
     global::Global,
     hal_api::HalApi,
     id,
-    id::DeviceId,
     init_tracker::MemoryInitKind,
     pipeline,
     resource::{self},
@@ -44,9 +43,9 @@ pub enum ComputeCommand {
     SetBindGroup {
         index: u32,
         num_dynamic_offsets: usize,
-        bind_group_id: id::BindGroupId,
+        bind_group_id: (),
     },
-    SetPipeline(id::ComputePipelineId),
+    SetPipeline(()),
 
     /// Set a range of push constants to values stored in [`BasePass::push_constant_data`].
     SetPushConstant {
@@ -67,7 +66,7 @@ pub enum ComputeCommand {
 
     Dispatch([u32; 3]),
     DispatchIndirect {
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: wgt::BufferAddress,
     },
     PushDebugGroup {
@@ -80,11 +79,11 @@ pub enum ComputeCommand {
         len: usize,
     },
     WriteTimestamp {
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     },
     BeginPipelineStatisticsQuery {
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     },
     EndPipelineStatisticsQuery,
@@ -93,7 +92,7 @@ pub enum ComputeCommand {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ComputePass {
     base: BasePass<ComputeCommand>,
-    parent_id: id::CommandEncoderId,
+    parent_id: (),
     timestamp_writes: Option<ComputePassTimestampWrites>,
 }
 
@@ -107,7 +106,7 @@ impl fmt::Debug for ComputePass {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ComputePassTimestampWrites {
     /// The query set to write the timestamps to.
-    pub query_set: id::QuerySetId,
+    pub query_set: (),
     /// The index of the query set at which a start timestamp of this pass is written, if any.
     pub beginning_of_pass_write_index: Option<u32>,
     /// The index of the query set at which an end timestamp of this pass is written, if any.
@@ -170,7 +169,7 @@ pub mod compute_ffi {
     pub unsafe extern "C" fn wgpu_compute_pass_set_bind_group(
         pass: &mut ComputePass,
         index: u32,
-        bind_group_id: id::BindGroupId,
+        bind_group_id: (),
         offsets: *const DynamicOffset,
         offset_length: usize,
     ) { todo!() }
@@ -178,7 +177,7 @@ pub mod compute_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_compute_pass_set_pipeline(
         pass: &mut ComputePass,
-        pipeline_id: id::ComputePipelineId,
+        pipeline_id: (),
     ) { todo!() }
 
     /// # Safety
@@ -204,7 +203,7 @@ pub mod compute_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_compute_pass_dispatch_workgroups_indirect(
         pass: &mut ComputePass,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
     ) { todo!() }
 
@@ -236,14 +235,14 @@ pub mod compute_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_compute_pass_write_timestamp(
         pass: &mut ComputePass,
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     ) { todo!() }
 
     #[no_mangle]
     pub extern "C" fn wgpu_compute_pass_begin_pipeline_statistics_query(
         pass: &mut ComputePass,
-        query_set_id: id::QuerySetId,
+        query_set_id: (),
         query_index: u32,
     ) { todo!() }
 

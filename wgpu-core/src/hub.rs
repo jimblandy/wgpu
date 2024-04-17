@@ -137,10 +137,6 @@ pub struct HubReport {
     pub samplers: RegistryReport,
 }
 
-impl HubReport {
-    pub fn is_empty(&self) -> bool { todo!() }
-}
-
 #[allow(rustdoc::private_intra_doc_links)]
 /// All the resources for a particular backend in a [`crate::global::Global`].
 ///
@@ -167,43 +163,5 @@ impl HubReport {
 ///
 /// [`A::hub(global)`]: HalApi::hub
 pub struct Hub<A: HalApi> {
-    pub(crate) adapters: Registry<Adapter<A>>,
-    pub(crate) devices: Registry<Device<A>>,
-    pub(crate) queues: Registry<Queue<A>>,
-    pub(crate) pipeline_layouts: Registry<PipelineLayout<A>>,
-    pub(crate) shader_modules: Registry<ShaderModule<A>>,
-    pub(crate) bind_group_layouts: Registry<BindGroupLayout<A>>,
-    pub(crate) bind_groups: Registry<BindGroup<A>>,
-    pub(crate) command_buffers: Registry<CommandBuffer<A>>,
-    pub(crate) render_bundles: Registry<RenderBundle<A>>,
-    pub(crate) render_pipelines: Registry<RenderPipeline<A>>,
-    pub(crate) compute_pipelines: Registry<ComputePipeline<A>>,
-    pub(crate) query_sets: Registry<QuerySet<A>>,
-    pub(crate) buffers: Registry<Buffer<A>>,
-    pub(crate) staging_buffers: Registry<StagingBuffer<A>>,
-    pub(crate) textures: Registry<Texture<A>>,
-    pub(crate) texture_views: Registry<TextureView<A>>,
-    pub(crate) samplers: Registry<Sampler<A>>,
-}
-
-impl<A: HalApi> Hub<A> {
-    fn new() -> Self { todo!() }
-
-    //TODO: instead of having a hacky `with_adapters` parameter,
-    // we should have `clear_device(device_id)` that specifically destroys
-    // everything related to a logical device.
-    pub(crate) fn clear(&self, surface_guard: &Storage<Surface>, with_adapters: bool) { todo!() }
-
-    pub(crate) fn surface_unconfigure(&self, device: &Device<A>, surface: &A::Surface) { todo!() }
-
-    pub fn generate_report(&self) -> HubReport { todo!() }
-}
-
-pub struct Hubs {
-    #[cfg(all(not(vulkan), not(metal), not(dx12), not(gles)))]
-    pub(crate) empty: Hub<hal::api::Empty>,
-}
-
-impl Hubs {
-    pub(crate) fn new() -> Self { todo!() }
+    marker: std::marker::PhantomData<A>,
 }

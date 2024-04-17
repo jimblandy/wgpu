@@ -2,7 +2,6 @@ use crate::{
     binding_model,
     hal_api::HalApi,
     hub::Hub,
-    id::{BindGroupLayoutId, PipelineLayoutId},
     resource::{Buffer, BufferAccessError, BufferAccessResult, BufferMapOperation},
     snatch::SnatchGuard,
     Label, DOWNLEVEL_ERROR_MESSAGE,
@@ -126,7 +125,7 @@ pub struct MissingDownlevelFlags(pub wgt::DownlevelFlags);
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ImplicitPipelineContext {
-    pub root_id: PipelineLayoutId,
-    pub group_ids: ArrayVec<BindGroupLayoutId, { hal::MAX_BIND_GROUPS }>,
+    pub root_id: (),
+    pub group_ids: ArrayVec<(), { hal::MAX_BIND_GROUPS }>,
 }
 

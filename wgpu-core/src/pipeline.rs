@@ -5,7 +5,6 @@ use crate::{
     command::ColorAttachmentError,
     device::{Device, DeviceError, MissingDownlevelFlags, MissingFeatures, RenderPassContext},
     hal_api::HalApi,
-    id::{PipelineLayoutId, ShaderModuleId},
     resource::{Resource, ResourceInfo, ResourceType},
     resource_log, validation, Label,
 };
@@ -18,23 +17,6 @@ use thiserror::Error;
 /// at draw time as opposed to initialization time.
 #[derive(Debug)]
 pub(crate) struct LateSizedBufferGroup {
-    // The order has to match `BindGroup::late_buffer_binding_sizes`.
-    pub(crate) shader_sizes: Vec<wgt::BufferAddress>,
-}
-
-#[allow(clippy::large_enum_variant)]
-pub enum ShaderModuleSource<'a> {
-    #[cfg(feature = "wgsl")]
-    Wgsl(Cow<'a, str>),
-    #[cfg(feature = "glsl")]
-    Glsl(Cow<'a, str>, naga::front::glsl::Options),
-    #[cfg(feature = "spirv")]
-    SpirV(Cow<'a, [u32]>, naga::front::spv::Options),
-    Naga(Cow<'static, naga::Module>),
-    /// Dummy variant because `Naga` doesn't have a lifetime and without enough active features it
-    /// could be the last one active.
-    #[doc(hidden)]
-    Dummy(PhantomData<&'a ()>),
 }
 
 #[derive(Clone, Debug)]
@@ -46,6 +28,7 @@ pub struct ShaderModuleDescriptor<'a> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // JIMB 38s
 pub struct ShaderModule<A: HalApi> {
     pub(crate) raw: Option<A::ShaderModule>,
     pub(crate) device: Arc<Device<A>>,
@@ -68,16 +51,6 @@ impl<A: HalApi> Resource for ShaderModule<A> {
     fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
 
     fn label(&self) -> String { todo!() }
-}
-
-impl<A: HalApi> ShaderModule<A> {
-    pub(crate) fn raw(&self) -> &A::ShaderModule { todo!() }
-
-    pub(crate) fn finalize_entry_point_name(
-        &self,
-        stage_bit: wgt::ShaderStages,
-        entry_point: Option<&str>,
-    ) -> Result<String, validation::StageError> { todo!() }
 }
 
 #[derive(Clone, Debug)]
@@ -113,35 +86,6 @@ where
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CreateShaderModuleError {
-    #[cfg(feature = "wgsl")]
-    #[error(transparent)]
-    Parsing(#[from] ShaderError<naga::front::wgsl::ParseError>),
-    #[cfg(feature = "glsl")]
-    #[error(transparent)]
-    ParsingGlsl(#[from] ShaderError<naga::front::glsl::ParseError>),
-    #[cfg(feature = "spirv")]
-    #[error(transparent)]
-    ParsingSpirV(#[from] ShaderError<naga::front::spv::Error>),
-    #[error("Failed to generate the backend-specific code")]
-    Generation,
-    #[error(transparent)]
-    Device(#[from] DeviceError),
-    #[error(transparent)]
-    Validation(#[from] ShaderError<naga::WithSpan<naga::valid::ValidationError>>),
-    #[error(transparent)]
-    MissingFeatures(#[from] MissingFeatures),
-    #[error(
-        "Shader global {bind:?} uses a group index {group} that exceeds the max_bind_groups limit of {limit}."
-    )]
-    InvalidGroupIndex {
-        bind: naga::ResourceBinding,
-        group: u32,
-        limit: u32,
-    },
-}
-
-impl CreateShaderModuleError {
-    pub fn location(&self, source: &str) -> Option<naga::SourceLocation> { todo!() }
 }
 
 /// Describes a programmable pipeline stage.
@@ -149,7 +93,7 @@ impl CreateShaderModuleError {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProgrammableStageDescriptor<'a> {
     /// The compiled shader module for this stage.
-    pub module: ShaderModuleId,
+    pub module: (),
     /// The name of the entry point in the compiled shader. The name is selected using the
     /// following logic:
     ///
@@ -167,20 +111,9 @@ pub struct ProgrammableStageDescriptor<'a> {
     pub constants: Cow<'a, naga::back::PipelineConstants>,
 }
 
-/// Number of implicit bind groups derived at pipeline creation.
-pub type ImplicitBindGroupCount = u8;
-
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum ImplicitLayoutError {
-    #[error("Missing IDs for deriving {0} bind groups")]
-    MissingIds(ImplicitBindGroupCount),
-    #[error("Unable to reflect the shader {0:?} interface")]
-    ReflectionError(wgt::ShaderStages),
-    #[error(transparent)]
-    BindGroup(#[from] CreateBindGroupLayoutError),
-    #[error(transparent)]
-    Pipeline(#[from] CreatePipelineLayoutError),
 }
 
 /// Describes a compute pipeline.
@@ -189,7 +122,7 @@ pub enum ImplicitLayoutError {
 pub struct ComputePipelineDescriptor<'a> {
     pub label: Label<'a>,
     /// The layout of bind groups for this pipeline.
-    pub layout: Option<PipelineLayoutId>,
+    pub layout: Option<()>,
     /// The compiled compute stage and its entry point.
     pub stage: ProgrammableStageDescriptor<'a>,
 }
@@ -197,21 +130,10 @@ pub struct ComputePipelineDescriptor<'a> {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum CreateComputePipelineError {
-    #[error(transparent)]
-    Device(#[from] DeviceError),
-    #[error("Pipeline layout is invalid")]
-    InvalidLayout,
-    #[error("Unable to derive an implicit layout")]
-    Implicit(#[from] ImplicitLayoutError),
-    #[error("Error matching shader requirements against the pipeline")]
-    Stage(#[from] validation::StageError),
-    #[error("Internal error: {0}")]
-    Internal(String),
-    #[error(transparent)]
-    MissingDownlevelFlags(#[from] MissingDownlevelFlags),
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // JIMB 40s
 pub struct ComputePipeline<A: HalApi> {
     pub(crate) raw: Option<A::ComputePipeline>,
     pub(crate) layout: Arc<PipelineLayout<A>>,
@@ -233,10 +155,6 @@ impl<A: HalApi> Resource for ComputePipeline<A> {
     fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
     fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
-}
-
-impl<A: HalApi> ComputePipeline<A> {
-    pub(crate) fn raw(&self) -> &A::ComputePipeline { todo!() }
 }
 
 /// Describes how the vertex buffer is interpreted.
@@ -278,7 +196,7 @@ pub struct FragmentState<'a> {
 pub struct RenderPipelineDescriptor<'a> {
     pub label: Label<'a>,
     /// The layout of bind groups for this pipeline.
-    pub layout: Option<PipelineLayoutId>,
+    pub layout: Option<()>,
     /// The vertex processing state for this pipeline.
     pub vertex: VertexState<'a>,
     /// The properties of the pipeline at the primitive assembly and rasterization level.
@@ -300,106 +218,16 @@ pub struct RenderPipelineDescriptor<'a> {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum ColorStateError {
-    #[error("Format {0:?} is not renderable")]
-    FormatNotRenderable(wgt::TextureFormat),
-    #[error("Format {0:?} is not blendable")]
-    FormatNotBlendable(wgt::TextureFormat),
-    #[error("Format {0:?} does not have a color aspect")]
-    FormatNotColor(wgt::TextureFormat),
-    #[error("Sample count {0} is not supported by format {1:?} on this device. The WebGPU spec guarantees {2:?} samples are supported by this format. With the TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES feature your device supports {3:?}.")]
-    InvalidSampleCount(u32, wgt::TextureFormat, Vec<u32>, Vec<u32>),
-    #[error("Output format {pipeline} is incompatible with the shader {shader}")]
-    IncompatibleFormat {
-        pipeline: validation::NumericType,
-        shader: validation::NumericType,
-    },
-    #[error("Blend factors for {0:?} must be `One`")]
-    InvalidMinMaxBlendFactors(wgt::BlendComponent),
-    #[error("Invalid write mask {0:?}")]
-    InvalidWriteMask(wgt::ColorWrites),
 }
 
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum DepthStencilStateError {
-    #[error("Format {0:?} is not renderable")]
-    FormatNotRenderable(wgt::TextureFormat),
-    #[error("Format {0:?} does not have a depth aspect, but depth test/write is enabled")]
-    FormatNotDepth(wgt::TextureFormat),
-    #[error("Format {0:?} does not have a stencil aspect, but stencil test/write is enabled")]
-    FormatNotStencil(wgt::TextureFormat),
-    #[error("Sample count {0} is not supported by format {1:?} on this device. The WebGPU spec guarantees {2:?} samples are supported by this format. With the TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES feature your device supports {3:?}.")]
-    InvalidSampleCount(u32, wgt::TextureFormat, Vec<u32>, Vec<u32>),
 }
 
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum CreateRenderPipelineError {
-    #[error(transparent)]
-    ColorAttachment(#[from] ColorAttachmentError),
-    #[error(transparent)]
-    Device(#[from] DeviceError),
-    #[error("Pipeline layout is invalid")]
-    InvalidLayout,
-    #[error("Unable to derive an implicit layout")]
-    Implicit(#[from] ImplicitLayoutError),
-    #[error("Color state [{0}] is invalid")]
-    ColorState(u8, #[source] ColorStateError),
-    #[error("Depth/stencil state is invalid")]
-    DepthStencilState(#[from] DepthStencilStateError),
-    #[error("Invalid sample count {0}")]
-    InvalidSampleCount(u32),
-    #[error("The number of vertex buffers {given} exceeds the limit {limit}")]
-    TooManyVertexBuffers { given: u32, limit: u32 },
-    #[error("The total number of vertex attributes {given} exceeds the limit {limit}")]
-    TooManyVertexAttributes { given: u32, limit: u32 },
-    #[error("Vertex buffer {index} stride {given} exceeds the limit {limit}")]
-    VertexStrideTooLarge { index: u32, given: u32, limit: u32 },
-    #[error("Vertex buffer {index} stride {stride} does not respect `VERTEX_STRIDE_ALIGNMENT`")]
-    UnalignedVertexStride {
-        index: u32,
-        stride: wgt::BufferAddress,
-    },
-    #[error("Vertex attribute at location {location} has invalid offset {offset}")]
-    InvalidVertexAttributeOffset {
-        location: wgt::ShaderLocation,
-        offset: wgt::BufferAddress,
-    },
-    #[error("Two or more vertex attributes were assigned to the same location in the shader: {0}")]
-    ShaderLocationClash(u32),
-    #[error("Strip index format was not set to None but to {strip_index_format:?} while using the non-strip topology {topology:?}")]
-    StripIndexFormatForNonStripTopology {
-        strip_index_format: Option<wgt::IndexFormat>,
-        topology: wgt::PrimitiveTopology,
-    },
-    #[error("Conservative Rasterization is only supported for wgt::PolygonMode::Fill")]
-    ConservativeRasterizationNonFillPolygonMode,
-    #[error(transparent)]
-    MissingFeatures(#[from] MissingFeatures),
-    #[error(transparent)]
-    MissingDownlevelFlags(#[from] MissingDownlevelFlags),
-    #[error("Error matching {stage:?} shader requirements against the pipeline")]
-    Stage {
-        stage: wgt::ShaderStages,
-        #[source]
-        error: validation::StageError,
-    },
-    #[error("Internal error in {stage:?} shader: {error}")]
-    Internal {
-        stage: wgt::ShaderStages,
-        error: String,
-    },
-    #[error("In the provided shader, the type given for group {group} binding {binding} has a size of {size}. As the device does not support `DownlevelFlags::BUFFER_BINDINGS_NOT_16_BYTE_ALIGNED`, the type must have a size that is a multiple of 16 bytes.")]
-    UnalignedShader { group: u32, binding: u32, size: u64 },
-    #[error("Using the blend factor {factor:?} for render target {target} is not possible. Only the first render target may be used when dual-source blending.")]
-    BlendFactorOnUnsupportedTarget {
-        factor: wgt::BlendFactor,
-        target: u32,
-    },
-    #[error("Pipeline expects the shader entry point to make use of dual-source blending.")]
-    PipelineExpectsShaderToUseDualSourceBlending,
-    #[error("Shader entry point expects the pipeline to make use of dual-source blending.")]
-    ShaderExpectsPipelineToUseDualSourceBlending,
 }
 
 bitflags::bitflags! {
@@ -431,6 +259,7 @@ impl Default for VertexStep {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // JIMB 40s
 pub struct RenderPipeline<A: HalApi> {
     pub(crate) raw: Option<A::RenderPipeline>,
     pub(crate) device: Arc<Device<A>>,
@@ -457,8 +286,4 @@ impl<A: HalApi> Resource for RenderPipeline<A> {
     fn as_info(&self) -> &ResourceInfo<Self> { todo!() }
 
     fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> { todo!() }
-}
-
-impl<A: HalApi> RenderPipeline<A> {
-    pub(crate) fn raw(&self) -> &A::RenderPipeline { todo!() }
 }

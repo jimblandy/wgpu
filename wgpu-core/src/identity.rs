@@ -9,9 +9,6 @@ use std::{fmt::Debug, marker::PhantomData};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum IdSource {
-    External,
-    Allocated,
-    None,
 }
 
 /// A simple structure to allocate [`Id`] identifiers.
@@ -43,45 +40,10 @@ enum IdSource {
 /// [`free`]: IdentityManager::free
 #[derive(Debug)]
 pub(super) struct IdentityValues {
-    free: Vec<(Index, Epoch)>,
-    next_index: Index,
-    count: usize,
-    // Sanity check: The allocation logic works under the assumption that we don't
-    // do a mix of allocating ids from here and providing ids manually for the same
-    // storage container.
-    id_source: IdSource,
-}
-
-impl IdentityValues {
-    /// Allocate a fresh, never-before-seen id with the given `backend`.
-    ///
-    /// The backend is incorporated into the id, so that ids allocated with
-    /// different `backend` values are always distinct.
-    pub fn alloc<T: Marker>(&mut self, backend: Backend) -> Id<T> { todo!() }
-
-    pub fn mark_as_used<T: Marker>(&mut self, id: Id<T>) -> Id<T> { todo!() }
-
-    /// Free `id`. It will never be returned from `alloc` again.
-    pub fn release<T: Marker>(&mut self, id: Id<T>) { todo!() }
-
-    pub fn count(&self) -> usize { todo!() }
 }
 
 #[derive(Debug)]
 pub struct IdentityManager<T: Marker> {
-    pub(super) values: Mutex<IdentityValues>,
     _phantom: PhantomData<T>,
 }
 
-impl<T: Marker> IdentityManager<T> {
-    pub fn process(&self, backend: Backend) -> Id<T> { todo!() }
-    pub fn mark_as_used(&self, id: Id<T>) -> Id<T> { todo!() }
-    pub fn free(&self, id: Id<T>) { todo!() }
-}
-
-impl<T: Marker> IdentityManager<T> {
-    pub fn new() -> Self { todo!() }
-}
-
-#[test]
-fn test_epoch_end_of_life() { todo!() }

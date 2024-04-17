@@ -7,15 +7,7 @@ use std::{
 };
 use wgt::{Backend, WasmNotSendSync};
 
-type IdType = u64;
-type ZippedIndex = Index;
 type NonZeroId = std::num::NonZeroU64;
-
-const INDEX_BITS: usize = std::mem::size_of::<ZippedIndex>() * 8;
-const EPOCH_BITS: usize = INDEX_BITS - BACKEND_BITS;
-const BACKEND_BITS: usize = 3;
-const BACKEND_SHIFT: usize = INDEX_BITS * 2 - BACKEND_BITS;
-pub const EPOCH_MASK: u32 = (1 << (EPOCH_BITS)) - 1;
 
 /// The raw underlying representation of an identifier.
 #[repr(transparent)]
@@ -31,33 +23,6 @@ pub const EPOCH_MASK: u32 = (1 << (EPOCH_BITS)) - 1;
 )]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RawId(NonZeroId);
-
-impl RawId {
-    #[doc(hidden)]
-    #[inline]
-    pub fn from_non_zero(non_zero: NonZeroId) -> Self { todo!() }
-
-    #[doc(hidden)]
-    #[inline]
-    pub fn into_non_zero(self) -> NonZeroId { todo!() }
-
-    /// Zip together an identifier and return its raw underlying representation.
-    pub fn zip(index: Index, epoch: Epoch, backend: Backend) -> RawId { todo!() }
-
-    /// Unzip a raw identifier into its components.
-    #[allow(trivial_numeric_casts)]
-    pub fn unzip(self) -> (Index, Epoch, Backend) { todo!() }
-
-    pub fn backend(self) -> Backend { todo!() }
-}
-
-/// Coerce a slice of identifiers into a slice of optional raw identifiers.
-///
-/// There's two reasons why we know this is correct:
-/// * `Option<T>` is guaranteed to be niche-filled to 0's.
-/// * The `T` in `Option<T>` can inhabit any representation except 0's, since
-///   its underlying representation is `NonZero*`.
-pub fn as_option_slice<T: Marker>(ids: &[Id<T>]) -> &[Option<Id<T>>] { todo!() }
 
 /// An identifier for a wgpu object.
 ///
@@ -107,35 +72,6 @@ impl From<RawId> for SerialId {
 
 impl From<SerialId> for RawId {
     fn from(id: SerialId) -> Self { todo!() }
-}
-
-impl<T> Id<T>
-where
-    T: Marker,
-{
-    /// # Safety
-    ///
-    /// The raw id must be valid for the type.
-    pub unsafe fn from_raw(raw: RawId) -> Self { todo!() }
-
-    /// Coerce the identifiers into its raw underlying representation.
-    pub fn into_raw(self) -> RawId { todo!() }
-
-    #[allow(dead_code)]
-    pub(crate) fn dummy(index: u32) -> Self { todo!() }
-
-    #[allow(dead_code)]
-    pub(crate) fn is_valid(&self) -> bool { todo!() }
-
-    /// Get the backend this identifier corresponds to.
-    #[inline]
-    pub fn backend(self) -> Backend { todo!() }
-
-    #[inline]
-    pub fn zip(index: Index, epoch: Epoch, backend: Backend) -> Self { todo!() }
-
-    #[inline]
-    pub fn unzip(self) -> (Index, Epoch, Backend) { todo!() }
 }
 
 impl<T> Copy for Id<T> where T: Marker {}
@@ -216,11 +152,6 @@ macro_rules! ids {
                 impl super::Marker for $marker {}
             )*
         }
-
-        $(
-            $(#[$($meta)*])*
-            pub type $name = Id<self::markers::$marker>;
-        )*
     }
 }
 
@@ -247,18 +178,6 @@ ids! {
     pub type RenderBundleEncoderId RenderBundleEncoder;
     pub type RenderBundleId RenderBundle;
     pub type QuerySetId QuerySet;
-}
-
-impl CommandEncoderId {
-    pub fn into_command_buffer_id(self) -> CommandBufferId { todo!() }
-}
-
-impl CommandBufferId {
-    pub fn into_command_encoder_id(self) -> CommandEncoderId { todo!() }
-}
-
-impl DeviceId {
-    pub fn into_queue_id(self) -> QueueId { todo!() }
 }
 
 #[test]

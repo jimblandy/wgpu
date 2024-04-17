@@ -4,7 +4,7 @@ use wgt::Backend;
 
 use crate::{
     hal_api::HalApi,
-    hub::{HubReport, Hubs},
+    hub::{HubReport},
     instance::{Instance, Surface},
     registry::{Registry, RegistryReport},
     resource_log,

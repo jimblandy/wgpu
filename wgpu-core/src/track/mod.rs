@@ -248,17 +248,17 @@ fn skip_barrier<T: ResourceUses>(old_state: T, new_state: T) -> bool { todo!() }
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum UsageConflict {
     #[error("Attempted to use invalid buffer")]
-    BufferInvalid { id: id::BufferId },
+    BufferInvalid { id: () },
     #[error("Attempted to use invalid texture")]
-    TextureInvalid { id: id::TextureId },
+    TextureInvalid { id: () },
     #[error("Attempted to use buffer with {invalid_use}.")]
     Buffer {
-        id: id::BufferId,
+        id: (),
         invalid_use: InvalidUse<hal::BufferUses>,
     },
     #[error("Attempted to use a texture (mips {mip_levels:?} layers {array_layers:?}) with {invalid_use}.")]
     Texture {
-        id: id::TextureId,
+        id: (),
         mip_levels: ops::Range<u32>,
         array_layers: ops::Range<u32>,
         invalid_use: InvalidUse<hal::TextureUses>,
@@ -267,13 +267,13 @@ pub enum UsageConflict {
 
 impl UsageConflict {
     fn from_buffer(
-        id: id::BufferId,
+        id: (),
         current_state: hal::BufferUses,
         new_state: hal::BufferUses,
     ) -> Self { todo!() }
 
     fn from_texture(
-        id: id::TextureId,
+        id: (),
         selector: TextureSelector,
         current_state: hal::TextureUses,
         new_state: hal::TextureUses,

@@ -6,7 +6,6 @@ use crate::{
     },
     error::{ErrorFormatter, PrettyError},
     hal_api::HalApi,
-    id::{BindGroupLayoutId, BufferId, SamplerId, TextureId, TextureViewId},
     init_tracker::{BufferInitTrackerAction, TextureInitTrackerAction},
     resource::{Resource, ResourceInfo, ResourceType},
     resource_log,
@@ -116,8 +115,6 @@ pub struct BindGroupDescriptor<'a> {
     ///
     /// This will show up in graphics debuggers for easy identification.
     pub label: Label<'a>,
-    /// The [`BindGroupLayout`] that corresponds to this bind group.
-    pub layout: BindGroupLayoutId,
     /// The resources to bind to this bind group.
     pub entries: Cow<'a, [BindGroupEntry<'a>]>,
 }
@@ -182,9 +179,6 @@ pub struct PipelineLayoutDescriptor<'a> {
     ///
     /// This will show up in graphics debuggers for easy identification.
     pub label: Label<'a>,
-    /// Bind groups that this pipeline uses. The first entry will provide all the bindings for
-    /// "set = 0", second entry will provide all the bindings for "set = 1" etc.
-    pub bind_group_layouts: Cow<'a, [BindGroupLayoutId]>,
     /// Set of push constant ranges this pipeline uses. Each shader stage that
     /// uses push constants must define the range in push constant memory that
     /// corresponds to its single `layout(push_constant)` uniform block.
@@ -221,7 +215,7 @@ impl<A: HalApi> Resource for PipelineLayout<A> {
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BufferBinding {
-    pub buffer_id: BufferId,
+    pub buffer_id: (),
     pub offset: wgt::BufferAddress,
     pub size: Option<wgt::BufferSize>,
 }
@@ -233,10 +227,10 @@ pub struct BufferBinding {
 pub enum BindingResource<'a> {
     Buffer(BufferBinding),
     BufferArray(Cow<'a, [BufferBinding]>),
-    Sampler(SamplerId),
-    SamplerArray(Cow<'a, [SamplerId]>),
-    TextureView(TextureViewId),
-    TextureViewArray(Cow<'a, [TextureViewId]>),
+    Sampler(()),
+    SamplerArray(Cow<'a, [()]>),
+    TextureView(()),
+    TextureViewArray(Cow<'a, [()]>),
 }
 
 #[derive(Clone, Debug, Error)]

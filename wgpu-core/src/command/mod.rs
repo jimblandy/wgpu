@@ -22,7 +22,6 @@ use self::memory_init::CommandBufferTextureMemoryActions;
 use crate::device::{Device, DeviceError};
 use crate::error::{ErrorFormatter, PrettyError};
 use crate::hub::Hub;
-use crate::id::CommandBufferId;
 use crate::snatch::SnatchGuard;
 
 use crate::init_tracker::BufferInitTrackerAction;

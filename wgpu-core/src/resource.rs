@@ -9,8 +9,7 @@ use crate::{
     global::Global,
     hal_api::HalApi,
     id::{
-        AdapterId, BufferId, CommandEncoderId, DeviceId, Id, Marker, SurfaceId, TextureId,
-        TextureViewId,
+        Id, Marker,
     },
     init_tracker::{BufferInitTracker, TextureInitTracker},
     resource, resource_log,
@@ -59,49 +58,11 @@ use std::{
 /// [`Buffer`]: crate::resource::Buffer
 #[derive(Debug)]
 pub(crate) struct ResourceInfo<T: Resource> {
-    id: Option<Id<T::Marker>>,
-    tracker_index: TrackerIndex,
-    tracker_indices: Option<Arc<SharedTrackerIndexAllocator>>,
-    /// The index of the last queue submission in which the resource
-    /// was used.
-    ///
-    /// Each queue submission is fenced and assigned an index number
-    /// sequentially. Thus, when a queue submission completes, we know any
-    /// resources used in that submission and any lower-numbered submissions are
-    /// no longer in use by the GPU.
-    submission_index: AtomicUsize,
-
-    /// The `label` from the descriptor used to create the resource.
-    pub(crate) label: String,
+    marker: std::marker::PhantomData<T>,
 }
 
 impl<T: Resource> Drop for ResourceInfo<T> {
     fn drop(&mut self) { todo!() }
-}
-
-impl<T: Resource> ResourceInfo<T> {
-    #[allow(unused_variables)]
-    pub(crate) fn new(
-        label: &str,
-        tracker_indices: Option<Arc<SharedTrackerIndexAllocator>>,
-    ) -> Self { todo!() }
-
-    pub(crate) fn label(&self) -> &dyn Debug
-    where
-        Id<T::Marker>: Debug,
-    { todo!() }
-
-    pub(crate) fn id(&self) -> Id<T::Marker> { todo!() }
-
-    pub(crate) fn tracker_index(&self) -> TrackerIndex { todo!() }
-
-    pub(crate) fn set_id(&mut self, id: Id<T::Marker>) { todo!() }
-
-    /// Record that this resource will be used by the queue submission with the
-    /// given index.
-    pub(crate) fn use_at(&self, submit_index: SubmissionIndex) { todo!() }
-
-    pub(crate) fn submission_index(&self) -> SubmissionIndex { todo!() }
 }
 
 pub(crate) type ResourceType = &'static str;
@@ -120,54 +81,13 @@ pub(crate) trait Resource: 'static + Sized + WasmNotSendSync {
 /// The status code provided to the buffer mapping callback.
 ///
 /// This is very similar to `BufferAccessResult`, except that this is FFI-friendly.
-#[repr(C)]
 #[derive(Debug)]
 pub enum BufferMapAsyncStatus {
-    /// The Buffer is successfully mapped, `get_mapped_range` can be called.
-    ///
-    /// All other variants of this enum represent failures to map the buffer.
-    Success,
-    /// The buffer is already mapped.
-    ///
-    /// While this is treated as an error, it does not prevent mapped range from being accessed.
-    AlreadyMapped,
-    /// Mapping was already requested.
-    MapAlreadyPending,
-    /// An unknown error.
-    Error,
-    /// Mapping was aborted (by unmapping or destroying the buffer before mapping
-    /// happened).
-    Aborted,
-    /// The context is Lost.
-    ContextLost,
-    /// The buffer is in an invalid state.
-    Invalid,
-    /// The range isn't fully contained in the buffer.
-    InvalidRange,
-    /// The range isn't properly aligned.
-    InvalidAlignment,
-    /// Incompatible usage flags.
-    InvalidUsageFlags,
 }
 
 #[derive(Debug)]
-pub(crate) enum BufferMapState<A: HalApi> {
-    /// Mapped at creation.
-    Init {
-        ptr: NonNull<u8>,
-        stage_buffer: Arc<Buffer<A>>,
-        needs_flush: bool,
-    },
-    /// Waiting for GPU to be done before mapping
-    Waiting(BufferPendingMapping<A>),
-    /// Mapped
-    Active {
-        ptr: NonNull<u8>,
-        range: hal::MemoryRange,
-        host: HostMap,
-    },
-    /// Not mapped
-    Idle,
+pub(crate) struct BufferMapState<A: HalApi> {
+    marker: std::marker::PhantomData<A>,
 }
 
 #[cfg(send_sync)]
@@ -186,38 +106,13 @@ unsafe impl Send for BufferMapCallbackC {}
 
 #[derive(Debug)]
 pub struct BufferMapCallback {
-    // We wrap this so creating the enum in the C variant can be unsafe,
-    // allowing our call function to be safe.
-    inner: BufferMapCallbackInner,
 }
 
-#[cfg(send_sync)]
-type BufferMapCallbackCallback = Box<dyn FnOnce(BufferAccessResult) + Send + 'static>;
-#[cfg(not(send_sync))]
-type BufferMapCallbackCallback = Box<dyn FnOnce(BufferAccessResult) + 'static>;
-
 enum BufferMapCallbackInner {
-    Rust { callback: BufferMapCallbackCallback },
-    C { inner: BufferMapCallbackC },
 }
 
 impl Debug for BufferMapCallbackInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { todo!() }
-}
-
-impl BufferMapCallback {
-    pub fn from_rust(callback: BufferMapCallbackCallback) -> Self { todo!() }
-
-    /// # Safety
-    ///
-    /// - The callback pointer must be valid to call with the provided user_data
-    ///   pointer.
-    ///
-    /// - Both pointers must point to valid memory until the callback is
-    ///   invoked, which may happen at an unspecified time.
-    pub unsafe fn from_c(inner: BufferMapCallbackC) -> Self { todo!() }
-
-    pub(crate) fn call(self, result: BufferAccessResult) { todo!() }
 }
 
 #[derive(Debug)]
@@ -229,64 +124,19 @@ pub struct BufferMapOperation {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum BufferAccessError {
-    #[error(transparent)]
-    Device(#[from] DeviceError),
-    #[error("Buffer map failed")]
-    Failed,
-    #[error("Buffer is invalid")]
-    Invalid,
-    #[error("Buffer is destroyed")]
-    Destroyed,
-    #[error("Buffer is already mapped")]
-    AlreadyMapped,
-    #[error("Buffer map is pending")]
-    MapAlreadyPending,
-    #[error(transparent)]
-    MissingBufferUsage(#[from] MissingBufferUsageError),
-    #[error("Buffer is not mapped")]
-    NotMapped,
-    #[error(
-        "Buffer map range must start aligned to `MAP_ALIGNMENT` and end to `COPY_BUFFER_ALIGNMENT`"
-    )]
-    UnalignedRange,
-    #[error("Buffer offset invalid: offset {offset} must be multiple of 8")]
-    UnalignedOffset { offset: wgt::BufferAddress },
-    #[error("Buffer range size invalid: range_size {range_size} must be multiple of 4")]
-    UnalignedRangeSize { range_size: wgt::BufferAddress },
-    #[error("Buffer access out of bounds: index {index} would underrun the buffer (limit: {min})")]
-    OutOfBoundsUnderrun {
-        index: wgt::BufferAddress,
-        min: wgt::BufferAddress,
-    },
-    #[error(
-        "Buffer access out of bounds: last index {index} would overrun the buffer (limit: {max})"
-    )]
-    OutOfBoundsOverrun {
-        index: wgt::BufferAddress,
-        max: wgt::BufferAddress,
-    },
-    #[error("Buffer map range start {start} is greater than end {end}")]
-    NegativeRange {
-        start: wgt::BufferAddress,
-        end: wgt::BufferAddress,
-    },
-    #[error("Buffer map aborted")]
-    MapAborted,
 }
 
 pub type BufferAccessResult = Result<(), BufferAccessError>;
 
 #[derive(Debug)]
 pub(crate) struct BufferPendingMapping<A: HalApi> {
-    pub(crate) range: Range<wgt::BufferAddress>,
-    pub(crate) op: BufferMapOperation,
-    // hold the parent alive while the mapping is active
-    pub(crate) _parent_buffer: Arc<Buffer<A>>,
+    marker: std::marker::PhantomData<A>,
 }
 
 pub type BufferDescriptor<'a> = wgt::BufferDescriptor<Label<'a>>;
 
 #[derive(Debug)]
+#[allow(dead_code)] // JIMB 15s
 pub struct Buffer<A: HalApi> {
     pub(crate) raw: Snatchable<A::Buffer>,
     pub(crate) device: Arc<Device<A>>,
@@ -303,36 +153,9 @@ impl<A: HalApi> Drop for Buffer<A> {
     fn drop(&mut self) { todo!() }
 }
 
-impl<A: HalApi> Buffer<A> {
-    pub(crate) fn raw(&self, guard: &SnatchGuard) -> Option<&A::Buffer> { todo!() }
-
-    pub(crate) fn is_destroyed(&self, guard: &SnatchGuard) -> bool { todo!() }
-
-    // Note: This must not be called while holding a lock.
-    pub(crate) fn unmap(self: &Arc<Self>) -> Result<(), BufferAccessError> { todo!() }
-
-    fn unmap_inner(self: &Arc<Self>) -> Result<Option<BufferMapPendingClosure>, BufferAccessError> { todo!() }
-
-    pub(crate) fn destroy(self: &Arc<Self>) -> Result<(), DestroyError> { todo!() }
-}
-
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum CreateBufferError {
-    #[error(transparent)]
-    Device(#[from] DeviceError),
-    #[error("Failed to map buffer while creating: {0}")]
-    AccessError(#[from] BufferAccessError),
-    #[error("Buffers that are mapped at creation have to be aligned to `COPY_BUFFER_ALIGNMENT`")]
-    UnalignedSize,
-    #[error("Invalid usage flags {0:?}")]
-    InvalidUsage(wgt::BufferUsages),
-    #[error("`MAP` usage can only be combined with the opposite `COPY`, requested {0:?}")]
-    UsageMismatch(wgt::BufferUsages),
-    #[error("Buffer size {requested} is greater than the maximum buffer size ({maximum})")]
-    MaxBufferSize { requested: u64, maximum: u64 },
-    #[error(transparent)]
-    MissingDownlevelFlags(#[from] MissingDownlevelFlags),
 }
 
 impl<A: HalApi> Resource for Buffer<A> {
@@ -351,7 +174,7 @@ pub struct DestroyedBuffer<A: HalApi> {
     raw: Option<A::Buffer>,
     device: Arc<Device<A>>,
     label: String,
-    pub(crate) id: BufferId,
+    pub(crate) id: (),
     pub(crate) tracker_index: TrackerIndex,
     pub(crate) submission_index: u64,
     bind_groups: Vec<Weak<BindGroup<A>>>,
@@ -418,7 +241,7 @@ pub(crate) enum TextureInner<A: HalApi> {
     },
     Surface {
         raw: Option<A::SurfaceTexture>,
-        parent_id: SurfaceId,
+        parent_id: (),
     },
 }
 
@@ -486,7 +309,7 @@ impl Global {
     /// - The raw texture handle must not be manually destroyed
     pub unsafe fn texture_as_hal<A: HalApi, F: FnOnce(Option<&A::Texture>) -> R, R>(
         &self,
-        id: TextureId,
+        id: (),
         hal_texture_callback: F,
     ) -> R { todo!() }
 
@@ -495,7 +318,7 @@ impl Global {
     /// - The raw texture view handle must not be manually destroyed
     pub unsafe fn texture_view_as_hal<A: HalApi, F: FnOnce(Option<&A::TextureView>) -> R, R>(
         &self,
-        id: TextureViewId,
+        id: (),
         hal_texture_view_callback: F,
     ) -> R { todo!() }
 
@@ -504,7 +327,7 @@ impl Global {
     /// - The raw adapter handle must not be manually destroyed
     pub unsafe fn adapter_as_hal<A: HalApi, F: FnOnce(Option<&A::Adapter>) -> R, R>(
         &self,
-        id: AdapterId,
+        id: (),
         hal_adapter_callback: F,
     ) -> R { todo!() }
 
@@ -513,7 +336,7 @@ impl Global {
     /// - The raw device handle must not be manually destroyed
     pub unsafe fn device_as_hal<A: HalApi, F: FnOnce(Option<&A::Device>) -> R, R>(
         &self,
-        id: DeviceId,
+        id: (),
         hal_device_callback: F,
     ) -> R { todo!() }
 
@@ -522,7 +345,7 @@ impl Global {
     /// - The raw fence handle must not be manually destroyed
     pub unsafe fn device_fence_as_hal<A: HalApi, F: FnOnce(Option<&A::Fence>) -> R, R>(
         &self,
-        id: DeviceId,
+        id: (),
         hal_fence_callback: F,
     ) -> R { todo!() }
 
@@ -530,7 +353,7 @@ impl Global {
     /// - The raw surface handle must not be manually destroyed
     pub unsafe fn surface_as_hal<A: HalApi, F: FnOnce(Option<&A::Surface>) -> R, R>(
         &self,
-        id: SurfaceId,
+        id: (),
         hal_surface_callback: F,
     ) -> R { todo!() }
 
@@ -543,7 +366,7 @@ impl Global {
         R,
     >(
         &self,
-        id: CommandEncoderId,
+        id: (),
         hal_command_encoder_callback: F,
     ) -> R { todo!() }
 }
@@ -556,7 +379,7 @@ pub struct DestroyedTexture<A: HalApi> {
     bind_groups: Vec<Weak<BindGroup<A>>>,
     device: Arc<Device<A>>,
     label: String,
-    pub(crate) id: TextureId,
+    pub(crate) id: (),
     pub(crate) tracker_index: TrackerIndex,
     pub(crate) submission_index: u64,
 }

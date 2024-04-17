@@ -146,7 +146,7 @@ pub struct RenderBundleEncoderDescriptor<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct RenderBundleEncoder {
     base: BasePass<RenderCommand>,
-    parent_id: id::DeviceId,
+    parent_id: (),
     pub(crate) context: RenderPassContext,
     pub(crate) is_depth_read_only: bool,
     pub(crate) is_stencil_read_only: bool,
@@ -278,7 +278,7 @@ pub mod bundle_ffi {
     pub unsafe extern "C" fn wgpu_render_bundle_set_bind_group(
         bundle: &mut RenderBundleEncoder,
         index: u32,
-        bind_group_id: id::BindGroupId,
+        bind_group_id: (),
         offsets: *const DynamicOffset,
         offset_length: usize,
     ) { todo!() }
@@ -286,14 +286,14 @@ pub mod bundle_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_bundle_set_pipeline(
         bundle: &mut RenderBundleEncoder,
-        pipeline_id: id::RenderPipelineId,
+        pipeline_id: (),
     ) { todo!() }
 
     #[no_mangle]
     pub extern "C" fn wgpu_render_bundle_set_vertex_buffer(
         bundle: &mut RenderBundleEncoder,
         slot: u32,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
         size: Option<BufferSize>,
     ) { todo!() }
@@ -301,7 +301,7 @@ pub mod bundle_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_bundle_set_index_buffer(
         encoder: &mut RenderBundleEncoder,
-        buffer: id::BufferId,
+        buffer: (),
         index_format: IndexFormat,
         offset: BufferAddress,
         size: Option<BufferSize>,
@@ -342,14 +342,14 @@ pub mod bundle_ffi {
     #[no_mangle]
     pub extern "C" fn wgpu_render_bundle_draw_indirect(
         bundle: &mut RenderBundleEncoder,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
     ) { todo!() }
 
     #[no_mangle]
     pub extern "C" fn wgpu_render_bundle_draw_indexed_indirect(
         bundle: &mut RenderBundleEncoder,
-        buffer_id: id::BufferId,
+        buffer_id: (),
         offset: BufferAddress,
     ) { todo!() }
 

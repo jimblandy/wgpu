@@ -8,7 +8,7 @@ use crate::{
     },
     global::Global,
     hal_api::HalApi,
-    id::{self, AdapterId, DeviceId, QueueId, SurfaceId},
+    id::{self},
     init_tracker::TextureInitTracker,
     instance::{self, Adapter, Surface},
     pipeline, present,

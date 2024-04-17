@@ -8,7 +8,6 @@ use crate::{
     device::DeviceError,
     global::Global,
     hal_api::HalApi,
-    id::{BufferId, CommandEncoderId, DeviceId, TextureId},
     init_tracker::{MemoryInitKind, TextureInitRange},
     resource::{Resource, Texture, TextureClearMode},
     snatch::SnatchGuard,

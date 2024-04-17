@@ -9,17 +9,6 @@ pub type FastHashMap<K, V> =
 pub type FastHashSet<K> =
     std::collections::HashSet<K, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
 
-/// IndexMap using a fast, non-cryptographic hash algorithm.
-pub type FastIndexMap<K, V> =
-    indexmap::IndexMap<K, V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
-
-/// HashMap that uses pre-hashed keys and an identity hasher.
-///
-/// This is useful when you only need the key to lookup the value, and don't need to store the key,
-/// particularly when the key is large.
-pub type PreHashedMap<K, V> =
-    std::collections::HashMap<PreHashedKey<K>, V, std::hash::BuildHasherDefault<IdentityHasher>>;
-
 /// A pre-hashed key using FxHash which allows the hashing operation to be disconnected
 /// from the storage in the map.
 pub struct PreHashedKey<K>(u64, std::marker::PhantomData<fn() -> K>);
@@ -44,17 +33,12 @@ impl<K> std::hash::Hash for PreHashedKey<K> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) { todo!() }
 }
 
-impl<K: std::hash::Hash> PreHashedKey<K> {
-    pub fn from_key(key: &K) -> Self { todo!() }
-}
-
 /// A hasher which does nothing. Useful for when you want to use a map with pre-hashed keys.
 ///
 /// When hashing with this hasher, you must provide exactly 8 bytes. Multiple calls to `write`
 /// will overwrite the previous value.
 #[derive(Default)]
 pub struct IdentityHasher {
-    hash: u64,
 }
 
 impl std::hash::Hasher for IdentityHasher {

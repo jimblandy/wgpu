@@ -2,7 +2,6 @@ use std::hash::{Hash, Hasher};
 
 use crate::{
     binding_model::{self},
-    FastIndexMap,
 };
 
 /// Where a given BGL came from.
