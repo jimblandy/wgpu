@@ -50,7 +50,6 @@
  * - You must record *explicit barriers* between different usages of a
  *   resource. For example, if a buffer is written to by a compute
  *   shader, and then used as and index buffer to a draw call, you
- *   must use [`CommandEncoder::transition_buffers`] between those two
  *   operations.
  *
  * - Pipeline layouts are *explicitly specified* when setting bind
@@ -103,7 +102,6 @@
  *
  * You can see what capabilities an adapter is missing by checking the
  * [`DownlevelCapabilities`][tdc] in [`ExposedAdapter::capabilities`], available
- * from [`Instance::enumerate_adapters`].
  *
  * The API is generally designed to fit the primary backends better than the
  * secondary backends, so the latter may impose more overhead.
@@ -288,8 +286,6 @@ pub trait Api: Clone + fmt::Debug + Sized {
     ///
     /// The only thing you can do with `CommandBuffer`s is build them
     /// with a [`CommandEncoder`] and then pass them to
-    /// [`Queue::submit`] for execution, or destroy them by passing
-    /// them to [`CommandEncoder::reset_all`].
     ///
     /// [`CommandEncoder`]: Api::CommandEncoder
     type CommandBuffer: WasmNotSendSync + fmt::Debug;
@@ -314,253 +310,22 @@ pub trait Api: Clone + fmt::Debug + Sized {
 
 pub trait Instance: Sized + WasmNotSendSync {
     type A: Api;
-
-    unsafe fn init(desc: &InstanceDescriptor) -> Result<Self, InstanceError>;
-    unsafe fn create_surface(
-        &self,
-        display_handle: raw_window_handle::RawDisplayHandle,
-        window_handle: raw_window_handle::RawWindowHandle,
-    ) -> Result<<Self::A as Api>::Surface, InstanceError>;
-    unsafe fn destroy_surface(&self, surface: <Self::A as Api>::Surface);
-    unsafe fn enumerate_adapters(&self) -> Vec<ExposedAdapter<Self::A>>;
 }
 
 pub trait Surface: WasmNotSendSync {
     type A: Api;
-
-    /// Configures the surface to use the given device.
-    ///
-    /// # Safety
-    ///
-    /// - All gpu work that uses the surface must have been completed.
-    /// - All [`AcquiredSurfaceTexture`]s must have been destroyed.
-    /// - All [`Api::TextureView`]s derived from the [`AcquiredSurfaceTexture`]s must have been destroyed.
-    /// - All surfaces created using other devices must have been unconfigured before this call.
-    unsafe fn configure(
-        &self,
-        device: &<Self::A as Api>::Device,
-        config: &SurfaceConfiguration,
-    ) -> Result<(), SurfaceError>;
-
-    /// Unconfigures the surface on the given device.
-    ///
-    /// # Safety
-    ///
-    /// - All gpu work that uses the surface must have been completed.
-    /// - All [`AcquiredSurfaceTexture`]s must have been destroyed.
-    /// - All [`Api::TextureView`]s derived from the [`AcquiredSurfaceTexture`]s must have been destroyed.
-    /// - The surface must have been configured on the given device.
-    unsafe fn unconfigure(&self, device: &<Self::A as Api>::Device);
-
-    /// Returns the next texture to be presented by the swapchain for drawing
-    ///
-    /// A `timeout` of `None` means to wait indefinitely, with no timeout.
-    ///
-    /// # Portability
-    ///
-    /// Some backends can't support a timeout when acquiring a texture and
-    /// the timeout will be ignored.
-    ///
-    /// Returns `None` on timing out.
-    unsafe fn acquire_texture(
-        &self,
-        timeout: Option<std::time::Duration>,
-    ) -> Result<Option<AcquiredSurfaceTexture<Self::A>>, SurfaceError>;
-    unsafe fn discard_texture(&self, texture: <Self::A as Api>::SurfaceTexture);
 }
 
 pub trait Adapter: WasmNotSendSync {
     type A: Api;
-
-    unsafe fn open(
-        &self,
-        features: wgt::Features,
-        limits: &wgt::Limits,
-    ) -> Result<OpenDevice<Self::A>, DeviceError>;
-
-    /// Return the set of supported capabilities for a texture format.
-    unsafe fn texture_format_capabilities(
-        &self,
-        format: wgt::TextureFormat,
-    ) -> TextureFormatCapabilities;
-
-    /// Returns the capabilities of working with a specified surface.
-    ///
-    /// `None` means presentation is not supported for it.
-    unsafe fn surface_capabilities(
-        &self,
-        surface: &<Self::A as Api>::Surface,
-    ) -> Option<SurfaceCapabilities>;
-
-    /// Creates a [`PresentationTimestamp`] using the adapter's WSI.
-    ///
-    /// [`PresentationTimestamp`]: wgt::PresentationTimestamp
-    unsafe fn get_presentation_timestamp(&self) -> wgt::PresentationTimestamp;
 }
 
 pub trait Device: WasmNotSendSync {
     type A: Api;
-
-    /// Exit connection to this logical device.
-    unsafe fn exit(self, queue: <Self::A as Api>::Queue);
-    /// Creates a new buffer.
-    ///
-    /// The initial usage is `BufferUses::empty()`.
-    unsafe fn create_buffer(
-        &self,
-        desc: &BufferDescriptor,
-    ) -> Result<<Self::A as Api>::Buffer, DeviceError>;
-    unsafe fn destroy_buffer(&self, buffer: <Self::A as Api>::Buffer);
-    //TODO: clarify if zero-sized mapping is allowed
-    unsafe fn map_buffer(
-        &self,
-        buffer: &<Self::A as Api>::Buffer,
-        range: MemoryRange,
-    ) -> Result<BufferMapping, DeviceError>;
-    unsafe fn unmap_buffer(&self, buffer: &<Self::A as Api>::Buffer) -> Result<(), DeviceError>;
-    unsafe fn flush_mapped_ranges<I>(&self, buffer: &<Self::A as Api>::Buffer, ranges: I)
-    where
-        I: Iterator<Item = MemoryRange>;
-    unsafe fn invalidate_mapped_ranges<I>(&self, buffer: &<Self::A as Api>::Buffer, ranges: I)
-    where
-        I: Iterator<Item = MemoryRange>;
-
-    /// Creates a new texture.
-    ///
-    /// The initial usage for all subresources is `TextureUses::UNINITIALIZED`.
-    unsafe fn create_texture(
-        &self,
-        desc: &TextureDescriptor,
-    ) -> Result<<Self::A as Api>::Texture, DeviceError>;
-    unsafe fn destroy_texture(&self, texture: <Self::A as Api>::Texture);
-    unsafe fn create_texture_view(
-        &self,
-        texture: &<Self::A as Api>::Texture,
-        desc: &TextureViewDescriptor,
-    ) -> Result<<Self::A as Api>::TextureView, DeviceError>;
-    unsafe fn destroy_texture_view(&self, view: <Self::A as Api>::TextureView);
-    unsafe fn create_sampler(
-        &self,
-        desc: &SamplerDescriptor,
-    ) -> Result<<Self::A as Api>::Sampler, DeviceError>;
-    unsafe fn destroy_sampler(&self, sampler: <Self::A as Api>::Sampler);
-
-    /// Create a fresh [`CommandEncoder`].
-    ///
-    /// The new `CommandEncoder` is in the "closed" state.
-    unsafe fn create_command_encoder(
-        &self,
-        desc: &CommandEncoderDescriptor<Self::A>,
-    ) -> Result<<Self::A as Api>::CommandEncoder, DeviceError>;
-    unsafe fn destroy_command_encoder(&self, pool: <Self::A as Api>::CommandEncoder);
-
-    /// Creates a bind group layout.
-    unsafe fn create_bind_group_layout(
-        &self,
-        desc: &BindGroupLayoutDescriptor,
-    ) -> Result<<Self::A as Api>::BindGroupLayout, DeviceError>;
-    unsafe fn destroy_bind_group_layout(&self, bg_layout: <Self::A as Api>::BindGroupLayout);
-    unsafe fn create_pipeline_layout(
-        &self,
-        desc: &PipelineLayoutDescriptor<Self::A>,
-    ) -> Result<<Self::A as Api>::PipelineLayout, DeviceError>;
-    unsafe fn destroy_pipeline_layout(&self, pipeline_layout: <Self::A as Api>::PipelineLayout);
-    unsafe fn create_bind_group(
-        &self,
-        desc: &BindGroupDescriptor<Self::A>,
-    ) -> Result<<Self::A as Api>::BindGroup, DeviceError>;
-    unsafe fn destroy_bind_group(&self, group: <Self::A as Api>::BindGroup);
-
-    unsafe fn create_shader_module(
-        &self,
-        desc: &ShaderModuleDescriptor,
-        shader: ShaderInput,
-    ) -> Result<<Self::A as Api>::ShaderModule, ShaderError>;
-    unsafe fn destroy_shader_module(&self, module: <Self::A as Api>::ShaderModule);
-    unsafe fn create_render_pipeline(
-        &self,
-        desc: &RenderPipelineDescriptor<Self::A>,
-    ) -> Result<<Self::A as Api>::RenderPipeline, PipelineError>;
-    unsafe fn destroy_render_pipeline(&self, pipeline: <Self::A as Api>::RenderPipeline);
-    unsafe fn create_compute_pipeline(
-        &self,
-        desc: &ComputePipelineDescriptor<Self::A>,
-    ) -> Result<<Self::A as Api>::ComputePipeline, PipelineError>;
-    unsafe fn destroy_compute_pipeline(&self, pipeline: <Self::A as Api>::ComputePipeline);
-
-    unsafe fn create_query_set(
-        &self,
-        desc: &wgt::QuerySetDescriptor<Label>,
-    ) -> Result<<Self::A as Api>::QuerySet, DeviceError>;
-    unsafe fn destroy_query_set(&self, set: <Self::A as Api>::QuerySet);
-    unsafe fn create_fence(&self) -> Result<<Self::A as Api>::Fence, DeviceError>;
-    unsafe fn destroy_fence(&self, fence: <Self::A as Api>::Fence);
-    unsafe fn get_fence_value(
-        &self,
-        fence: &<Self::A as Api>::Fence,
-    ) -> Result<FenceValue, DeviceError>;
-    /// Calling wait with a lower value than the current fence value will immediately return.
-    unsafe fn wait(
-        &self,
-        fence: &<Self::A as Api>::Fence,
-        value: FenceValue,
-        timeout_ms: u32,
-    ) -> Result<bool, DeviceError>;
-
-    unsafe fn start_capture(&self) -> bool;
-    unsafe fn stop_capture(&self);
-
-    unsafe fn create_acceleration_structure(
-        &self,
-        desc: &AccelerationStructureDescriptor,
-    ) -> Result<<Self::A as Api>::AccelerationStructure, DeviceError>;
-    unsafe fn get_acceleration_structure_build_sizes(
-        &self,
-        desc: &GetAccelerationStructureBuildSizesDescriptor<Self::A>,
-    ) -> AccelerationStructureBuildSizes;
-    unsafe fn get_acceleration_structure_device_address(
-        &self,
-        acceleration_structure: &<Self::A as Api>::AccelerationStructure,
-    ) -> wgt::BufferAddress;
-    unsafe fn destroy_acceleration_structure(
-        &self,
-        acceleration_structure: <Self::A as Api>::AccelerationStructure,
-    );
 }
 
 pub trait Queue: WasmNotSendSync {
     type A: Api;
-
-    /// Submits the command buffers for execution on GPU.
-    ///
-    /// Valid usage:
-    ///
-    /// - All of the [`CommandBuffer`][cb]s were created from
-    ///   [`CommandEncoder`][ce]s that are associated with this queue.
-    ///
-    /// - All of those [`CommandBuffer`][cb]s must remain alive until
-    ///   the submitted commands have finished execution. (Since
-    ///   command buffers must not outlive their encoders, this
-    ///   implies that the encoders must remain alive as well.)
-    ///
-    /// - All of the [`SurfaceTexture`][st]s that the command buffers
-    ///   write to appear in the `surface_textures` argument.
-    ///
-    /// [cb]: Api::CommandBuffer
-    /// [ce]: Api::CommandEncoder
-    /// [st]: Api::SurfaceTexture
-    unsafe fn submit(
-        &self,
-        command_buffers: &[&<Self::A as Api>::CommandBuffer],
-        surface_textures: &[&<Self::A as Api>::SurfaceTexture],
-        signal_fence: Option<(&mut <Self::A as Api>::Fence, FenceValue)>,
-    ) -> Result<(), DeviceError>;
-    unsafe fn present(
-        &self,
-        surface: &<Self::A as Api>::Surface,
-        texture: <Self::A as Api>::SurfaceTexture,
-    ) -> Result<(), SurfaceError>;
-    unsafe fn get_timestamp_period(&self) -> f32;
 }
 
 /// Encoder and allocation pool for `CommandBuffer`s.
@@ -572,7 +337,7 @@ pub trait Queue: WasmNotSendSync {
 ///
 /// The life cycle of a `CommandBuffer` is as follows:
 ///
-/// - Call [`Device::create_command_encoder`] to create a new
+/// - Call to create a new
 ///   `CommandEncoder`, in the "closed" state.
 ///
 /// - Call `begin_encoding` on a closed `CommandEncoder` to begin
@@ -615,285 +380,6 @@ pub trait Queue: WasmNotSendSync {
 /// tracking to a minimum.
 pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
     type A: Api;
-
-    /// Begin encoding a new command buffer.
-    ///
-    /// This puts this `CommandEncoder` in the "recording" state.
-    ///
-    /// # Safety
-    ///
-    /// This `CommandEncoder` must be in the "closed" state.
-    unsafe fn begin_encoding(&mut self, label: Label) -> Result<(), DeviceError>;
-
-    /// Discard the command list under construction, if any.
-    ///
-    /// If an error has occurred while recording commands, this
-    /// is the only safe thing to do with the encoder.
-    ///
-    /// This puts this `CommandEncoder` in the "closed" state.
-    ///
-    /// # Safety
-    ///
-    /// This `CommandEncoder` must be in the "recording" state.
-    unsafe fn discard_encoding(&mut self);
-
-    /// Return a fresh [`CommandBuffer`] holding the recorded commands.
-    ///
-    /// The returned [`CommandBuffer`] holds all the commands recorded
-    /// on this `CommandEncoder` since the last call to
-    /// [`begin_encoding`].
-    ///
-    /// This puts this `CommandEncoder` in the "closed" state.
-    ///
-    /// # Safety
-    ///
-    /// This `CommandEncoder` must be in the "recording" state.
-    ///
-    /// The returned [`CommandBuffer`] must not outlive this
-    /// `CommandEncoder`. Implementations are allowed to build
-    /// `CommandBuffer`s that depend on storage owned by this
-    /// `CommandEncoder`.
-    ///
-    /// [`CommandBuffer`]: Api::CommandBuffer
-    /// [`begin_encoding`]: CommandEncoder::begin_encoding
-    unsafe fn end_encoding(&mut self) -> Result<<Self::A as Api>::CommandBuffer, DeviceError>;
-
-    /// Reclaim all resources belonging to this `CommandEncoder`.
-    ///
-    /// # Safety
-    ///
-    /// This `CommandEncoder` must be in the "closed" state.
-    ///
-    /// The `command_buffers` iterator must produce all the live
-    /// [`CommandBuffer`]s built using this `CommandEncoder` --- that
-    /// is, every extant `CommandBuffer` returned from `end_encoding`.
-    ///
-    /// [`CommandBuffer`]: Api::CommandBuffer
-    unsafe fn reset_all<I>(&mut self, command_buffers: I)
-    where
-        I: Iterator<Item = <Self::A as Api>::CommandBuffer>;
-
-    unsafe fn transition_buffers<'a, T>(&mut self, barriers: T)
-    where
-        T: Iterator<Item = BufferBarrier<'a, Self::A>>;
-
-    unsafe fn transition_textures<'a, T>(&mut self, barriers: T)
-    where
-        T: Iterator<Item = TextureBarrier<'a, Self::A>>;
-
-    // copy operations
-
-    unsafe fn clear_buffer(&mut self, buffer: &<Self::A as Api>::Buffer, range: MemoryRange);
-
-    unsafe fn copy_buffer_to_buffer<T>(
-        &mut self,
-        src: &<Self::A as Api>::Buffer,
-        dst: &<Self::A as Api>::Buffer,
-        regions: T,
-    ) where
-        T: Iterator<Item = BufferCopy>;
-
-    /// Copy from an external image to an internal texture.
-    /// Works with a single array layer.
-    /// Note: `dst` current usage has to be `TextureUses::COPY_DST`.
-    /// Note: the copy extent is in physical size (rounded to the block size)
-    #[cfg(webgl)]
-    unsafe fn copy_external_image_to_texture<T>(
-        &mut self,
-        src: &wgt::ImageCopyExternalImage,
-        dst: &<Self::A as Api>::Texture,
-        dst_premultiplication: bool,
-        regions: T,
-    ) where
-        T: Iterator<Item = TextureCopy>;
-
-    /// Copy from one texture to another.
-    /// Works with a single array layer.
-    /// Note: `dst` current usage has to be `TextureUses::COPY_DST`.
-    /// Note: the copy extent is in physical size (rounded to the block size)
-    unsafe fn copy_texture_to_texture<T>(
-        &mut self,
-        src: &<Self::A as Api>::Texture,
-        src_usage: TextureUses,
-        dst: &<Self::A as Api>::Texture,
-        regions: T,
-    ) where
-        T: Iterator<Item = TextureCopy>;
-
-    /// Copy from buffer to texture.
-    /// Works with a single array layer.
-    /// Note: `dst` current usage has to be `TextureUses::COPY_DST`.
-    /// Note: the copy extent is in physical size (rounded to the block size)
-    unsafe fn copy_buffer_to_texture<T>(
-        &mut self,
-        src: &<Self::A as Api>::Buffer,
-        dst: &<Self::A as Api>::Texture,
-        regions: T,
-    ) where
-        T: Iterator<Item = BufferTextureCopy>;
-
-    /// Copy from texture to buffer.
-    /// Works with a single array layer.
-    /// Note: the copy extent is in physical size (rounded to the block size)
-    unsafe fn copy_texture_to_buffer<T>(
-        &mut self,
-        src: &<Self::A as Api>::Texture,
-        src_usage: TextureUses,
-        dst: &<Self::A as Api>::Buffer,
-        regions: T,
-    ) where
-        T: Iterator<Item = BufferTextureCopy>;
-
-    // pass common
-
-    /// Sets the bind group at `index` to `group`, assuming the layout
-    /// of all the preceding groups to be taken from `layout`.
-    unsafe fn set_bind_group(
-        &mut self,
-        layout: &<Self::A as Api>::PipelineLayout,
-        index: u32,
-        group: &<Self::A as Api>::BindGroup,
-        dynamic_offsets: &[wgt::DynamicOffset],
-    );
-
-    /// Sets a range in push constant data.
-    ///
-    /// IMPORTANT: while the data is passed as words, the offset is in bytes!
-    ///
-    /// # Safety
-    ///
-    /// - `offset_bytes` must be a multiple of 4.
-    /// - The range of push constants written must be valid for the pipeline layout at draw time.
-    unsafe fn set_push_constants(
-        &mut self,
-        layout: &<Self::A as Api>::PipelineLayout,
-        stages: wgt::ShaderStages,
-        offset_bytes: u32,
-        data: &[u32],
-    );
-
-    unsafe fn insert_debug_marker(&mut self, label: &str);
-    unsafe fn begin_debug_marker(&mut self, group_label: &str);
-    unsafe fn end_debug_marker(&mut self);
-
-    // queries
-
-    /// # Safety:
-    ///
-    /// - If `set` is an occlusion query set, it must be the same one as used in the [`RenderPassDescriptor::occlusion_query_set`] parameter.
-    unsafe fn begin_query(&mut self, set: &<Self::A as Api>::QuerySet, index: u32);
-    /// # Safety:
-    ///
-    /// - If `set` is an occlusion query set, it must be the same one as used in the [`RenderPassDescriptor::occlusion_query_set`] parameter.
-    unsafe fn end_query(&mut self, set: &<Self::A as Api>::QuerySet, index: u32);
-    unsafe fn write_timestamp(&mut self, set: &<Self::A as Api>::QuerySet, index: u32);
-    unsafe fn reset_queries(&mut self, set: &<Self::A as Api>::QuerySet, range: Range<u32>);
-    unsafe fn copy_query_results(
-        &mut self,
-        set: &<Self::A as Api>::QuerySet,
-        range: Range<u32>,
-        buffer: &<Self::A as Api>::Buffer,
-        offset: wgt::BufferAddress,
-        stride: wgt::BufferSize,
-    );
-
-    // render passes
-
-    // Begins a render pass, clears all active bindings.
-    unsafe fn begin_render_pass(&mut self, desc: &RenderPassDescriptor<Self::A>);
-    unsafe fn end_render_pass(&mut self);
-
-    unsafe fn set_render_pipeline(&mut self, pipeline: &<Self::A as Api>::RenderPipeline);
-
-    unsafe fn set_index_buffer<'a>(
-        &mut self,
-        binding: BufferBinding<'a, Self::A>,
-        format: wgt::IndexFormat,
-    );
-    unsafe fn set_vertex_buffer<'a>(&mut self, index: u32, binding: BufferBinding<'a, Self::A>);
-    unsafe fn set_viewport(&mut self, rect: &Rect<f32>, depth_range: Range<f32>);
-    unsafe fn set_scissor_rect(&mut self, rect: &Rect<u32>);
-    unsafe fn set_stencil_reference(&mut self, value: u32);
-    unsafe fn set_blend_constants(&mut self, color: &[f32; 4]);
-
-    unsafe fn draw(
-        &mut self,
-        first_vertex: u32,
-        vertex_count: u32,
-        first_instance: u32,
-        instance_count: u32,
-    );
-    unsafe fn draw_indexed(
-        &mut self,
-        first_index: u32,
-        index_count: u32,
-        base_vertex: i32,
-        first_instance: u32,
-        instance_count: u32,
-    );
-    unsafe fn draw_indirect(
-        &mut self,
-        buffer: &<Self::A as Api>::Buffer,
-        offset: wgt::BufferAddress,
-        draw_count: u32,
-    );
-    unsafe fn draw_indexed_indirect(
-        &mut self,
-        buffer: &<Self::A as Api>::Buffer,
-        offset: wgt::BufferAddress,
-        draw_count: u32,
-    );
-    unsafe fn draw_indirect_count(
-        &mut self,
-        buffer: &<Self::A as Api>::Buffer,
-        offset: wgt::BufferAddress,
-        count_buffer: &<Self::A as Api>::Buffer,
-        count_offset: wgt::BufferAddress,
-        max_count: u32,
-    );
-    unsafe fn draw_indexed_indirect_count(
-        &mut self,
-        buffer: &<Self::A as Api>::Buffer,
-        offset: wgt::BufferAddress,
-        count_buffer: &<Self::A as Api>::Buffer,
-        count_offset: wgt::BufferAddress,
-        max_count: u32,
-    );
-
-    // compute passes
-
-    // Begins a compute pass, clears all active bindings.
-    unsafe fn begin_compute_pass(&mut self, desc: &ComputePassDescriptor<Self::A>);
-    unsafe fn end_compute_pass(&mut self);
-
-    unsafe fn set_compute_pipeline(&mut self, pipeline: &<Self::A as Api>::ComputePipeline);
-
-    unsafe fn dispatch(&mut self, count: [u32; 3]);
-    unsafe fn dispatch_indirect(
-        &mut self,
-        buffer: &<Self::A as Api>::Buffer,
-        offset: wgt::BufferAddress,
-    );
-
-    /// To get the required sizes for the buffer allocations use `get_acceleration_structure_build_sizes` per descriptor
-    /// All buffers must be synchronized externally
-    /// All buffer regions, which are written to may only be passed once per function call,
-    /// with the exception of updates in the same descriptor.
-    /// Consequences of this limitation:
-    /// - scratch buffers need to be unique
-    /// - a tlas can't be build in the same call with a blas it contains
-    unsafe fn build_acceleration_structures<'a, T>(
-        &mut self,
-        descriptor_count: u32,
-        descriptors: T,
-    ) where
-        Self::A: 'a,
-        T: IntoIterator<Item = BuildAccelerationStructureDescriptor<'a, Self::A>>;
-
-    unsafe fn place_acceleration_structure_barrier(
-        &mut self,
-        barrier: AccelerationStructureBarrier,
-    );
 }
 
 bitflags!(
@@ -1156,7 +642,7 @@ pub struct ExposedAdapter<A: Api> {
 }
 
 /// Describes information about what a `Surface`'s presentation capabilities are.
-/// Fetch this with [Adapter::surface_capabilities].
+/// Fetch this with.
 #[derive(Debug, Clone)]
 pub struct SurfaceCapabilities {
     /// List of supported texture formats.

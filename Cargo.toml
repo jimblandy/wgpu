@@ -168,7 +168,3 @@ termcolor = "1.4.1"
 #web-sys = { path = "../wasm-bindgen/crates/web-sys" }
 #js-sys = { path = "../wasm-bindgen/crates/js-sys" }
 #wasm-bindgen = { path = "../wasm-bindgen" }
-
-# Speed up image comparison even in debug builds
-[profile.dev.package."nv-flip-sys"]
-opt-level = 3

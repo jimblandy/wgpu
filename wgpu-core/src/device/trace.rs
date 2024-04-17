@@ -7,16 +7,6 @@ use std::{borrow::Cow, io::Write as _};
 
 type FileName = String;
 
-pub const FILE_NAME: &str = "trace.ron";
-
-#[cfg(feature = "trace")]
-pub(crate) fn new_render_bundle_encoder_descriptor<'a>(
-    label: crate::Label<'a>,
-    context: &'a super::RenderPassContext,
-    depth_read_only: bool,
-    stencil_read_only: bool,
-) -> crate::command::RenderBundleEncoderDescriptor<'a> { todo!() }
-
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -174,22 +164,5 @@ pub enum Command {
 #[cfg(feature = "trace")]
 #[derive(Debug)]
 pub struct Trace {
-    path: std::path::PathBuf,
-    file: std::fs::File,
-    config: ron::ser::PrettyConfig,
-    binary_id: usize,
 }
 
-#[cfg(feature = "trace")]
-impl Trace {
-    pub fn new(path: &std::path::Path) -> Result<Self, std::io::Error> { todo!() }
-
-    pub fn make_binary(&mut self, kind: &str, data: &[u8]) -> String { todo!() }
-
-    pub(crate) fn add(&mut self, action: Action) { todo!() }
-}
-
-#[cfg(feature = "trace")]
-impl Drop for Trace {
-    fn drop(&mut self) { todo!() }
-}
