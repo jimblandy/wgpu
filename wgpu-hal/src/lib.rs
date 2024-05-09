@@ -709,7 +709,10 @@ pub trait Queue: WasmNotSendSync {
     ///   implies that the encoders must remain alive as well.)
     ///
     /// - All of the [`SurfaceTexture`][st]s that the command buffers
-    ///   write to appear in the `surface_textures` argument.
+    ///   write to must appear in the `surface_textures` argument.
+    /// 
+    /// - A given [`SurfaceTexture`][st] must not appear in the
+    ///   `surface_textures` argument more than once.
     ///
     /// [`Fence`]: Api::Fence
     /// [cb]: Api::CommandBuffer
