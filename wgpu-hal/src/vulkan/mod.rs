@@ -31,7 +31,7 @@ mod conv;
 mod device;
 mod instance;
 
-use std::{borrow::Borrow, collections::HashSet, ffi::CStr, fmt, mem, num::NonZeroU32, sync::Arc};
+use std::{borrow::Borrow, collections::HashSet, ffi::CStr, fmt, num::NonZeroU32, sync::Arc};
 
 use arrayvec::ArrayVec;
 use ash::{
@@ -485,70 +485,12 @@ pub struct Device {
     render_doc: crate::auxil::renderdoc::RenderDoc,
 }
 
-/// Semaphores that a given submission should wait on and signal.
-struct RelaySemaphoreState {
-    wait: Option<vk::Semaphore>,
-    signal: vk::Semaphore,
-}
-
-/// A pair of binary semaphores that are used to synchronize each submission with the next.
-struct RelaySemaphores {
-    wait: vk::Semaphore,
-    /// Signals if the wait semaphore should be waited on.
-    ///
-    /// Because nothing will signal the semaphore for the first submission, we don't want to wait on it.
-    should_wait: bool,
-    signal: vk::Semaphore,
-}
-
-impl RelaySemaphores {
-    fn new(device: &ash::Device) -> Result<Self, crate::DeviceError> {
-        let wait = unsafe {
-            device
-                .create_semaphore(&vk::SemaphoreCreateInfo::builder(), None)
-                .map_err(crate::DeviceError::from)?
-        };
-        let signal = unsafe {
-            device
-                .create_semaphore(&vk::SemaphoreCreateInfo::builder(), None)
-                .map_err(crate::DeviceError::from)?
-        };
-        Ok(Self {
-            wait,
-            should_wait: false,
-            signal,
-        })
-    }
-
-    /// Advances the semaphores, returning the semaphores that should be used for a submission.
-    #[must_use]
-    fn advance(&mut self) -> RelaySemaphoreState {
-        let old = RelaySemaphoreState {
-            wait: self.should_wait.then_some(self.wait),
-            signal: self.signal,
-        };
-
-        mem::swap(&mut self.wait, &mut self.signal);
-        self.should_wait = true;
-
-        old
-    }
-
-    /// Destroys the semaphores.
-    unsafe fn destroy(&self, device: &ash::Device) {
-        unsafe {
-            device.destroy_semaphore(self.wait, None);
-            device.destroy_semaphore(self.signal, None);
-        }
-    }
-}
-
 pub struct Queue {
     raw: vk::Queue,
     swapchain_fn: khr::Swapchain,
     device: Arc<DeviceShared>,
     family_index: u32,
-    relay_semaphores: Mutex<RelaySemaphores>,
+    relay_semaphore: Mutex<Option<vk::Semaphore>>,
 }
 
 #[derive(Debug)]
@@ -928,16 +870,31 @@ impl crate::Queue for Queue {
             signal_values.push(!0);
         }
 
-        // In order for submissions to be strictly ordered, we encode a dependency between each submission
-        // using a pair of semaphores. This adds a wait if it is needed, and signals the next semaphore.
-        let semaphore_state = self.relay_semaphores.lock().advance();
+        let signal_semaphore = match *self.relay_semaphore.lock() {
+            Some(sem) => {
+                // Wait for the previous submission to complete.
+                wait_stage_masks.push(vk::PipelineStageFlags::TOP_OF_PIPE);
+                wait_semaphores.push(sem);
+                sem
+            }
+            ref mut next @ None => {
+                // This is the first submission to this queue, so we needn't
+                // wait for any prior submissions to complete. But we do need to
+                // create a semaphore for this submission to signal when it's
+                // complete.
+                let new_sem = unsafe {
+                    self.device
+                        .raw
+                        .create_semaphore(&vk::SemaphoreCreateInfo::builder(), None)
+                        .map_err(crate::DeviceError::from)?
+                };
+                *next = Some(new_sem);
+                new_sem
+            }
+        };
 
-        if let Some(sem) = semaphore_state.wait {
-            wait_stage_masks.push(vk::PipelineStageFlags::TOP_OF_PIPE);
-            wait_semaphores.push(sem);
-        }
-
-        signal_semaphores.push(semaphore_state.signal);
+        // This submission must signal the semaphore that the next one waits on.
+        signal_semaphores.push(signal_semaphore);
         signal_values.push(!0);
 
         // We need to signal our wgpu::Fence if we have one, this adds it to the signal list.

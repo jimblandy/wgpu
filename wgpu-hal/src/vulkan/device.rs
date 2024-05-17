@@ -851,10 +851,9 @@ impl crate::Device for super::Device {
         unsafe { self.mem_allocator.into_inner().cleanup(&*self.shared) };
         unsafe { self.desc_allocator.into_inner().cleanup(&*self.shared) };
         unsafe {
-            queue
-                .relay_semaphores
-                .into_inner()
-                .destroy(&self.shared.raw)
+            if let Some(semaphore) = queue.relay_semaphore.into_inner() {
+                self.shared.raw.destroy_semaphore(semaphore, None);
+            }
         };
         unsafe { self.shared.free_resources() };
     }

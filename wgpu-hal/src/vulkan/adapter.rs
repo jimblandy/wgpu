@@ -1793,14 +1793,12 @@ impl super::Adapter {
             framebuffers: Mutex::new(Default::default()),
         });
 
-        let relay_semaphores = super::RelaySemaphores::new(&shared.raw)?;
-
         let queue = super::Queue {
             raw: raw_queue,
             swapchain_fn,
             device: Arc::clone(&shared),
             family_index,
-            relay_semaphores: Mutex::new(relay_semaphores),
+            relay_semaphore: Mutex::new(None),
         };
 
         let mem_allocator = {
