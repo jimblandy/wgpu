@@ -428,12 +428,14 @@ impl PhysicalDeviceFeatures {
             shader_atomic_int64: if device_api_version >= vk::API_VERSION_1_2
                 || enabled_extensions.contains(&khr::shader_atomic_int64::NAME)
             {
+                let requested = requested_features.intersects(
+                    wgt::Features::SHADER_INT64_ATOMIC_ALL_OPS
+                        | wgt::Features::SHADER_INT64_ATOMIC_MIN_MAX,
+                );
                 Some(
                     vk::PhysicalDeviceShaderAtomicInt64Features::default()
-                        .shader_buffer_int64_atomics(requested_features.intersects(
-                            wgt::Features::SHADER_INT64_ATOMIC_ALL_OPS
-                                | wgt::Features::SHADER_INT64_ATOMIC_MIN_MAX,
-                        )),
+                        .shader_buffer_int64_atomics(requested)
+                        .shader_shared_int64_atomics(requested),
                 )
             } else {
                 None
