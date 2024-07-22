@@ -1063,11 +1063,10 @@ impl Global {
             // Fence lock must be acquired after the snatch lock everywhere to avoid deadlocks.
             let mut fence_guard = device.fence.write();
             let fence = fence_guard.as_mut().unwrap();
-            let submit_index = device
-                .active_submission_index
-                .fetch_add(1, Ordering::SeqCst)
-                + 1;
             let mut active_executions = Vec::new();
+
+            #[cfg(feature = "trace")]
+            let mut tracing_commands = Vec::new();
 
             let mut used_surface_textures = track::TextureUsageScope::default();
 
@@ -1100,9 +1099,8 @@ impl Global {
                         };
 
                         #[cfg(feature = "trace")]
-                        if let Some(ref mut trace) = *device.trace.lock() {
-                            trace.add(Action::Submit(
-                                submit_index,
+                        if device.trace.lock().is_some() {
+                            tracing_commands.push(
                                 cmdbuf
                                     .data
                                     .lock()
@@ -1111,7 +1109,7 @@ impl Global {
                                     .commands
                                     .take()
                                     .unwrap(),
-                            ));
+                            );
                         }
 
                         cmdbuf.same_device_as(queue.as_ref())?;
@@ -1241,8 +1239,6 @@ impl Global {
                             pending_textures: FastHashMap::default(),
                         });
                     }
-
-                    log::trace!("Device after submission {}", submit_index);
                 }
             }
 
@@ -1286,9 +1282,25 @@ impl Global {
                 }
             }
 
-            if let Some(pending_execution) =
-                pending_writes.pre_submit(&device.command_allocator, device.raw(), queue.raw())?
-            {
+            let submit_index = device
+                .active_submission_index
+                .fetch_add(1, Ordering::SeqCst)
+                + 1;
+
+            log::trace!("Device after submission {}", submit_index);
+
+            #[cfg(feature = "trace")]
+            if let Some(ref mut trace) = *device.trace.lock() {
+                for commands in tracing_commands {
+                    trace.add(Action::Submit(submit_index, commands));
+                }
+            }
+
+            if let Some(pending_execution) = pending_writes.pre_submit(
+                &device.command_allocator,
+                device.raw(),
+                queue.raw(),
+            )? {
                 active_executions.insert(0, pending_execution);
             }
 
