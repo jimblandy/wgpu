@@ -21,7 +21,7 @@ use crate::{
     pipeline,
     pool::ResourcePool,
     resource::{
-        self, Buffer, Labeled, ParentDevice, QuerySet, Sampler, StagingBuffer, Texture,
+        self, Buffer, Fallible, Labeled, ParentDevice, QuerySet, Sampler, StagingBuffer, Texture,
         TextureView, TextureViewNotRenderableReason, TrackingData,
     },
     resource_log,
@@ -694,11 +694,11 @@ impl Device {
         Ok(texture)
     }
 
-    pub fn create_buffer_from_hal(
+    pub(crate) fn create_buffer_from_hal(
         self: &Arc<Self>,
         hal_buffer: Box<dyn hal::DynBuffer>,
         desc: &resource::BufferDescriptor,
-    ) -> Arc<Buffer> {
+    ) -> Fallible<Buffer> {
         unsafe { self.raw().add_raw_buffer(&*hal_buffer) };
 
         let buffer = Buffer {
@@ -723,7 +723,7 @@ impl Device {
             .buffers
             .insert_single(&buffer, hal::BufferUses::empty());
 
-        buffer
+        Fallible::Valid(buffer)
     }
 
     pub(crate) fn create_texture(
@@ -3630,16 +3630,6 @@ impl Device {
 }
 
 impl Device {
-    pub(crate) fn destroy_command_buffer(&self, mut cmd_buf: command::CommandBuffer) {
-        let mut baked = cmd_buf.extract_baked_commands();
-        unsafe {
-            baked.encoder.reset_all(baked.list);
-        }
-        unsafe {
-            self.raw().destroy_command_encoder(baked.encoder);
-        }
-    }
-
     /// Wait for idle and remove resources that we can, before we die.
     pub(crate) fn prepare_to_die(&self) {
         self.pending_writes.lock().deactivate();
