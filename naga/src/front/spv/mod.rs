@@ -565,11 +565,15 @@ impl<'a> BlockContext<'a> {
     /// Descend into the expression with the given handle, locating a contained
     /// global variable.
     ///
+    /// If the expression doesn't actually refer to something in a global
+    /// variable, we can't upgrate its type in a way that Naga validation would
+    /// pass, so reject the input instead.
+    ///
     /// This is used to track atomic upgrades.
     fn get_contained_global_variable(
         &self,
         mut handle: Handle<crate::Expression>,
-    ) -> Option<Handle<crate::GlobalVariable>> {
+    ) -> Result<Handle<crate::GlobalVariable>, Error> {
         log::debug!("\t\tlocating global variable in {handle:?}");
         loop {
             match self.expressions[handle] {
@@ -583,14 +587,14 @@ impl<'a> BlockContext<'a> {
                 }
                 crate::Expression::GlobalVariable(h) => {
                     log::debug!("\t\t  found {h:?}");
-                    return Some(h);
+                    return Ok(h);
                 }
                 _ => {
                     break;
                 }
             }
         }
-        None
+        Err(Error::from(crate::front::atomic_upgrade::Error::Unsupported))
     }
 }
 
@@ -1405,8 +1409,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
         block.push(stmt, span);
 
         // Store any associated global variables so we can upgrade their types later
-        self.upgrade_atomics
-            .extend(ctx.get_contained_global_variable(p_lexp_handle));
+        self.upgrade_atomics.insert(ctx.get_contained_global_variable(p_lexp_handle)?);
 
         Ok(())
     }
@@ -4103,7 +4106,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
 
                     // Store any associated global variables so we can upgrade their types later
                     self.upgrade_atomics
-                        .extend(ctx.get_contained_global_variable(p_lexp_handle));
+                        .insert(ctx.get_contained_global_variable(p_lexp_handle)?);
                 }
                 Op::AtomicStore => {
                     inst.expect(5)?;
@@ -4133,7 +4136,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
 
                     // Store any associated global variables so we can upgrade their types later
                     self.upgrade_atomics
-                        .extend(ctx.get_contained_global_variable(p_lexp_handle));
+                        .insert(ctx.get_contained_global_variable(p_lexp_handle)?);
                 }
                 Op::AtomicIIncrement | Op::AtomicIDecrement => {
                     inst.expect(6)?;
@@ -4198,7 +4201,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
 
                     // Store any associated global variables so we can upgrade their types later
                     self.upgrade_atomics
-                        .extend(ctx.get_contained_global_variable(p_exp_h));
+                        .insert(ctx.get_contained_global_variable(p_exp_h)?);
                 }
                 Op::AtomicExchange
                 | Op::AtomicIAdd
@@ -4280,7 +4283,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
                     emitter.start(ctx.expressions);
 
                     self.upgrade_atomics
-                        .extend(ctx.get_contained_global_variable(pointer));
+                        .insert(ctx.get_contained_global_variable(pointer)?);
                 }
                 Op::AtomicFlagClear => {
                     // Atomic flag clear is essentially an atomic store of a literal "false"
@@ -4303,7 +4306,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
                     block.push(crate::Statement::Store { pointer, value }, span);
                     emitter.start(ctx.expressions);
                     self.upgrade_atomics
-                        .extend(ctx.get_contained_global_variable(pointer));
+                        .insert(ctx.get_contained_global_variable(pointer)?);
                 }
 
                 _ => {
