@@ -1081,6 +1081,7 @@ pub struct CommandEncoder {
     cmd_buffer: CommandBuffer,
     state: command::State,
     private_caps: PrivateCapabilities,
+    counter: wgt::InternalCounter,
 }
 
 impl fmt::Debug for CommandEncoder {

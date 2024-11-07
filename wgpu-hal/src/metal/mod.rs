@@ -900,6 +900,7 @@ pub struct CommandEncoder {
     raw_cmd_buf: Option<metal::CommandBuffer>,
     state: CommandState,
     temp: Temp,
+    counter: wgt::InternalCounter,
 }
 
 impl fmt::Debug for CommandEncoder {

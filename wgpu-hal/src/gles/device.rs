@@ -1116,11 +1116,8 @@ impl crate::Device for super::Device {
             cmd_buffer: super::CommandBuffer::default(),
             state: Default::default(),
             private_caps: self.shared.private_caps,
+            counter: self.counters.command_encoders.clone(),
         })
-    }
-
-    unsafe fn destroy_command_encoder(&self, _encoder: super::CommandEncoder) {
-        self.counters.command_encoders.sub(1);
     }
 
     unsafe fn create_bind_group_layout(

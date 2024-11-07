@@ -1295,5 +1295,6 @@ impl Drop for super::CommandEncoder {
         unsafe {
             self.discard_encoding();
         }
+        self.counter.sub(1);
     }
 }

@@ -387,13 +387,10 @@ impl CommandBufferMutable {
         }
     }
 
-    pub(crate) fn destroy(mut self, device: &Device) {
+    pub(crate) fn destroy(mut self) {
         self.encoder.discard();
         unsafe {
             self.encoder.raw.reset_all(self.encoder.list);
-        }
-        unsafe {
-            device.raw().destroy_command_encoder(self.encoder.raw);
         }
     }
 }
@@ -435,7 +432,7 @@ impl Drop for CommandBuffer {
     fn drop(&mut self) {
         resource_log!("Drop {}", self.error_ident());
         if let Some(data) = self.data.lock().take() {
-            data.destroy(&self.device);
+            data.destroy();
         }
     }
 }

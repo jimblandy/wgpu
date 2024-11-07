@@ -745,11 +745,8 @@ impl crate::Device for super::Device {
             pass: super::PassState::new(),
             temp: super::Temp::default(),
             end_of_pass_timer_query: None,
+            counter: self.counters.command_encoders.clone(),
         })
-    }
-
-    unsafe fn destroy_command_encoder(&self, _encoder: super::CommandEncoder) {
-        self.counters.command_encoders.sub(1);
     }
 
     unsafe fn create_bind_group_layout(

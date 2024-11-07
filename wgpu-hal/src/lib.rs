@@ -842,7 +842,6 @@ pub trait Device: WasmNotSendSync {
         &self,
         desc: &CommandEncoderDescriptor<<Self::A as Api>::Queue>,
     ) -> Result<<Self::A as Api>::CommandEncoder, DeviceError>;
-    unsafe fn destroy_command_encoder(&self, pool: <Self::A as Api>::CommandEncoder);
 
     /// Creates a bind group layout.
     unsafe fn create_bind_group_layout(

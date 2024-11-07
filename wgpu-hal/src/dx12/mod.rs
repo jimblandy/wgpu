@@ -722,6 +722,8 @@ pub struct CommandEncoder {
     /// If set, the end of the next render/compute pass will write a timestamp at
     /// the given pool & location.
     end_of_pass_timer_query: Option<(Direct3D12::ID3D12QueryHeap, u32)>,
+
+    counter: wgt::InternalCounter,
 }
 
 unsafe impl Send for CommandEncoder {}

@@ -918,6 +918,21 @@ pub struct CommandEncoder {
     /// If set, the end of the next render/compute pass will write a timestamp at
     /// the given pool & location.
     end_of_pass_timer_query: Option<(vk::QueryPool, u32)>,
+
+    counter: InternalCounter,
+}
+
+impl Drop for CommandEncoder {
+    fn drop(&mut self) {
+        unsafe {
+            // `vkDestroyCommandPool` also frees any command buffers allocated
+            // from that pool, so there's no need to explicitly call
+            // `vkFreeCommandBuffers` on `cmd_encoder`'s `free` and `discarded`
+            // fields.
+            self.device.raw.destroy_command_pool(self.raw, None);
+        }
+        self.counter.sub(1);
+    }
 }
 
 impl CommandEncoder {

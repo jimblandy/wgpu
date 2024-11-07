@@ -584,11 +584,8 @@ impl crate::Device for super::Device {
             raw_cmd_buf: None,
             state: super::CommandState::default(),
             temp: super::Temp::default(),
+            counter: self.counters.command_encoders.clone(),
         })
-    }
-
-    unsafe fn destroy_command_encoder(&self, _encoder: super::CommandEncoder) {
-        self.counters.command_encoders.sub(1);
     }
 
     unsafe fn create_bind_group_layout(
