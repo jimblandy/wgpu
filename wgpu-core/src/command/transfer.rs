@@ -531,8 +531,8 @@ impl Global {
         let cmd_buf = hub
             .command_buffers
             .get(command_encoder_id.into_command_buffer_id());
-        let mut cmd_buf_data = cmd_buf.try_get()?;
-        cmd_buf_data.check_recording()?;
+        let mut cmd_buf_data = cmd_buf.data.lock();
+        let cmd_buf_data = cmd_buf_data.record()?;
 
         let device = &cmd_buf.device;
         device.check_is_valid()?;
@@ -689,8 +689,8 @@ impl Global {
         let cmd_buf = hub
             .command_buffers
             .get(command_encoder_id.into_command_buffer_id());
-        let mut cmd_buf_data = cmd_buf.try_get()?;
-        cmd_buf_data.check_recording()?;
+        let mut cmd_buf_data = cmd_buf.data.lock();
+        let cmd_buf_data = cmd_buf_data.record()?;
 
         let device = &cmd_buf.device;
         device.check_is_valid()?;
@@ -728,7 +728,7 @@ impl Global {
         // have an easier time inserting "immediate-inits" that may be required
         // by prior discards in rare cases.
         handle_dst_texture_init(
-            &mut cmd_buf_data,
+            cmd_buf_data,
             device,
             destination,
             copy_size,
@@ -842,14 +842,14 @@ impl Global {
         let cmd_buf = hub
             .command_buffers
             .get(command_encoder_id.into_command_buffer_id());
-        let mut cmd_buf_data = cmd_buf.try_get()?;
-        cmd_buf_data.check_recording()?;
+        let mut cmd_buf_data = cmd_buf.data.lock();
+        let cmd_buf_data = cmd_buf_data.record()?;
 
         let device = &cmd_buf.device;
         device.check_is_valid()?;
 
         #[cfg(feature = "trace")]
-        if let Some(ref mut list) = cmd_buf_data.commands {
+        if let Some(list) = cmd_buf_data.commands.as_mut() {
             list.push(TraceCommand::CopyTextureToBuffer {
                 src: *source,
                 dst: *destination,
@@ -877,7 +877,7 @@ impl Global {
         // have an easier time inserting "immediate-inits" that may be required
         // by prior discards in rare cases.
         handle_src_texture_init(
-            &mut cmd_buf_data,
+            cmd_buf_data,
             device,
             source,
             copy_size,
@@ -1009,8 +1009,8 @@ impl Global {
         let cmd_buf = hub
             .command_buffers
             .get(command_encoder_id.into_command_buffer_id());
-        let mut cmd_buf_data = cmd_buf.try_get()?;
-        cmd_buf_data.check_recording()?;
+        let mut cmd_buf_data = cmd_buf.data.lock();
+        let cmd_buf_data = cmd_buf_data.record()?;
 
         let device = &cmd_buf.device;
         device.check_is_valid()?;
@@ -1074,7 +1074,7 @@ impl Global {
         // have an easier time inserting "immediate-inits" that may be required
         // by prior discards in rare cases.
         handle_src_texture_init(
-            &mut cmd_buf_data,
+            cmd_buf_data,
             device,
             source,
             copy_size,
@@ -1082,7 +1082,7 @@ impl Global {
             &snatch_guard,
         )?;
         handle_dst_texture_init(
-            &mut cmd_buf_data,
+            cmd_buf_data,
             device,
             destination,
             copy_size,

@@ -129,7 +129,7 @@ impl Global {
         #[cfg(feature = "trace")]
         let trace_tlas: Vec<TlasBuildEntry> = tlas_iter.collect();
         #[cfg(feature = "trace")]
-        if let Some(ref mut list) = cmd_buf.data.lock().as_mut().unwrap().commands {
+        if let Some(ref mut list) = cmd_buf.data.lock().get_inner()?.commands {
             list.push(
                 crate::device::trace::Command::BuildAccelerationStructuresUnsafeTlas {
                     blas: trace_blas.clone(),
@@ -173,7 +173,7 @@ impl Global {
         let mut scratch_buffer_blas_size = 0;
         let mut blas_storage = Vec::new();
         let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
+        let cmd_buf_data = cmd_buf_data.record()?;
 
         iter_blas(
             blas_iter,
@@ -437,7 +437,7 @@ impl Global {
             .collect();
 
         #[cfg(feature = "trace")]
-        if let Some(ref mut list) = cmd_buf.data.lock().as_mut().unwrap().commands {
+        if let Some(ref mut list) = cmd_buf.data.lock().get_inner()?.commands {
             list.push(crate::device::trace::Command::BuildAccelerationStructures {
                 blas: trace_blas.clone(),
                 tlas: trace_tlas.clone(),
@@ -488,7 +488,7 @@ impl Global {
         let mut scratch_buffer_blas_size = 0;
         let mut blas_storage = Vec::new();
         let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
+        let cmd_buf_data = cmd_buf_data.record()?;
 
         iter_blas(
             blas_iter,
