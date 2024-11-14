@@ -108,9 +108,12 @@ macro_rules! change_state_with_inner {
 
 impl CommandEncoderStatus {
     /// Checks that the encoder is in the [`Self::Recording`] state.
-    pub(crate) fn record(&mut self) -> Result<&mut CommandBufferMutable, CommandEncoderError> {
+    pub(crate) fn record(&mut self) -> Result<EncoderGuard<'_>, CommandEncoderError> {
         match self {
-            Self::Recording(inner) => Ok(inner),
+            Self::Recording(_) => Ok(EncoderGuard {
+                inner: self,
+                succeeded: false,
+            }),
             Self::Locked(_) => {
                 let _ = mem::replace(self, Self::Error);
                 Err(CommandEncoderError::Locked)
@@ -731,7 +734,8 @@ impl Global {
 
         let cmd_buf = hub.command_buffers.get(encoder_id.into_command_buffer_id());
         let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.record()?;
+        let mut cmd_buf_data_guard = cmd_buf_data.record()?;
+        let cmd_buf_data = &mut *cmd_buf_data_guard;
 
         #[cfg(feature = "trace")]
         if let Some(ref mut list) = cmd_buf_data.commands {
@@ -748,6 +752,8 @@ impl Global {
                 cmd_buf_raw.begin_debug_marker(label);
             }
         }
+
+        cmd_buf_data_guard.succeeded();
         Ok(())
     }
 
@@ -763,7 +769,8 @@ impl Global {
 
         let cmd_buf = hub.command_buffers.get(encoder_id.into_command_buffer_id());
         let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.record()?;
+        let mut cmd_buf_data_guard = cmd_buf_data.record()?;
+        let cmd_buf_data = &mut *cmd_buf_data_guard;
 
         #[cfg(feature = "trace")]
         if let Some(ref mut list) = cmd_buf_data.commands {
@@ -780,6 +787,8 @@ impl Global {
                 cmd_buf_raw.insert_debug_marker(label);
             }
         }
+
+        cmd_buf_data_guard.succeeded();
         Ok(())
     }
 
@@ -794,7 +803,8 @@ impl Global {
 
         let cmd_buf = hub.command_buffers.get(encoder_id.into_command_buffer_id());
         let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.record()?;
+        let mut cmd_buf_data_guard = cmd_buf_data.record()?;
+        let cmd_buf_data = &mut *cmd_buf_data_guard;
 
         #[cfg(feature = "trace")]
         if let Some(ref mut list) = cmd_buf_data.commands {
@@ -811,6 +821,8 @@ impl Global {
                 cmd_buf_raw.end_debug_marker();
             }
         }
+
+        cmd_buf_data_guard.succeeded();
         Ok(())
     }
 }

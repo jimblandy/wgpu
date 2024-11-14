@@ -173,7 +173,8 @@ impl Global {
         let mut scratch_buffer_blas_size = 0;
         let mut blas_storage = Vec::new();
         let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.record()?;
+        let mut cmd_buf_data_guard = cmd_buf_data.record()?;
+        let cmd_buf_data = &mut *cmd_buf_data_guard;
 
         iter_blas(
             blas_iter,
@@ -355,6 +356,7 @@ impl Global {
                 .consume_temp(TempResource::ScratchBuffer(scratch_buffer));
         }
 
+        cmd_buf_data_guard.succeeded();
         Ok(())
     }
 
@@ -488,7 +490,8 @@ impl Global {
         let mut scratch_buffer_blas_size = 0;
         let mut blas_storage = Vec::new();
         let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.record()?;
+        let mut cmd_buf_data_guard = cmd_buf_data.record()?;
+        let cmd_buf_data = &mut *cmd_buf_data_guard;
 
         iter_blas(
             blas_iter,
@@ -761,6 +764,7 @@ impl Global {
                 .consume_temp(TempResource::ScratchBuffer(scratch_buffer));
         }
 
+        cmd_buf_data_guard.succeeded();
         Ok(())
     }
 }
