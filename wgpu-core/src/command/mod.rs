@@ -169,7 +169,7 @@ impl CommandEncoderStatus {
 
     /// Unlocks the [`CommandBuffer`] and puts it back into the [`Self::Recording`] state.
     ///
-    /// This function is the counterpart to [`Self::lock_encoder`].
+    /// This function is the unlocking counterpart to [`Self::lock_encoder`].
     ///
     /// It is only valid to call this function if the encoder is in the [`Self::Locked`] state.
     fn unlock_encoder(&mut self) -> Result<EncoderGuard<'_>, CommandEncoderError> {
