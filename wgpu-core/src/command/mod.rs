@@ -230,6 +230,8 @@ impl<'a> EncoderGuard<'a> {
 impl<'a> Drop for EncoderGuard<'a> {
     fn drop(&mut self) {
         if !self.succeeded {
+            // NOTE: We `mem::replace` here to ensure that the `Error` state is set before we
+            // attempt to `drop` the old state.
             let _ = mem::replace(&mut *self.inner, CommandEncoderStatus::Error);
         }
     }
