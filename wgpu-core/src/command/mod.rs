@@ -99,7 +99,16 @@ pub(crate) enum CommandEncoderStatus {
 macro_rules! change_state_with_inner {
     ($self:ident, $before:path, $after:path) => {{
         let v = ::core::mem::replace($self, CommandEncoderStatus::Error);
-        let $before(inner) = v else { unreachable!() };
+        let $before(inner) = v else {
+            unreachable!(
+                concat!(
+                    "internal error: command encoder was expected to be in ",
+                    stringify!($before),
+                    " state, but was {}"
+                ),
+                CommandEncoderStatus::display_state_discriminant($self)
+            )
+        };
         let _ = ::core::mem::replace($self, $after(inner));
         let $after(inner) = $self else { unreachable!() };
         inner
@@ -107,6 +116,15 @@ macro_rules! change_state_with_inner {
 }
 
 impl CommandEncoderStatus {
+    fn display_state_discriminant(&self) -> &'static str {
+        match self {
+            Self::Recording(..) => "Recording",
+            Self::Locked(..) => "Locked",
+            Self::Finished(..) => "Finished",
+            Self::Error => "Error",
+        }
+    }
+
     /// Checks that the encoder is in the [`Self::Recording`] state.
     pub(crate) fn record(&mut self) -> Result<EncoderGuard<'_>, CommandEncoderError> {
         match self {
