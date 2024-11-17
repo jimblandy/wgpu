@@ -89,32 +89,6 @@ pub(crate) enum CommandEncoderStatus {
     Error,
 }
 
-/// Changes the state of the given encoder.
-///
-/// Takes `&mut CommandEncoderStatus`, the previous state kind and the next state kind.
-///
-/// Returns `&mut CommandBufferMutable`.
-///
-/// Will panic if the previous state is not accurate.
-macro_rules! change_state_with_inner {
-    ($self:ident, $before:path, $after:path) => {{
-        let v = ::core::mem::replace($self, CommandEncoderStatus::Error);
-        let $before(inner) = v else {
-            unreachable!(
-                concat!(
-                    "internal error: command encoder was expected to be in ",
-                    stringify!($before),
-                    " state, but was {}"
-                ),
-                CommandEncoderStatus::display_state_discriminant($self)
-            )
-        };
-        let _ = ::core::mem::replace($self, $after(inner));
-        let $after(inner) = $self else { unreachable!() };
-        inner
-    }};
-}
-
 impl CommandEncoderStatus {
     fn display_state_discriminant(&self) -> &'static str {
         match self {
@@ -153,16 +127,13 @@ impl CommandEncoderStatus {
     ///
     /// Call [`Self::unlock_encoder`] to put the [`CommandBuffer`] back into the [`Self::Recording`] state.
     fn lock_encoder(&mut self) -> Result<(), CommandEncoderError> {
-        match *self {
-            Self::Recording(_) => {
-                change_state_with_inner!(self, Self::Recording, Self::Locked);
+        match std::mem::replace(self, Self::Error) {
+            Self::Recording(mutable) => {
+                *self = Self::Locked(mutable);
                 Ok(())
             }
             Self::Finished(_) => Err(CommandEncoderError::NotRecording),
-            Self::Locked(_) => {
-                let _ = mem::replace(self, Self::Error);
-                Err(CommandEncoderError::Locked)
-            }
+            Self::Locked(_) => Err(CommandEncoderError::Locked),
             Self::Error => Err(CommandEncoderError::Invalid),
         }
     }
@@ -173,35 +144,28 @@ impl CommandEncoderStatus {
     ///
     /// It is only valid to call this function if the encoder is in the [`Self::Locked`] state.
     fn unlock_encoder(&mut self) -> Result<EncoderGuard<'_>, CommandEncoderError> {
-        match *self {
-            Self::Locked(_) => {
-                change_state_with_inner!(self, Self::Locked, Self::Recording);
+        match std::mem::replace(self, Self::Error) {
+            Self::Locked(mutable) => {
+                *self = Self::Recording(mutable);
                 Ok(EncoderGuard {
                     inner: self,
                     succeeded: false,
                 })
             }
             Self::Finished(_) => Err(CommandEncoderError::NotRecording),
-            Self::Recording(_) => {
-                let _ = mem::replace(self, Self::Error);
-                Err(CommandEncoderError::Invalid)
-            }
+            Self::Recording(_) => Err(CommandEncoderError::Invalid),
             Self::Error => Err(CommandEncoderError::Invalid),
         }
     }
 
     fn finish(&mut self, device: &Device) -> Result<(), CommandEncoderError> {
-        match self {
-            Self::Recording(inner) => {
-                if let Err(e) = inner.encoder.close(device) {
-                    let _ = mem::replace(self, Self::Error);
-                    Err(e.into())
-                } else {
-                    change_state_with_inner!(self, Self::Recording, Self::Finished);
-                    // Note: if we want to stop tracking the swapchain texture view,
-                    // this is the place to do it.
-                    Ok(())
-                }
+        match std::mem::replace(self, Self::Error) {
+            Self::Recording(mut inner) => {
+                inner.encoder.close(device)?;
+                *self = Self::Finished(inner);
+                // Note: if we want to stop tracking the swapchain texture view,
+                // this is the place to do it.
+                Ok(())
             }
             Self::Finished(_) => Err(CommandEncoderError::NotRecording),
             Self::Locked(_) => {
