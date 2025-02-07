@@ -704,11 +704,11 @@ impl Validator {
                             .with_span_handle(handle, &module.overrides)
                         })?;
                     } else {
-                        Err(ValidationError::UninitializedOverride {
+                        return Err(ValidationError::UninitializedOverride {
                             handle,
                             name: r#override.name.clone().unwrap_or_default(),
                         }
-                        .with_span_handle(handle, &module.overrides))?;
+                        .with_span_handle(handle, &module.overrides));
                     }
                 }
             }
