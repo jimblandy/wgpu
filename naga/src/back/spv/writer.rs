@@ -2355,10 +2355,6 @@ impl Writer {
         debug_info: &Option<DebugInfo>,
         words: &mut Vec<Word>,
     ) -> Result<(), Error> {
-        if !ir_module.overrides.is_empty() {
-            return Err(Error::Override);
-        }
-
         self.reset();
 
         // Try to find the entry point and corresponding index

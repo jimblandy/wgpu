@@ -602,10 +602,6 @@ impl<'a, W: Write> Writer<'a, W> {
         pipeline_options: &'a PipelineOptions,
         policies: proc::BoundsCheckPolicies,
     ) -> Result<Self, Error> {
-        if !module.overrides.is_empty() {
-            return Err(Error::Override);
-        }
-
         // Check if the requested version is supported
         if !options.version.is_supported() {
             log::error!("Version {}", options.version);

@@ -533,10 +533,6 @@ impl Validator {
 
         let o = &gctx.overrides[handle];
 
-        if o.name.is_none() && o.id.is_none() {
-            return Err(OverrideError::MissingNameAndID);
-        }
-
         if let Some(id) = o.id {
             if !self.override_ids.insert(id) {
                 return Err(OverrideError::DuplicateID);
