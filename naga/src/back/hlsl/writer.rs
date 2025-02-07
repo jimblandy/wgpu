@@ -2623,7 +2623,6 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
     {
         use crate::Expression;
 
-        eprintln!("{:?}", expressions[expr]);
         match expressions[expr] {
             Expression::Literal(literal) => match literal {
                 // Floats are written using `Debug` instead of `Display` because it always appends the
