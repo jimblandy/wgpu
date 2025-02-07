@@ -313,6 +313,7 @@ fn process_override(
     let h = module.constants.append(constant, *span);
     override_map.insert(old_h, h);
     adjusted_constant_initializers.insert(h);
+    r#override.init = Some(init);
     Ok(h)
 }
 
