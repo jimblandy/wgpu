@@ -1550,6 +1550,9 @@ impl Writer {
 
                 self.get_constant_composite(ty, component_ids)
             }
+            crate::Expression::Override(_) => {
+                return Err(Error::Override);
+            }
             _ => unreachable!(),
         };
 

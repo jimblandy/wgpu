@@ -2689,6 +2689,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write_expression(self, value)?;
                 write!(self.out, ").{number_of_components}")?
             }
+            Expression::Override(_) => {
+                return Err(Error::Override);
+            }
             _ => unreachable!(),
         }
 

@@ -2747,6 +2747,9 @@ impl<'a, W: Write> Writer<'a, W> {
                 write_expression(self, value)?;
                 write!(self.out, ")")?
             }
+            Expression::Override(_) => {
+                return Err(Error::Override);
+            }
             _ => unreachable!(),
         }
 
