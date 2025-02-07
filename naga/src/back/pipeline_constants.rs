@@ -158,10 +158,10 @@ pub fn process_overrides<'a>(
     }
 
     // Finish processing any overrides we didn't visit in the loop above.
-    for entry in override_iter {
+    for mut entry in override_iter {
         let (
             _,
-            Override {
+            &mut Override {
                 ref name, ref id, ..
             },
             _,
@@ -176,14 +176,14 @@ pub fn process_overrides<'a>(
                 &mut adjusted_constant_initializers,
                 &mut global_expression_kind_tracker,
             )?;
-        } else if let (
+        } else if let &mut (
             _,
-            Override {
+            &mut Override {
                 init: Some(ref mut init),
                 ..
             },
             _,
-        ) = entry
+        ) = &mut entry
         {
             *init = adjusted_global_expressions[*init];
         }
