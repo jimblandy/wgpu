@@ -315,7 +315,7 @@ pub fn access_needs_check(
     // Unwrap safety: `Err` here indicates unindexable base types and invalid
     // length constants, but `access_needs_check` is only used by back ends, so
     // validation should have caught those problems.
-    let length = base_inner.indexable_length(module).unwrap();
+    let length = base_inner.indexable_length_resolved(module).unwrap();
     index.try_resolve_to_constant(expressions, module);
     if let (&GuardedIndex::Known(index), &IndexableLength::Known(length)) = (&index, &length) {
         if index < length {
@@ -357,8 +357,10 @@ impl GuardedIndex {
 pub enum IndexableLengthError {
     #[error("Type is not indexable, and has no length (validation error)")]
     TypeNotIndexable,
-    #[error("Array length constant {0:?} is invalid")]
-    InvalidArrayLength(Handle<crate::Expression>),
+    #[error(transparent)]
+    ResolveArraySizeError(#[from] super::ResolveArraySizeError),
+    #[error("Array size is still pending")]
+    Pending(crate::ArraySize),
 }
 
 impl crate::TypeInner {
@@ -405,6 +407,30 @@ impl crate::TypeInner {
         };
         Ok(IndexableLength::Known(known_length))
     }
+
+    pub fn indexable_length_pending(
+        &self,
+        module: &crate::Module,
+    ) -> Result<IndexableLength, IndexableLengthError> {
+        let length = self.indexable_length(module);
+        if let Err(IndexableLengthError::Pending(_)) = length {
+            return Ok(IndexableLength::Dynamic);
+        }
+        length
+    }
+
+    pub fn indexable_length_resolved(
+        &self,
+        module: &crate::Module,
+    ) -> Result<IndexableLength, IndexableLengthError> {
+        let length = self.indexable_length(module);
+        if let Err(IndexableLengthError::Pending(size)) = length {
+            if let super::ResolvedSize::Constant(computed) = size.resolve(module.to_ctx())? {
+                return Ok(IndexableLength::Known(computed));
+            }
+        }
+        length
+    }
 }
 
 /// The number of elements in an indexable type.
@@ -416,8 +442,6 @@ pub enum IndexableLength {
     /// Values of this type always have the given number of elements.
     Known(u32),
 
-    Pending,
-
     /// The number of elements is determined at runtime.
     Dynamic,
 }
@@ -427,10 +451,10 @@ impl crate::ArraySize {
         self,
         _module: &crate::Module,
     ) -> Result<IndexableLength, IndexableLengthError> {
-        Ok(match self {
-            Self::Constant(length) => IndexableLength::Known(length.get()),
-            Self::Pending(_) => IndexableLength::Pending,
-            Self::Dynamic => IndexableLength::Dynamic,
-        })
+        match self {
+            Self::Constant(length) => Ok(IndexableLength::Known(length.get())),
+            Self::Pending(_) => Err(IndexableLengthError::Pending(self)),
+            Self::Dynamic => Ok(IndexableLength::Dynamic),
+        }
     }
 }

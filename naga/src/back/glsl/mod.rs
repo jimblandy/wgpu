@@ -529,6 +529,8 @@ pub enum Error {
     /// [`crate::Sampling::First`] is unsupported.
     #[error("`{:?}` sampling is unsupported", crate::Sampling::First)]
     FirstSamplingNotSupported,
+    #[error(transparent)]
+    ResolveArraySizeError(#[from] proc::ResolveArraySizeError),
 }
 
 /// Binary operation with a different logic on the GLSL side.
@@ -999,13 +1001,12 @@ impl<'a, W: Write> Writer<'a, W> {
         write!(self.out, "[")?;
 
         // Write the array size
-        // Writes nothing if `ArraySize::Dynamic`
-        match size {
-            crate::ArraySize::Constant(size) => {
+        // Writes nothing if `ResolvedSize::Dynamic`
+        match size.resolve(self.module.to_ctx())? {
+            proc::ResolvedSize::Constant(size) => {
                 write!(self.out, "{size}")?;
             }
-            crate::ArraySize::Pending(_) => unreachable!(),
-            crate::ArraySize::Dynamic => (),
+            proc::ResolvedSize::Dynamic => (),
         }
 
         write!(self.out, "]")?;
@@ -4560,13 +4561,9 @@ impl<'a, W: Write> Writer<'a, W> {
                 write!(self.out, ")")?;
             }
             TypeInner::Array { base, size, .. } => {
-                let count = match size
-                    .to_indexable_length(self.module)
-                    .expect("Bad array size")
-                {
-                    proc::IndexableLength::Known(count) => count,
-                    proc::IndexableLength::Pending => unreachable!(),
-                    proc::IndexableLength::Dynamic => return Ok(()),
+                let count = match size.resolve(self.module.to_ctx())? {
+                    proc::ResolvedSize::Constant(count) => count,
+                    proc::ResolvedSize::Dynamic => return Ok(()),
                 };
                 self.write_type(base)?;
                 self.write_array_size(base, size)?;

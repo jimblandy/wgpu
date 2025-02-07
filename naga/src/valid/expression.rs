@@ -286,11 +286,14 @@ impl super::Validator {
                     .eval_expr_to_u32_from(index, &function.expressions)
                 {
                     Ok(value) => {
+                        let length = if self.overrides_resolved {
+                            base_type.indexable_length_resolved(module)
+                        } else {
+                            base_type.indexable_length_pending(module)
+                        }?;
                         // If we know both the length and the index, we can do the
                         // bounds check now.
-                        if let crate::proc::IndexableLength::Known(known_length) =
-                            base_type.indexable_length(module)?
-                        {
+                        if let crate::proc::IndexableLength::Known(known_length) = length {
                             if value >= known_length {
                                 return Err(ExpressionError::IndexOutOfBounds(base, value));
                             }
