@@ -224,7 +224,7 @@ impl super::Validator {
                 crate::TypeInner::Scalar { .. } => {}
                 _ => return Err(ConstExpressionError::InvalidSplatType(value)),
             },
-            _ if global_expr_kind.is_const(handle) || !self.allow_overrides => {
+            _ if global_expr_kind.is_const(handle) => {
                 return Err(ConstExpressionError::NonFullyEvaluatedConst)
             }
             // the constant evaluator will report errors about override-expressions
