@@ -3240,12 +3240,15 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     handle
                 } else {
                     let ty = ctx.register_type(expr)?;
-                    ctx.module.overrides.append(crate::Override {
-                        name: None,
-                        id: None,
-                        ty,
-                        init: Some(expr),
-                    }, span)
+                    ctx.module.overrides.append(
+                        crate::Override {
+                            name: None,
+                            id: None,
+                            ty,
+                            init: Some(expr),
+                        },
+                        span,
+                    )
                 }
             }),
             _ => Err(Error::ExpectedConstExprConcreteIntegerScalar(span)),

@@ -324,7 +324,7 @@ impl super::Validator {
                         let r#override = &overrides[h];
                         handle.check_dep(r#override.ty)?;
                         r#override.init
-                    },
+                    }
                     crate::ArraySize::Constant(_) | crate::ArraySize::Dynamic => None,
                 }
             }
@@ -928,12 +928,15 @@ fn array_size_deps() {
     let ex_zero = m
         .global_expressions
         .append(Expression::ZeroValue(ty_u32), nowhere);
-    let ty_handle = m.overrides.append(Override {
-        name: None,
-        id: None,
-        ty: ty_u32,
-        init: Some(ex_zero),
-    }, nowhere);
+    let ty_handle = m.overrides.append(
+        Override {
+            name: None,
+            id: None,
+            ty: ty_u32,
+            init: Some(ex_zero),
+        },
+        nowhere,
+    );
     let ty_arr = m.types.insert(
         Type {
             name: Some("bad_array".to_string()),

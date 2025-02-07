@@ -39,7 +39,7 @@ impl TypeTracer<'_> {
                         if let Some(expr) = r#override.init {
                             self.expressions_used.insert(expr);
                         }
-                    },
+                    }
                     crate::ArraySize::Constant(_) | crate::ArraySize::Dynamic => {}
                 }
             }

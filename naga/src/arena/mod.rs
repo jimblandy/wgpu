@@ -103,7 +103,9 @@ impl<T> Arena<T> {
 
     /// Returns an iterator over the items stored in this arena, returning both
     /// the item's handle and a reference to it.
-    pub fn iter_mut_span(&mut self) -> impl DoubleEndedIterator<Item = (Handle<T>, &mut T, &Span)> + ExactSizeIterator {
+    pub fn iter_mut_span(
+        &mut self,
+    ) -> impl DoubleEndedIterator<Item = (Handle<T>, &mut T, &Span)> + ExactSizeIterator {
         self.data
             .iter_mut()
             .zip(self.span_info.iter())

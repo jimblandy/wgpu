@@ -367,6 +367,11 @@ pub enum ValidationError {
         name: String,
         source: ConstExpressionError,
     },
+    #[error("Override {handle:?} '{name}' is uninitialized")]
+    UninitializedOverride {
+        handle: Handle<crate::Override>,
+        name: String,
+    },
     #[error("Global variable {handle:?} '{name}' is invalid")]
     GlobalVariable {
         handle: Handle<crate::GlobalVariable>,
@@ -688,8 +693,9 @@ impl Validator {
                             expr,
                             module.to_ctx(),
                             &mod_info,
-                            &global_expr_kind
-                        ).map_err(|source| {
+                            &global_expr_kind,
+                        )
+                        .map_err(|source| {
                             ValidationError::UnresolvedOverride {
                                 handle,
                                 name: r#override.name.clone().unwrap_or_default(),
@@ -697,6 +703,12 @@ impl Validator {
                             }
                             .with_span_handle(handle, &module.overrides)
                         })?;
+                    } else {
+                        Err(ValidationError::UninitializedOverride {
+                            handle,
+                            name: r#override.name.clone().unwrap_or_default(),
+                        }
+                        .with_span_handle(handle, &module.overrides))?;
                     }
                 }
             }

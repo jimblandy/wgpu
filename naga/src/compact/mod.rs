@@ -350,9 +350,7 @@ impl<'module> ModuleTracer<'module> {
                     crate::TypeInner::Array { size, .. }
                     | crate::TypeInner::BindingArray { size, .. } => match size {
                         crate::ArraySize::Constant(_) | crate::ArraySize::Dynamic => None,
-                        crate::ArraySize::Pending(handle) => {
-                            self.module.overrides[handle].init
-                        },
+                        crate::ArraySize::Pending(handle) => self.module.overrides[handle].init,
                     },
                     _ => None,
                 },
@@ -500,12 +498,15 @@ fn type_expression_interdependence() {
         crate::Span::default(),
     );
     let type_needs_expression = |module: &mut crate::Module, handle| {
-        let ty_handle = module.overrides.append(crate::Override {
-            name: None,
-            id: None,
-            ty: u32,
-            init: Some(handle),
-        }, crate::Span::default());
+        let ty_handle = module.overrides.append(
+            crate::Override {
+                name: None,
+                id: None,
+                ty: u32,
+                init: Some(handle),
+            },
+            crate::Span::default(),
+        );
         module.types.insert(
             crate::Type {
                 name: None,
@@ -784,12 +785,15 @@ fn array_length_expression() {
         crate::Expression::Literal(crate::Literal::U32(1)),
         crate::Span::default(),
     );
-    let ty_handle = module.overrides.append(crate::Override {
-        name: None,
-        id: None,
-        ty: ty_u32,
-        init: Some(one),
-    }, crate::Span::default());
+    let ty_handle = module.overrides.append(
+        crate::Override {
+            name: None,
+            id: None,
+            ty: ty_u32,
+            init: Some(one),
+        },
+        crate::Span::default(),
+    );
     let _ty_array = module.types.insert(
         crate::Type {
             name: Some("array<u32, 1>".to_string()),
