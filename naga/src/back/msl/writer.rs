@@ -1548,10 +1548,9 @@ impl<W: Write> Writer<W> {
                 put_expression(self, ctx, value)?;
                 write!(self.out, ")")?;
             }
-            crate::Expression::Override(_) => {
+            _ => {
                 return Err(Error::Override);
             }
-            _ => unreachable!(),
         }
 
         Ok(())

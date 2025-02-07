@@ -1550,10 +1550,9 @@ impl Writer {
 
                 self.get_constant_composite(ty, component_ids)
             }
-            crate::Expression::Override(_) => {
+            _ => {
                 return Err(Error::Override);
             }
-            _ => unreachable!(),
         };
 
         self.constant_ids[handle] = id;

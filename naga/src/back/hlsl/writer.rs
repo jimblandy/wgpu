@@ -2623,6 +2623,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
     {
         use crate::Expression;
 
+        eprintln!("{:?}", expressions[expr]);
         match expressions[expr] {
             Expression::Literal(literal) => match literal {
                 // Floats are written using `Debug` instead of `Display` because it always appends the
@@ -2689,10 +2690,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write_expression(self, value)?;
                 write!(self.out, ").{number_of_components}")?
             }
-            Expression::Override(_) => {
+            _ => {
                 return Err(Error::Override);
             }
-            _ => unreachable!(),
         }
 
         Ok(())
