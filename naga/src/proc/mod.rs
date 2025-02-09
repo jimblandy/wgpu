@@ -493,6 +493,8 @@ pub enum ResolvedSize {
 pub enum ResolveArraySizeError {
     #[error("array element count must be positive (> 0)")]
     ExpectedPositiveArrayLength,
+    #[error("internal: array size override has not been resolved")]
+    NonConstArrayLength,
 }
 
 impl crate::ArraySize {
@@ -510,9 +512,7 @@ impl crate::ArraySize {
             crate::ArraySize::Pending(handle) => {
                 let expr = gctx.overrides[handle].init.unwrap();
                 let length = gctx.eval_expr_to_u32(expr).map_err(|err| match err {
-                    U32EvalError::NonConst => {
-                        unreachable!("unresolved array size");
-                    }
+                    U32EvalError::NonConst => ResolveArraySizeError::NonConstArrayLength,
                     U32EvalError::Negative => ResolveArraySizeError::ExpectedPositiveArrayLength,
                 })?;
 
