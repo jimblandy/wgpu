@@ -327,6 +327,13 @@ pub enum OverrideError {
     TypeNotScalar,
     #[error("Override declarations are not allowed")]
     NotAllowed,
+    #[error("Override is uninitialized")]
+    UninitializedOverride,
+    #[error("Constant expression {handle:?} is invalid")]
+    ConstExpression {
+        handle: Handle<crate::Expression>,
+        source: ConstExpressionError,
+    },
 }
 
 #[derive(Clone, Debug, thiserror::Error)]
@@ -366,11 +373,6 @@ pub enum ValidationError {
         handle: Handle<crate::Override>,
         name: String,
         source: ConstExpressionError,
-    },
-    #[error("Override {handle:?} '{name}' is uninitialized")]
-    UninitializedOverride {
-        handle: Handle<crate::Override>,
-        name: String,
     },
     #[error("Global variable {handle:?} '{name}' is invalid")]
     GlobalVariable {
@@ -537,6 +539,7 @@ impl Validator {
         handle: Handle<crate::Override>,
         gctx: crate::proc::GlobalCtx,
         mod_info: &ModuleInfo,
+        global_expr_kind: &ExpressionKindTracker,
     ) -> Result<(), OverrideError> {
         let o = &gctx.overrides[handle];
 
@@ -568,6 +571,13 @@ impl Validator {
             if !decl_ty.equivalent(init_ty, gctx.types) {
                 return Err(OverrideError::InvalidType);
             }
+            self.validate_const_expression(init, gctx, mod_info, global_expr_kind)
+                .map_err(|err| OverrideError::ConstExpression {
+                    handle: init,
+                    source: err,
+                })?;
+        } else if self.overrides_resolved {
+            return Err(OverrideError::UninitializedOverride);
         }
 
         Ok(())
@@ -678,7 +688,7 @@ impl Validator {
             }
 
             for (handle, r#override) in module.overrides.iter() {
-                self.validate_override(handle, module.to_ctx(), &mod_info)
+                self.validate_override(handle, module.to_ctx(), &mod_info, &global_expr_kind)
                     .map_err(|source| {
                         ValidationError::Override {
                             handle,
@@ -687,30 +697,6 @@ impl Validator {
                         }
                         .with_span_handle(handle, &module.overrides)
                     })?;
-                if self.overrides_resolved {
-                    if let Some(expr) = r#override.init {
-                        self.validate_const_expression(
-                            expr,
-                            module.to_ctx(),
-                            &mod_info,
-                            &global_expr_kind,
-                        )
-                        .map_err(|source| {
-                            ValidationError::UnresolvedOverride {
-                                handle,
-                                name: r#override.name.clone().unwrap_or_default(),
-                                source,
-                            }
-                            .with_span_handle(handle, &module.overrides)
-                        })?;
-                    } else {
-                        return Err(ValidationError::UninitializedOverride {
-                            handle,
-                            name: r#override.name.clone().unwrap_or_default(),
-                        }
-                        .with_span_handle(handle, &module.overrides));
-                    }
-                }
             }
         }
 
