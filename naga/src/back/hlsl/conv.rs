@@ -66,9 +66,9 @@ impl crate::TypeInner {
             }
             Self::Array { base, size, stride } => {
                 let count = match size.resolve(gctx)? {
-                    crate::proc::ResolvedSize::Known(size) => size,
+                    crate::proc::IndexableLength::Known(size) => size,
                     // A dynamically-sized array has to have at least one element
-                    crate::proc::ResolvedSize::Dynamic => 1,
+                    crate::proc::IndexableLength::Dynamic => 1,
                 };
                 let last_el_size = gctx.types[base].inner.size_hlsl(gctx)?;
                 Ok(((count - 1) * stride) + last_el_size)

@@ -3975,7 +3975,7 @@ impl<W: Write> Writer<W> {
                     };
 
                     match size.resolve(module.to_ctx())? {
-                        proc::ResolvedSize::Known(size) => {
+                        proc::IndexableLength::Known(size) => {
                             writeln!(self.out, "struct {name} {{")?;
                             writeln!(
                                 self.out,
@@ -3987,7 +3987,7 @@ impl<W: Write> Writer<W> {
                             )?;
                             writeln!(self.out, "}};")?;
                         }
-                        proc::ResolvedSize::Dynamic => {
+                        proc::IndexableLength::Dynamic => {
                             writeln!(self.out, "typedef {base_name} {name}[1];")?;
                         }
                     }
@@ -6665,8 +6665,8 @@ mod workgroup_mem_init {
                     }
                     crate::TypeInner::Array { base, size, .. } => {
                         let count = match size.resolve(module.to_ctx())? {
-                            proc::ResolvedSize::Known(count) => count,
-                            proc::ResolvedSize::Dynamic => unreachable!(),
+                            proc::IndexableLength::Known(count) => count,
+                            proc::IndexableLength::Dynamic => unreachable!(),
                         };
 
                         access_stack.enter_array(|access_stack, array_depth| {

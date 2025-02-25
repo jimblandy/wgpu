@@ -1260,11 +1260,11 @@ impl Writer {
 
                     let type_id = self.get_type_id(LookupType::Handle(base));
                     match size.resolve(module.to_ctx())? {
-                        crate::proc::ResolvedSize::Known(length) => {
+                        crate::proc::IndexableLength::Known(length) => {
                             let length_id = self.get_index_constant(length);
                             Instruction::type_array(id, type_id, length_id)
                         }
-                        crate::proc::ResolvedSize::Dynamic => {
+                        crate::proc::IndexableLength::Dynamic => {
                             Instruction::type_runtime_array(id, type_id)
                         }
                     }
@@ -1272,11 +1272,11 @@ impl Writer {
                 crate::TypeInner::BindingArray { base, size } => {
                     let type_id = self.get_type_id(LookupType::Handle(base));
                     match size.resolve(module.to_ctx())? {
-                        crate::proc::ResolvedSize::Known(length) => {
+                        crate::proc::IndexableLength::Known(length) => {
                             let length_id = self.get_index_constant(length);
                             Instruction::type_array(id, type_id, length_id)
                         }
-                        crate::proc::ResolvedSize::Dynamic => {
+                        crate::proc::IndexableLength::Dynamic => {
                             Instruction::type_runtime_array(id, type_id)
                         }
                     }

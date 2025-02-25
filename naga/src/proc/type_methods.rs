@@ -152,12 +152,12 @@ impl crate::TypeInner {
                 stride,
             } => {
                 let count = match size.resolve(gctx) {
-                    Ok(crate::proc::ResolvedSize::Known(count)) => count,
+                    Ok(crate::proc::IndexableLength::Known(count)) => count,
                     // any struct member or array element needing a size at pipeline-creation time
                     // must have a creation-fixed footprint
                     Err(_) => 0,
                     // A dynamically-sized array has to have at least one element
-                    Ok(crate::proc::ResolvedSize::Dynamic) => 1,
+                    Ok(crate::proc::IndexableLength::Dynamic) => 1,
                 };
                 count * stride
             }

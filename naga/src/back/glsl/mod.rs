@@ -1001,12 +1001,12 @@ impl<'a, W: Write> Writer<'a, W> {
         write!(self.out, "[")?;
 
         // Write the array size
-        // Writes nothing if `ResolvedSize::Dynamic`
+        // Writes nothing if `IndexableLength::Dynamic`
         match size.resolve(self.module.to_ctx())? {
-            proc::ResolvedSize::Known(size) => {
+            proc::IndexableLength::Known(size) => {
                 write!(self.out, "{size}")?;
             }
-            proc::ResolvedSize::Dynamic => (),
+            proc::IndexableLength::Dynamic => (),
         }
 
         write!(self.out, "]")?;
@@ -4564,8 +4564,8 @@ impl<'a, W: Write> Writer<'a, W> {
             }
             TypeInner::Array { base, size, .. } => {
                 let count = match size.resolve(self.module.to_ctx())? {
-                    proc::ResolvedSize::Known(count) => count,
-                    proc::ResolvedSize::Dynamic => return Ok(()),
+                    proc::IndexableLength::Known(count) => count,
+                    proc::IndexableLength::Dynamic => return Ok(()),
                 };
                 self.write_type(base)?;
                 self.write_array_size(base, size)?;

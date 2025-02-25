@@ -484,11 +484,6 @@ impl GlobalCtx<'_> {
     }
 }
 
-pub enum ResolvedSize {
-    Known(u32),
-    Dynamic,
-}
-
 #[derive(Error, Debug, Clone, Copy, PartialEq)]
 pub enum ResolveArraySizeError {
     #[error("array element count must be positive (> 0)")]
@@ -507,14 +502,14 @@ impl crate::ArraySize {
     /// this function expects.
     ///
     /// [`pipeline_constants::process_overrides`]: crate::back::pipeline_constants::process_overrides
-    pub fn resolve(&self, gctx: GlobalCtx) -> Result<ResolvedSize, ResolveArraySizeError> {
+    pub fn resolve(&self, gctx: GlobalCtx) -> Result<IndexableLength, ResolveArraySizeError> {
         match *self {
-            crate::ArraySize::Constant(length) => Ok(ResolvedSize::Known(length.get())),
+            crate::ArraySize::Constant(length) => Ok(IndexableLength::Known(length.get())),
             crate::ArraySize::Pending(handle) => {
                 let length = gctx.overrides[handle].resolve_to_known_array_size(gctx)?;
-                Ok(ResolvedSize::Known(length))
+                Ok(IndexableLength::Known(length))
             }
-            crate::ArraySize::Dynamic => Ok(ResolvedSize::Dynamic),
+            crate::ArraySize::Dynamic => Ok(IndexableLength::Dynamic),
         }
     }
 }
