@@ -511,22 +511,29 @@ impl crate::ArraySize {
         match *self {
             crate::ArraySize::Constant(length) => Ok(ResolvedSize::Constant(length.get())),
             crate::ArraySize::Pending(handle) => {
-                let Some(expr) = gctx.overrides[handle].init else {
-                    return Err(ResolveArraySizeError::NonConstArrayLength);
-                };
-                let length = gctx.eval_expr_to_u32(expr).map_err(|err| match err {
-                    U32EvalError::NonConst => ResolveArraySizeError::NonConstArrayLength,
-                    U32EvalError::Negative => ResolveArraySizeError::ExpectedPositiveArrayLength,
-                })?;
-
-                if length == 0 {
-                    return Err(ResolveArraySizeError::ExpectedPositiveArrayLength);
-                }
-
+                let length = gctx.overrides[handle].resolve_to_known_array_size(gctx)?;
                 Ok(ResolvedSize::Constant(length))
             }
             crate::ArraySize::Dynamic => Ok(ResolvedSize::Dynamic),
         }
+    }
+}
+
+impl crate::Override {
+    pub fn resolve_to_known_array_size(&self, gctx: GlobalCtx) -> Result<u32, ResolveArraySizeError> {
+        let Some(expr) = self.init else {
+            return Err(ResolveArraySizeError::NonConstArrayLength);
+        };
+        let length = gctx.eval_expr_to_u32(expr).map_err(|err| match err {
+            U32EvalError::NonConst => ResolveArraySizeError::NonConstArrayLength,
+            U32EvalError::Negative => ResolveArraySizeError::ExpectedPositiveArrayLength,
+        })?;
+
+        if length == 0 {
+            return Err(ResolveArraySizeError::ExpectedPositiveArrayLength);
+        }
+
+        Ok(length)
     }
 }
 

@@ -373,7 +373,7 @@ pub enum IndexableLengthError {
     #[error(transparent)]
     ResolveArraySizeError(#[from] super::ResolveArraySizeError),
     #[error("Array size is still pending")]
-    Pending(crate::ArraySize),
+    Pending(Handle<crate::Override>),
 }
 
 impl crate::TypeInner {
@@ -472,15 +472,15 @@ impl crate::TypeInner {
         &self,
         module: &crate::Module,
     ) -> Result<IndexableLength, IndexableLengthError> {
-        let length = self.indexable_length(module);
-
-        // If the length is override-based, then try to compute its value now.
-        if let Err(IndexableLengthError::Pending(size)) = length {
-            if let super::ResolvedSize::Constant(computed) = size.resolve(module.to_ctx())? {
-                return Ok(IndexableLength::Known(computed));
+        match self.indexable_length(module) {
+            // If the length is override-based, then try to compute its value now.
+            Err(IndexableLengthError::Pending(handle)) => {
+                let r#override = &module.overrides[handle];
+                let length = r#override.resolve_to_known_array_size(module.to_ctx())?;
+                Ok(IndexableLength::Known(length))
             }
+            other => other,
         }
-        length
     }
 }
 
@@ -504,7 +504,7 @@ impl crate::ArraySize {
     ) -> Result<IndexableLength, IndexableLengthError> {
         match self {
             Self::Constant(length) => Ok(IndexableLength::Known(length.get())),
-            Self::Pending(_) => Err(IndexableLengthError::Pending(self)),
+            Self::Pending(handle) => Err(IndexableLengthError::Pending(handle)),
             Self::Dynamic => Ok(IndexableLength::Dynamic),
         }
     }
