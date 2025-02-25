@@ -66,7 +66,7 @@ impl crate::TypeInner {
             }
             Self::Array { base, size, stride } => {
                 let count = match size.resolve(gctx)? {
-                    crate::proc::ResolvedSize::Constant(size) => size,
+                    crate::proc::ResolvedSize::Known(size) => size,
                     // A dynamically-sized array has to have at least one element
                     crate::proc::ResolvedSize::Dynamic => 1,
                 };

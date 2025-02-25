@@ -152,7 +152,7 @@ impl crate::TypeInner {
                 stride,
             } => {
                 let count = match size.resolve(gctx) {
-                    Ok(crate::proc::ResolvedSize::Constant(count)) => count,
+                    Ok(crate::proc::ResolvedSize::Known(count)) => count,
                     // any struct member or array element needing a size at pipeline-creation time
                     // must have a creation-fixed footprint
                     Err(_) => 0,

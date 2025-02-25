@@ -3975,7 +3975,7 @@ impl<W: Write> Writer<W> {
                     };
 
                     match size.resolve(module.to_ctx())? {
-                        proc::ResolvedSize::Constant(size) => {
+                        proc::ResolvedSize::Known(size) => {
                             writeln!(self.out, "struct {name} {{")?;
                             writeln!(
                                 self.out,
@@ -6665,7 +6665,7 @@ mod workgroup_mem_init {
                     }
                     crate::TypeInner::Array { base, size, .. } => {
                         let count = match size.resolve(module.to_ctx())? {
-                            proc::ResolvedSize::Constant(count) => count,
+                            proc::ResolvedSize::Known(count) => count,
                             proc::ResolvedSize::Dynamic => unreachable!(),
                         };
 

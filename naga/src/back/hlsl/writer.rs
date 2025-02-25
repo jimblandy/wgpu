@@ -1119,7 +1119,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         write!(self.out, "[")?;
 
         match size.resolve(module.to_ctx())? {
-            proc::ResolvedSize::Constant(size) => {
+            proc::ResolvedSize::Known(size) => {
                 write!(self.out, "{size}")?;
             }
             proc::ResolvedSize::Dynamic => unreachable!(),

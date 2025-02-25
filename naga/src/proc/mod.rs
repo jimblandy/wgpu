@@ -485,7 +485,7 @@ impl GlobalCtx<'_> {
 }
 
 pub enum ResolvedSize {
-    Constant(u32),
+    Known(u32),
     Dynamic,
 }
 
@@ -509,10 +509,10 @@ impl crate::ArraySize {
     /// [`pipeline_constants::process_overrides`]: crate::back::pipeline_constants::process_overrides
     pub fn resolve(&self, gctx: GlobalCtx) -> Result<ResolvedSize, ResolveArraySizeError> {
         match *self {
-            crate::ArraySize::Constant(length) => Ok(ResolvedSize::Constant(length.get())),
+            crate::ArraySize::Constant(length) => Ok(ResolvedSize::Known(length.get())),
             crate::ArraySize::Pending(handle) => {
                 let length = gctx.overrides[handle].resolve_to_known_array_size(gctx)?;
-                Ok(ResolvedSize::Constant(length))
+                Ok(ResolvedSize::Known(length))
             }
             crate::ArraySize::Dynamic => Ok(ResolvedSize::Dynamic),
         }

@@ -1003,7 +1003,7 @@ impl<'a, W: Write> Writer<'a, W> {
         // Write the array size
         // Writes nothing if `ResolvedSize::Dynamic`
         match size.resolve(self.module.to_ctx())? {
-            proc::ResolvedSize::Constant(size) => {
+            proc::ResolvedSize::Known(size) => {
                 write!(self.out, "{size}")?;
             }
             proc::ResolvedSize::Dynamic => (),
@@ -4564,7 +4564,7 @@ impl<'a, W: Write> Writer<'a, W> {
             }
             TypeInner::Array { base, size, .. } => {
                 let count = match size.resolve(self.module.to_ctx())? {
-                    proc::ResolvedSize::Constant(count) => count,
+                    proc::ResolvedSize::Known(count) => count,
                     proc::ResolvedSize::Dynamic => return Ok(()),
                 };
                 self.write_type(base)?;
