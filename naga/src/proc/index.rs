@@ -304,6 +304,19 @@ pub fn find_checked_indexes(
 /// matrices. It does not handle struct member indices; those never require
 /// run-time checks, so it's best to deal with them further up the call
 /// chain.
+///
+/// This function assumes that any relevant overrides have fully-evaluated
+/// constants as their values (as arranged by [`process_overrides`], for
+/// example).
+///
+/// [`process_overrides`]: crate::back::pipeline_constants::process_overrides
+///
+/// # Panics
+///
+/// - If `base` is not an indexable type, panic.
+///
+/// - If `base` is an override-sized array, but the override's value is not a
+///   fully-evaluated constant expression, panic.
 pub fn access_needs_check(
     base: Handle<crate::Expression>,
     mut index: GuardedIndex,
@@ -408,6 +421,23 @@ impl crate::TypeInner {
         Ok(IndexableLength::Known(known_length))
     }
 
+    /// Return the length of `self`, assuming overrides are yet to be supplied.
+    ///
+    /// Return the number of elements in `self`:
+    ///
+    /// - If `self` is a runtime-sized array, then return
+    ///   [`IndexableLength::Dynamic`].
+    ///
+    /// - If `self` is an override-sized array, then assume that override values
+    ///   have not yet been supplied, and return [`IndexableLength::Dynamic`].
+    ///
+    /// - Otherwise, the type simply tells us the length of `self`, so return
+    ///   [`IndexableLength::Known`].
+    ///
+    /// If `self` is not an indexable type at all, return an error.
+    ///
+    /// The difference between this and `indexable_length_resolved` is that we assume
+    /// that override-sized arrays have a dynamic length.
     pub fn indexable_length_pending(
         &self,
         module: &crate::Module,
@@ -419,11 +449,32 @@ impl crate::TypeInner {
         length
     }
 
+    /// Return the length of `self`, assuming overrides have been resolved.
+    ///
+    /// Return the number of elements in `self`:
+    ///
+    /// - If `self` is a runtime-sized array, then return
+    ///   [`IndexableLength::Dynamic`].
+    ///
+    /// - If `self` is an override-sized array, then assume that the override's
+    ///   value is a fully-evaluated constant expression, and return
+    ///   [`IndexableLength::Known`]. Otherwise, return an error.
+    ///
+    /// - Otherwise, the type simply tells us the length of `self`, so return
+    ///   [`IndexableLength::Known`].
+    ///
+    /// If `self` is not an indexable type at all, return an error.
+    ///
+    /// The difference between this and `indexable_length_pending` is
+    /// that if `self` is override-sized, we require the override's
+    /// value to be known.
     pub fn indexable_length_resolved(
         &self,
         module: &crate::Module,
     ) -> Result<IndexableLength, IndexableLengthError> {
         let length = self.indexable_length(module);
+
+        // If the length is override-based, then try to compute its value now.
         if let Err(IndexableLengthError::Pending(size)) = length {
             if let super::ResolvedSize::Constant(computed) = size.resolve(module.to_ctx())? {
                 return Ok(IndexableLength::Known(computed));

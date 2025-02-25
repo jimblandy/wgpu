@@ -276,6 +276,8 @@ pub struct Validator {
     valid_expression_list: Vec<Handle<crate::Expression>>,
     valid_expression_set: HandleSet<crate::Expression>,
     override_ids: FastHashSet<u16>,
+
+    /// Treat overrides whose values are not resolved as errors.
     overrides_resolved: bool,
 
     /// A checklist of expressions that must be visited by a specific kind of
@@ -592,9 +594,13 @@ impl Validator {
         self.validate_impl(module)
     }
 
-    /// Check the given module to be valid.
+    /// Check the given module to be valid, requiring overrides to be resolved.
     ///
-    /// With the additional restriction that overrides are all resolved.
+    /// This is the same as [`validate`], except that any override
+    /// whose value is not a fully-evaluated constant expression is
+    /// treated as an error.
+    ///
+    /// [`validate`]: Validator::validate
     pub fn validate_resolved_overrides(
         &mut self,
         module: &crate::Module,

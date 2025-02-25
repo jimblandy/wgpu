@@ -500,17 +500,20 @@ pub enum ResolveArraySizeError {
 impl crate::ArraySize {
     /// Return the number of elements that `size` represents, if known at code generation time.
     ///
-    /// This must only be called after `back::pipeline_constants::process_overrides`, or on modules
-    /// that contain no overrides.
+    /// If `size` is override-based, return an error unless the override's
+    /// initializer is a fully evaluated constant expression. You can call
+    /// [`pipeline_constants::process_overrides`] to supply values for a
+    /// module's overrides and ensure their initializers are fully evaluated, as
+    /// this function expects.
     ///
-    /// # Panics
-    ///
-    /// - if [`crate::valid::Validator::validate_resolved_overrides`] has not been run
+    /// [`pipeline_constants::process_overrides`]: crate::back::pipeline_constants::process_overrides
     pub fn resolve(&self, gctx: GlobalCtx) -> Result<ResolvedSize, ResolveArraySizeError> {
         match *self {
             crate::ArraySize::Constant(length) => Ok(ResolvedSize::Constant(length.get())),
             crate::ArraySize::Pending(handle) => {
-                let expr = gctx.overrides[handle].init.unwrap();
+                let Some(expr) = gctx.overrides[handle].init else {
+                    return Err(ResolveArraySizeError::NonConstArrayLength);
+                };
                 let length = gctx.eval_expr_to_u32(expr).map_err(|err| match err {
                     U32EvalError::NonConst => ResolveArraySizeError::NonConstArrayLength,
                     U32EvalError::Negative => ResolveArraySizeError::ExpectedPositiveArrayLength,
