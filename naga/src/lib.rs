@@ -118,6 +118,7 @@ extern crate alloc;
 
 mod arena;
 pub mod back;
+mod benchmark;
 pub mod common;
 #[cfg(feature = "compact")]
 pub mod compact;

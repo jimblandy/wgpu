@@ -41,7 +41,9 @@ impl Frontend {
     }
 
     pub fn parse(&mut self, source: &str) -> core::result::Result<crate::Module, ParseError> {
-        self.inner(source).map_err(|x| x.as_parse_error(source))
+        crate::benchmark::stage!(wgsl_in {
+            self.inner(source).map_err(|x| x.as_parse_error(source))
+        })
     }
 
     fn inner<'a>(&mut self, source: &'a str) -> Result<'a, crate::Module> {
