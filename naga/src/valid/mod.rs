@@ -591,7 +591,9 @@ impl Validator {
         module: &crate::Module,
     ) -> Result<ModuleInfo, WithSpan<ValidationError>> {
         self.overrides_resolved = false;
-        self.validate_impl(module)
+        crate::benchmark::stage!(valid::validate {
+            self.validate_impl(module)
+        })
     }
 
     /// Check the given module to be valid, requiring overrides to be resolved.
@@ -606,7 +608,9 @@ impl Validator {
         module: &crate::Module,
     ) -> Result<ModuleInfo, WithSpan<ValidationError>> {
         self.overrides_resolved = true;
-        self.validate_impl(module)
+        crate::benchmark::stage!(valid::validate_resolved_overrides {
+            self.validate_impl(module)
+        })
     }
 
     fn validate_impl(
