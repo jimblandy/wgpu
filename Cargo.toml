@@ -24,6 +24,7 @@ members = [
     "wgpu-types",
     "wgpu",
     "xtask",
+    "wgpu-remote",
 ]
 exclude = []
 default-members = [

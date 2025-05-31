@@ -1,0 +1,29 @@
+[package]
+name = "wgpu-remote"
+edition.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+version.workspace = true
+authors.workspace = true
+
+[features]
+default = ["serde"]
+
+[[bin]]
+name = "parse-webidl"
+path = "webidl/main.rs"
+
+[dependencies]
+hashbrown = { workspace = true }
+weedle = "0.13"
+
+[dependencies.serde]
+optional = true
+version = "1.0"
+features = ["derive"]
+
+[lints]
+workspace = true
