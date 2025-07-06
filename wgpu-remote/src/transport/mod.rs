@@ -11,18 +11,28 @@ communication in each direction between client and server. This documentation
 refers to an interacting client and server as "counterparts".
 
 `Sender` and `Receiver` are low-level traits. Using them entails working with
-raw pointers to shared memory segments, so applications will generally need to
-build higher-level abstractions around them them to provide well-typed
-interfaces, prevent data races, batch messages to reduce IPC overhead, and so
-on.
+raw pointers to shared memory segments, so users will generally need to build
+higher-level abstractions around them them to provide well-typed interfaces,
+prevent data races, batch messages to reduce IPC overhead, and so on.
+
+For example, to build a communications channel carrying typed messages that was
+generic over `Sender` implementations, you could use `Sender` to create and map
+a shared memory segment, and then serialize the messages into the shared memory.
+When it became full, or a response was needed, you would call
+[`Sender::send_message`] to alert your counterpart to the whole batch of
+messages. Your [`Receiver::receive_message`] implementation in the counterpart
+would then map the shared memory segment, deserialize the messages from the
+given range, and process them.
 
 ## Senders
 
 A [`Sender`] implementation is responsible for interacting with the operating
-system to create memory segments that are shared with the `Receiver`, and
-sending unbuffered messages to the `Receiver`. However, a `Sender` should be
-agnostic to the actual content of those memory segments and messages. The
-`Sender` trait is meant to be easy to implement in terms of a wide range of
+system to create memory segments that are shared with its `Receiver`, and
+sending unbuffered messages to the `Receiver`. A `Sender` should be agnostic to
+the actual content of those memory segments and messages; only the `Sender`'s
+user knows their interpretation.
+
+The `Sender` trait is meant to be easy to implement in terms of a wide range of
 operating system mechanisms:
 
 - A Unix implementation might use [`mmap`] to create memory segments, and then
@@ -38,15 +48,22 @@ operating system mechanisms:
 
 ## Receivers
 
-The [`Receiver`] trait is meant to be implemented by users of the transport,
-serving as the callback invoked when messages are received. Exactly how
-`Receiver`s get called is specific to the `Sender` implementation:
+An implementation of the [`Receiver`] trait serves as the callback invoked when
+messages are received. It is meant to be implemented by users of the transport.
+
+Exactly how `Receiver`s get called when messages arrive is specific to the
+`Sender` implementation:
 
 - A `Sender` implementation might spawn a thread to read messages from a socket
-  and invoke the `Receiver` when a complete message has been received.
+  and invoke the `Receiver` when complete messages have been received.
 
-- A `Sender` implementation might register a listener with some sort of platform
-  event loop, and have that listener call the `Receiver` when appropriate.
+- A `Sender` implementation might register an internal listener with
+  some sort of platform event loop, and have that listener call the
+`Receiver` when appropriate.
+
+Whatever the case, the `Sender` implementation should document this behavior.
+For example, users may need to know which thread the `Receiver` is invoked on to
+avoid deadlocks.
 
 The [`Sender`] and [`Receiver`] traits are meant to integrate smoothly with
 existing interprocess communication mechanisms and event loops, like Firefox's
