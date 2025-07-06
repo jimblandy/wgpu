@@ -92,13 +92,14 @@ fn sender(socket: fd::OwnedFd) -> ! {
     //
     // The unix(7) man page for Linux says:
     //
-    //     At least one byte of real data should be  sent  when  sending  ancillary
-    //     data.   On  Linux,  this is required to successfully send ancillary data
-    //     over a UNIX domain stream socket.  When sending ancillary  data  over  a
-    //     UNIX  domain  datagram  socket, it is not necessary on Linux to send any
-    //     accompanying real data.  However, portable applications should also  in‐
-    //     clude  at least one byte of real data when sending ancillary data over a
-    //     datagram socket.
+    // > At least one byte of real data should be sent when sending
+    // > ancillary data. On Linux, this is required to successfully send
+    // > ancillary data over a UNIX domain stream socket. When sending
+    // > ancillary data over a UNIX domain datagram socket, it is not
+    // > necessary on Linux to send any accompanying real data. However,
+    // > portable applications should also in‐ clude at least one byte
+    // > of real data when sending ancillary data over a datagram
+    // > socket.
     socket::sendmsg::<()>(
         socket.as_raw_fd(),
         &[std::io::IoSlice::new(b"X")], // one byte of "real" data
