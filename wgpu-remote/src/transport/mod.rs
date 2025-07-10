@@ -1,57 +1,42 @@
 /*! The [`Sender`]  and [`Receiver`] traits, for wgpu transports.
 
 This module defines the [`Sender`] and [`Receiver`] traits, representing the
-endpoints of a one-way communications channel between a wgpu client and server.
-A single `Sender` sends messages to a single `Receiver`. A `Sender` can also
-create memory segments shared with the `Receiver` to hold message content and
-other common data.
+endpoints of a one-way communications channel between a wgpu client and server,
+based on shared memory. A single `Sender` sends messages to a single `Receiver`.
+For two-way communication, each side needs its own `Sender` and `Receiver`. This
+documentation refers to the two sides of a connection as "counterparts".
 
-Remote wgpu access requires two `Sender`/`Receiver` pairs, providing
-communication in each direction between client and server. This documentation
-refers to an interacting client and server as "counterparts".
+The [`Sender`] trait abstracts over platform APIs to define a portable but
+low-level interface for communication based on shared memory. To keep [`Sender`]
+easy to implement, it is a low-level interface: byte-oriented, unbuffered, and
+with no enforcement of synchronized access to shared memory. However, it should
+be sufficient for applications to build well-typed, thread-safe abstractions
+that are generic over any `Sender` implementation.
 
-`Sender` and `Receiver` are low-level traits. Using them entails working with
-raw pointers to shared memory segments, so users will generally need to build
-higher-level abstractions around them them to provide well-typed interfaces,
-prevent data races, batch messages to reduce IPC overhead, and so on.
-
-For example, to build a communications channel carrying typed messages that was
-generic over `Sender` implementations, you could use `Sender` to create and map
-a shared memory segment, and then serialize the messages into the shared memory.
-When it became full, or a response was needed, you would call
-[`Sender::send_message`] to alert your counterpart to the whole batch of
-messages. Your [`Receiver::receive_message`] implementation in the counterpart
-would then map the shared memory segment, deserialize the messages from the
-given range, and process them.
-
-## Senders
-
-A [`Sender`] implementation is responsible for interacting with the operating
-system to create memory segments that are shared with its `Receiver`, and
-sending unbuffered messages to the `Receiver`. A `Sender` should be agnostic to
-the actual content of those memory segments and messages; only the `Sender`'s
-user knows their interpretation.
+As messages arrive from the counterpart, a `Sender` implementation passes them
+to a [`Receiver`] implementation provided by the user, which serves the role of
+"callback" or "event handler". Like [`Sender`], [`Receiver`] is a low-level,
+byte-oriented interface; interpretation of the contents as data meaningful to
+the application is left to the [`Receiver`] implementation.
 
 The `Sender` trait is meant to be easy to implement in terms of a wide range of
 operating system mechanisms:
 
-- A Unix implementation might use [`mmap`] to create memory segments, and then
-  send `SCM_RIGHTS` messages over [`AF_UNIX`] sockets to share them with their
-  counterpart.
+- A Unix implementation might use [`AF_UNIX`] address family sockets
+  (also known as "Unix domain sockets") to exchange messages. Shared
+  memory segments would be created with [`memfd_create`], conveyed to
+  the counterpart over the socket using `SCM_RIGHTS` ancillary
+  messages, and mapped into each side's address space with [`mmap`].
 
-- A Windows implementation might use [`CreateFileMappingW`] to create memory
-  segments, and then use [`DuplicateHandle`] to share them.
+- A Windows implementation might use ordinary sockets for
+  communication, [`CreateFileMappingW`] to create memory segments, and
+  then use [`DuplicateHandle`] to share them.
 
 - For testing, the [`transport::local`] module provides a [`Sender`]
   implementation in which both sides of the connection live in the
   same process. "Shared" memory is simply an ordinary block of memory.
 
-## Receivers
-
-An implementation of the [`Receiver`] trait serves as the callback invoked when
-messages are received. It is meant to be implemented by users of the transport.
-
-Exactly how `Receiver`s get called when messages arrive is specific to the
+Exactly how [`Receiver`]s get called when messages arrive is specific to the
 `Sender` implementation:
 
 - A `Sender` implementation might spawn a thread to read messages from a socket
@@ -61,13 +46,10 @@ Exactly how `Receiver`s get called when messages arrive is specific to the
   some sort of platform event loop, and have that listener call the
 `Receiver` when appropriate.
 
-Whatever the case, the `Sender` implementation should document this behavior.
-For example, users may need to know which thread the `Receiver` is invoked on to
-avoid deadlocks.
-
-The [`Sender`] and [`Receiver`] traits are meant to integrate smoothly with
-existing interprocess communication mechanisms and event loops, like Firefox's
-[`IPDL`] and [`nsISerialEventTarget`].
+While the [`Sender`] and [`Receiver`] traits can be implemented directly in
+terms of operating system facilities, they are also meant to integrate smoothly
+with existing interprocess communication mechanisms and event loops, like
+Firefox's [`IPDL`] and [`nsISerialEventTarget`].
 
 Although these traits are designed for use with `wgpu`, this module attempts to
 fully specify the contract between a transport and its user, independently of
@@ -77,43 +59,70 @@ on.
 
 ## Shared memory
 
-The [`Sender`] and [`Receiver`] traits are meant for use in situations where the
-endpoints can share memory with each other, such that writes to a shared memory
-segment on one side are immediately visible on the other.
+The [`Sender`] and [`Receiver`] traits are intended for use in situations where
+the endpoints can share memory with each other, such that writes to a shared
+memory segment on one side are immediately visible on the other.
 
 - [`Sender::allocate_shared_memory`] creates a shared memory segment, and
   returns an id by which both counterparts can refer to it.
 
 - [`Sender::send_message`] sends the counterpart a message whose content resides
-  in a shared memory segment.
+  in a given shared memory segment.
 
 - [`Sender::map_shared_memory`] takes a given shared memory segment and makes
   it visible in the caller's address space.
 
 - [`Sender::close_shared_memory`] frees a shared memory segment.
 
-However, it is possible to implement `Sender` without using shared memory (for
-example, over a network connection) if the transport's user is willing to make
-calls to [`Sender::flush_shared_memory_range`] to explicitly indicate which
-regions of its shared memory segments have new content that must be copied to
-the counterpart. If used correctly, this interface allows the transport to
-behave as expected whether or not shared memory is used; the shared memory
-becomes merely a transparent optimization, not an architectural feature.
+The application can create as many shared memory segments as it needs. Shared
+memory handles are transparent newtypes around integers, so they are easy to
+refer to in messages or data structures held in other shared memory segments.
+
+For example, a WebGPU implementation might create a shared memory segment to
+hold a queue of API calls made by web content that are waiting to be conveyed to
+a GPU sandbox process for execution; and it might create additional shared
+memory segments representing mappable buffer contents.
+
+## Using `Sender` without shared memory
+
+It is possible to implement `Sender` without using shared memory (for example,
+over a network connection), if the transport's user is willing to make calls to
+[`Sender::flush_shared_memory_range`] to explicitly indicate which regions of
+its shared memory segments have new content that must be copied to the
+counterpart. Although this interface is trickier to use, it allows the transport
+to behave as expected whether or not it can actually create memory segments
+shared with the counterpart, which in turn allows the application to work over a
+broader range of transports. Shared memory becomes merely a transparent
+optimization, not an architectural feature.
 
 The requirement to flush modified regions is not as onerous as one might expect.
-In practice, the steps needed to ensure that a shared-memory interaction is free
-of data races often also make it apparent where flushes are necessary. For
-example, to ensure consistent behavior between browsers, WebGPU's buffer API
-fully separates CPU access from GPU access; WebGPU's mapping and unmapping steps
-indicate where flushes on some underlying transport would need to occur.
+In practice, it is often the case that, by the time one has ensured that the
+application's interactions with shared memory segments are free of data races,
+it is also apparent where flushes would be necessary.
+
+For example, although WebGPU's buffer mapping behavior is intended to be
+implemented using memory regions that are shared between the web content process
+and a sandboxed process that interacts directly with the GPU, it is also
+possible to implement WebGPU without shared memory. To ensure consistent
+behavior across browsers and GPUs, WebGPU's buffer API segregates web content
+access from GPU access: web content can access a buffer only after mapping it,
+and the GPU can access a buffer only when it is unmapped. These ownership
+transitioning operations are where flushes would need to occur, in the case that
+the web content and GPU process do not actually share memory:
+
+- Before a buffer is mapped by web content, the GPU process must flush any
+  regions of the buffer it may have written to.
+
+- When web content unmaps a buffer, the content process must flush any regions
+  of the buffer web content modified (conservatively, the entire buffer).
 
 An implementation of [`Sender`] may guarantee that it uses shared memory. Users
-of such an implementation need not call [`flush_shared_memory_range`].
-Naturally, taking advantage of this looser contract limits which transport
+of such an implementation need not call [`flush_shared_memory_range`], but
+naturally, taking advantage of this looser contract limits which transport
 implementations they can use.
 
 [`Sender`] implementations may even decide whether or not to use shared memory
-dynamically. Users of such implementations should assume the worst, and call
+dynamically. Users of such implementations mustx assume the worst, and call
 [`flush_shared_memory_range`] as described in its documentation.
 
 In Rust, data races are undefined behavior. Users of these traits are
