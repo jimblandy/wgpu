@@ -280,6 +280,9 @@ pub trait Sender {
     ) -> std::io::Result<()>;
 }
 
+/// A dynamically dispatched `Sender`.
+pub type DynSender = dyn Sender + Send + 'static;
+
 /// The receiving side of a connection between wgpu client and server processes.
 ///
 /// The user must provide an implementation of this class when creating the
