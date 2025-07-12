@@ -38,25 +38,19 @@ impl LocalSender {
     /// Return two entangled [`LocalSender`] senders that can exchange
     /// messages with each other.
     ///
-    /// This function actually returns two [`LocalPair`] values, `(left, right)`, such that:
+    /// This function returns two [`TransportSide`] values, `(left, right)`, such that:
     ///
     /// - A message sent to `left.sender` will be received by the
-    ///   [`DynReceiver`] passed to `right.receiver_starter`.
+    ///   [`DynReceiver`] passed to `right.register_callback`.
     ///
     /// - A message sent to `right.sender` will be received by the
-    ///   [`DynReceiver`] passed to `left.receiver_starter`.
-    ///
-    /// Registering receivers in a separate step this way is
-    /// circuitous, but it avoids having each `Local` hold a strong
-    /// reference to its receiver. Since receivers typically want to
-    /// use a sender, such a reference would entail cyclic ownership,
-    /// which would be a pain.
+    ///   [`DynReceiver`] passed to `left.register_callback`.
     ///
     /// Dropping a `Sender` causes the `DynReceiver` that delivers its
     /// messages to be dropped as well.
     ///
     /// [`DynReceiver`]: crate::transport::DynReceiver
-    pub fn new_pair() -> (LocalPair, LocalPair) {
+    pub fn new_pair() -> (tp::TransportSide<Self>, tp::TransportSide<Self>) {
         let left_shmem_table = Default::default();
         let right_shmem_table = Default::default();
 
@@ -77,41 +71,17 @@ impl LocalSender {
             event_queue: right_to_left.0,
         };
 
-        let left = LocalPair {
+        let left = tp::TransportSide {
             sender: left_sender,
-            receiver_starter: ReceiverStarter(right_to_left.1),
+            register_callback: Box::new(move |receiver| start_receiver_thread(receiver, right_to_left.1, "LocalSender::left")),
         };
-        let right = LocalPair {
+        let right = tp::TransportSide {
             sender: right_sender,
-            receiver_starter: ReceiverStarter(left_to_right.1),
+            register_callback: Box::new(move |receiver| start_receiver_thread(receiver, left_to_right.1, "LocalSender::right")),
         };
 
         (left, right)
     }
-}
-
-/// A `Local` sender, together with a way to start its corresponding
-/// receiver.
-pub struct LocalPair {
-    /// The sending side of a one-way connection.
-    ///
-    /// This implements the [`Sender`] trait. However, you should pass
-    /// your [`DynReceiver`] to `receiver_starter` before sending any
-    /// messages on this sender. Sending messages may hang until there
-    /// is a receiver available to accept them.
-    ///
-    /// [`Sender`]: crate::transport::Sender
-    /// [`DynReceiver`]: crate::transport::DynReceiver
-    pub sender: LocalSender,
-
-    /// A value that can accept a [`DynReceiver`] to start delivering messages.
-    ///
-    /// Once you pass your [`DynReceiver`] to this value's [`start`]
-    /// method, messages sent on `sender` will begin to arrive.
-    ///
-    /// [`DynReceiver`]: crate::transport::DynReceiver
-    /// [`start`]: ReceiverStarter::start
-    pub receiver_starter: ReceiverStarter,
 }
 
 impl tp::Sender for LocalSender {
@@ -165,40 +135,28 @@ impl tp::Sender for LocalSender {
     }
 }
 
-pub struct ReceiverStarter(mpsc::Receiver<Message>);
-
-impl ReceiverStarter {
-    /// Spawn a thread to deliver messages.
-    ///
-    /// Given a `LocalPair { sender, receiver_starter }` returned by
-    /// [`LocalSender::new_pair`], passing `receiver` to this function
-    /// starts a thread that will pass messages sent to `sender` to
-    /// `receiver`.
-    pub fn start(self, mut receiver: Box<tp::DynReceiver>, name: Option<String>) {
-        let ReceiverStarter(incoming) = self;
-
-        let mut builder = std::thread::Builder::new();
-        if let Some(ref name) = name {
-            builder = builder.name(name.clone());
-        }
-        builder
-            .spawn(move || {
-                for Message {
-                    handle: shmem,
-                    range,
-                } in incoming
-                {
-                    if receiver.receive_message(shmem, range).is_err() {
-                        break;
-                    }
+/// Spawn a thread to deliver messages.
+///
+/// Start a thread that delivers messages that arrive on `incoming` to
+/// `receiver`. Use `name` as the thread's name.
+fn start_receiver_thread(mut receiver: Box<tp::DynReceiver>, incoming: mpsc::Receiver<Message>, name: &'static str) {
+    std::thread::Builder::new()
+        .name(name.to_string())
+        .spawn(move || {
+            for Message {
+                handle: shmem,
+                range,
+            } in incoming
+            {
+                if receiver.receive_message(shmem, range).is_err() {
+                    break;
                 }
-                eprintln!(
-                    "ReceiverStarter::start: thread `{}` exiting",
-                    name.as_deref().unwrap_or("anonymous")
-                );
-            })
-            .unwrap();
-    }
+            }
+            eprintln!(
+                "ReceiverStarter::start: thread `{name}` exiting",
+            );
+        })
+        .expect("failed to start `LocalSender` receiver thread for {name}");
 }
 
 struct Message {
@@ -291,11 +249,8 @@ mod tests {
         let (right_rx, right_mpsc_rx) = MockReceiver::new();
 
         let (left, right) = LocalSender::new_pair();
-        left.receiver_starter
-            .start(Box::new(left_rx), Some("left".into()));
-        right
-            .receiver_starter
-            .start(Box::new(right_rx), Some("right".into()));
+        (left.register_callback)(Box::new(left_rx));
+        (right.register_callback)(Box::new(right_rx));
         ((left.sender, right.sender), (left_mpsc_rx, right_mpsc_rx))
     }
 
@@ -429,9 +384,8 @@ mod tests {
         let (log_tx, log_rx) = mpsc::channel();
         let (mut alphonse, gaston) = LocalSender::new_pair();
 
-        gaston.receiver_starter.start(
+        (gaston.register_callback)(
             Box::new(GastonRx(Some(gaston.sender), log_tx.clone())),
-            Some("Gaston".into()),
         );
 
         {
@@ -452,9 +406,8 @@ mod tests {
                 .expect("Alphonse send failed");
         }
 
-        alphonse.receiver_starter.start(
+        (alphonse.register_callback)(
             Box::new(AlphonseRx(Some(alphonse.sender), log_tx.clone())),
-            Some("Alphonse".into()),
         );
         drop(log_tx);
 

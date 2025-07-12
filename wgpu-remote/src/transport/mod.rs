@@ -4,20 +4,26 @@ This module defines the [`Sender`] and [`Receiver`] traits, representing the
 endpoints of a one-way communications channel between a wgpu client and server,
 based on shared memory. A single `Sender` sends messages to a single `Receiver`.
 For two-way communication, each side needs its own `Sender` and `Receiver`. This
-documentation refers to the two sides of a connection as "counterparts".
+documentation refers to the two sides of a communications channel as
+"counterparts".
 
 The [`Sender`] trait abstracts over platform APIs to define a portable but
-low-level interface for communication based on shared memory. To keep [`Sender`]
-easy to implement, it is a low-level interface: byte-oriented, unbuffered, and
-with no enforcement of synchronized access to shared memory. However, it should
-be sufficient for applications to build well-typed, thread-safe abstractions
-that are generic over any `Sender` implementation.
+low-level interface for communication based on shared memory. All message
+content is stored in shared memory segments; the actual messages conveyed are
+merely references to ranges of segments.
 
-As messages arrive from the counterpart, a `Sender` implementation passes them
-to a [`Receiver`] implementation provided by the user, which serves the role of
-"callback" or "event handler". Like [`Sender`], [`Receiver`] is a low-level,
-byte-oriented interface; interpretation of the contents as data meaningful to
-the application is left to the [`Receiver`] implementation.
+The user of [`Sender`] must provide their own [`Receiver`] implementation, to
+serve as a callback or event handler invoked when messages arrive. While other
+channel designs have blocking "receive" methods (like the Rust standard
+library's [`mpsc::Receiver::recv`], for example), having the user provide a
+callback makes [`Sender`] implementations easier to integrate into event loop
+architectures, which generally don't like blocking calls.
+
+To keep `Sender` easy to implement, `Sender` and `Receiver` are low-level
+interfaces: byte-oriented, unbuffered, and with no enforcement of synchronized
+access to shared memory. However, they should be sufficient for applications to
+build well-typed, thread-safe abstractions that are generic over any `Sender`
+implementation.
 
 The `Sender` trait is meant to be easy to implement in terms of a wide range of
 operating system mechanisms:
@@ -28,13 +34,13 @@ operating system mechanisms:
   the counterpart over the socket using `SCM_RIGHTS` ancillary
   messages, and mapped into each side's address space with [`mmap`].
 
-- A Windows implementation might use ordinary sockets for
-  communication, [`CreateFileMappingW`] to create memory segments, and
-  then use [`DuplicateHandle`] to share them.
+- A Windows implementation might use ordinary sockets for communication, call
+  [`CreateFileMappingW`] to create memory segments, and then use
+  [`DuplicateHandle`] to share them.
 
 - For testing, the [`transport::local`] module provides a [`Sender`]
-  implementation in which both sides of the connection live in the
-  same process. "Shared" memory is simply an ordinary block of memory.
+  implementation in which both sides of the connection live in the same process.
+  "Shared" memory is simply an ordinary block of memory.
 
 Exactly how [`Receiver`]s get called when messages arrive is specific to the
 `Sender` implementation:
@@ -42,14 +48,13 @@ Exactly how [`Receiver`]s get called when messages arrive is specific to the
 - A `Sender` implementation might spawn a thread to read messages from a socket
   and invoke the `Receiver` when complete messages have been received.
 
-- A `Sender` implementation might register an internal listener with
-  some sort of platform event loop, and have that listener call the
-`Receiver` when appropriate.
+- Or, it might register an internal listener with some sort of platform event
+  loop, and have that listener call the `Receiver` when appropriate.
 
-While the [`Sender`] and [`Receiver`] traits can be implemented directly in
-terms of operating system facilities, they are also meant to integrate smoothly
-with existing interprocess communication mechanisms and event loops, like
-Firefox's [`IPDL`] and [`nsISerialEventTarget`].
+While the [`Sender`] trait can be implemented directly in terms of operating
+system facilities, it is also meant to integrate smoothly with existing
+interprocess communication mechanisms and event loops, like Firefox's [`IPDL`]
+and [`nsISerialEventTarget`].
 
 Although these traits are designed for use with `wgpu`, this module attempts to
 fully specify the contract between a transport and its user, independently of
@@ -60,40 +65,70 @@ on.
 ## Shared memory
 
 The [`Sender`] and [`Receiver`] traits are intended for use in situations where
-the endpoints can share memory with each other, such that writes to a shared
+the counterparts can share memory with each other, such that writes to a shared
 memory segment on one side are immediately visible on the other.
 
 - [`Sender::allocate_shared_memory`] creates a shared memory segment, and
-  returns an id by which both counterparts can refer to it.
-
-- [`Sender::send_message`] sends the counterpart a message whose content resides
-  in a given shared memory segment.
+  returns a handle by which both counterparts can refer to it. The application
+  can create as many shared memory segments as it needs.
 
 - [`Sender::map_shared_memory`] takes a given shared memory segment and makes
   it visible in the caller's address space.
 
+- [`Sender::send_message`] sends the counterpart a message that refers to some
+  range of some shared memory segment. All message content is held in shared
+  memory segments.
+
 - [`Sender::close_shared_memory`] frees a shared memory segment.
 
-The application can create as many shared memory segments as it needs. Shared
-memory handles are transparent newtypes around integers, so they are easy to
-refer to in messages or data structures held in other shared memory segments.
+Shared memory handles are transparent newtypes around integers, so they are easy
+to serialize into messages, or store in other data structures held in shared
+memory segments.
 
-For example, a WebGPU implementation might create a shared memory segment to
-hold a queue of API calls made by web content that are waiting to be conveyed to
-a GPU sandbox process for execution; and it might create additional shared
-memory segments representing mappable buffer contents.
+For example, a WebGPU implementation could operate as follows:
+
+- First, the system establishes transport channels between a web content process
+  using the WebGPU API and a GPU sandbox process. This must be two-way
+  communication, so each side has a `Sender`, and supplies a `Receiver`
+  callback.
+
+- The content process buffers its API calls in a shared memory segment, for
+  eventual execution by the GPU process.
+
+- When the call buffer is ready to be flushed, the content process sends a
+  message to the GPU process, pointing at the call buffer.
+
+- The GPU process deserializes the calls from the call buffer (first mapping its
+  shared memory segment if it hasn't done so already), and executes them on the
+  GPU.
+
+- To create a mappable `GPUBuffer`, the content process creates a shared memory
+  segment to hold its mapped contents, and includes that segment's handle in the
+  request sent to the GPU process, along with the other parameters. (Ideally,
+  one would create large shared memory segments and then treat individual
+  `GPUBuffers` as suballocations within those.)
+
+Although a single `Sender`/`Receiver` channel only provides one-way
+communication, in practice these channels are almost always used in pairs for
+two-way communication. Since all message content lives in shared memory, it
+would be impossible for the sender of a message to tell when the receiver has
+finished processing the message, and thus that its memory can be reused, without
+some sort of handshake back from the recipient. In the case of WebGPU, for
+example, the GPU process would need to send back an acknowledgement message to
+the content process to indicate that it was done reading from a call buffer, and
+thus its memory was safe for the content process to reuse.
 
 ## Using `Sender` without shared memory
 
-It is possible to implement `Sender` without using shared memory (for example,
-over a network connection), if the transport's user is willing to make calls to
-[`Sender::flush_shared_memory_range`] to explicitly indicate which regions of
-its shared memory segments have new content that must be copied to the
-counterpart. Although this interface is trickier to use, it allows the transport
-to behave as expected whether or not it can actually create memory segments
-shared with the counterpart, which in turn allows the application to work over a
-broader range of transports. Shared memory becomes merely a transparent
-optimization, not an architectural feature.
+It is possible to implement `Sender` without using shared memory (over a network
+connection, for example), as long as the transport's user is willing to make
+calls to [`Sender::flush_shared_memory_range`] to explicitly indicate which
+regions of its shared memory segments have new content that must be copied to
+the counterpart. Although this interface is trickier to use, it allows the
+transport to behave as expected whether or not it can actually create memory
+segments shared with the counterpart, which in turn allows the application to
+work over a broader range of transports. Shared memory becomes merely a
+transparent optimization, not an architectural feature.
 
 The requirement to flush modified regions is not as onerous as one might expect.
 In practice, it is often the case that, by the time one has ensured that the
@@ -282,6 +317,32 @@ pub trait Sender {
 
 /// A dynamically dispatched `Sender`.
 pub type DynSender = dyn Sender + Send + 'static;
+
+/// One side of a two-way communications channel.
+///
+/// This struct provides a [`Sender`] implementation to send messages to a
+/// counterpart, along with a function to register the user's [`Receiver`]
+/// callback for messages received from that counterpart.
+///
+/// Note: these are *not* the two ends of a one-way communication channel, like
+/// the `(rx, tx)` tuple that [`std::sync::mpsc::channel`] returns. Rather, in a
+/// two-way communication scenario, these are the sender and
+/// callback-registration function for one counterpart. The registered
+/// `Receiver` gets messages sent from the party that `sender` sends to.
+///
+/// Users that wish to be generic over any [`Sender`] implementation can accept
+/// a value of this type to represent their side of the channel.
+pub struct TransportSide<S> {
+    /// A sender.
+    pub sender: S,
+
+    /// A function that starts delivering messages to a given `Receiver`.
+    ///
+    /// This is a value that implements `FnOnce(Box<DynReceiver>)`. When passed
+    /// your receiver, it starts passing it messages from `sender`'s counterpart
+    /// as they arrive.
+    pub register_callback: Box<dyn FnOnce(Box<DynReceiver>) + Send + 'static>,
+}
 
 /// The receiving side of a connection between wgpu client and server processes.
 ///
