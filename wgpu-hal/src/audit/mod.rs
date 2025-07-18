@@ -154,11 +154,17 @@ pub type ComputePipeline = Audited<dyn DynComputePipeline>;
 pub type PipelineCache = Audited<dyn DynPipelineCache>;
 pub type AccelerationStructure = Audited<dyn DynAccelerationStructure>;
 
+// Ideally this would just be another `Audited` type, but we need the
+// `texture` field.
 pub struct SurfaceTexture {
     inner: Box<dyn DynSurfaceTexture>,
     id: AuditId,
     state: Arc<State>,
-    texture: Arc<Texture>,
+
+    /// We need to be able to `std::borrow::Borrow` the original
+    /// texture from a `SurfaceTexture`, and we can't just recreate a
+    /// fresh `audit::Texture` each time, so we cache it here.
+    texture: Texture,
 }
 
 crate::impl_dyn_resource!(

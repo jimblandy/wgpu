@@ -1,45 +1,46 @@
 /*! Implementation of [`validation_layer::Surface`]. */
 #![allow(unused_variables)]
 
+use crate::audit;
 use crate::DynTexture;
 use core::borrow::Borrow;
 
-impl crate::Surface for super::Surface {
-    type A = super::Api;
+impl crate::Surface for audit::Surface {
+    type A = audit::Api;
 
     unsafe fn configure(
         &self,
-        device: &super::Device,
+        device: &audit::Device,
         config: &crate::SurfaceConfiguration,
     ) -> Result<(), crate::SurfaceError> {
         todo!()
     }
 
-    unsafe fn unconfigure(&self, device: &super::Device) {
+    unsafe fn unconfigure(&self, device: &audit::Device) {
         todo!()
     }
 
     unsafe fn acquire_texture(
         &self,
         timeout: Option<core::time::Duration>,
-        fence: &super::Fence,
-    ) -> Result<Option<crate::AcquiredSurfaceTexture<Self::A>>, crate::SurfaceError> {
+        fence: &audit::Fence,
+    ) -> Result<Option<crate::AcquiredSurfaceTexture<audit::Api>>, crate::SurfaceError> {
         todo!()
     }
 
-    unsafe fn discard_texture(&self, texture: super::SurfaceTexture) {
+    unsafe fn discard_texture(&self, texture: audit::SurfaceTexture) {
         todo!()
     }
 }
 
-impl Borrow<super::Texture> for super::SurfaceTexture {
-    fn borrow(&self) -> &super::Texture {
+impl Borrow<audit::Texture> for audit::SurfaceTexture {
+    fn borrow(&self) -> &audit::Texture {
         &self.texture
     }
 }
 
-impl Borrow<dyn DynTexture> for super::SurfaceTexture {
+impl Borrow<dyn DynTexture> for audit::SurfaceTexture {
     fn borrow(&self) -> &dyn DynTexture {
-        &*self.texture.inner
+        &self.texture
     }
 }
