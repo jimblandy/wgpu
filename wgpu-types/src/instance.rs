@@ -238,6 +238,13 @@ bitflags::bitflags! {
         ///
         /// When `Self::from_env()` is used takes value from `WGPU_STRICT_WEBGPU_COMPLIANCE` environment variable.
         const STRICT_WEBGPU_COMPLIANCE = 1 << 7;
+
+        /// Enable `wgpu_hal` safety invariant auditing layer.
+        ///
+        /// When `Self::from_env()` is used, this flag is set if the
+        /// `WGPU_AUDIT_HAL_USAGE` environment variable is set to a value other
+        /// than `0`.
+        const AUDIT_HAL_USAGE = 1 << 8;
     }
 }
 
@@ -326,6 +333,9 @@ impl InstanceFlags {
         }
         if let Some(bit) = env("WGPU_STRICT_WEBGPU_COMPLIANCE") {
             self.set(Self::STRICT_WEBGPU_COMPLIANCE, bit);
+        }
+        if let Some(bit) = env("WGPU_AUDIT_HAL_USAGE") {
+            self.set(Self::AUDIT_HAL_USAGE, bit);
         }
 
         self

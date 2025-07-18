@@ -283,7 +283,7 @@ mod validation_canary;
 #[cfg(feature = "validation_canary")]
 pub use validation_canary::{ValidationCanary, VALIDATION_CANARY};
 
-mod audit;
+pub mod audit;
 
 pub(crate) use dynamic::impl_dyn_resource;
 pub use dynamic::{

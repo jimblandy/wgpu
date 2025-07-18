@@ -194,8 +194,16 @@ impl Instance {
         match unsafe { A::Instance::init(&hal_desc) } {
             Ok(instance) => {
                 log::debug!("Instance::new: created {:?} backend", A::VARIANT);
+
+                let mut instance: Box<dyn hal::DynInstance> = Box::new(instance);
+
+                // If requested, wrap the new instance in the hal auditing layer.
+                if instance_desc.flags.contains(wgt::InstanceFlags::AUDIT_HAL_USAGE) {
+                    instance = Box::new(hal::audit::Instance::new(instance, A::VARIANT));
+                }
+
                 self.instance_per_backend
-                    .push((A::VARIANT, Box::new(instance)));
+                    .push((A::VARIANT, instance));
             }
             Err(err) => {
                 log::debug!(
