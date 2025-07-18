@@ -199,7 +199,8 @@ impl Instance {
 
                 // If requested, wrap the new instance in the hal auditing layer.
                 if instance_desc.flags.contains(wgt::InstanceFlags::AUDIT_HAL_USAGE) {
-                    instance = Box::new(hal::audit::Instance::new(instance, A::VARIANT));
+                    let logger = hal::audit::report_by_log(log::Level::Error);
+                    instance = hal::audit::new_auditing_instance(instance, A::VARIANT, logger);
                 }
 
                 self.instance_per_backend

@@ -18,19 +18,22 @@ impl crate::CommandEncoder for super::CommandEncoder {
 
     unsafe fn reset_all<I>(&mut self, command_buffers: I)
     where
-        I: Iterator<Item = super::CommandBuffer> {
+        I: Iterator<Item = super::CommandBuffer>,
+    {
         todo!()
     }
 
     unsafe fn transition_buffers<'a, T>(&mut self, barriers: T)
     where
-        T: Iterator<Item = crate::BufferBarrier<'a, super::Buffer>> {
+        T: Iterator<Item = crate::BufferBarrier<'a, super::Buffer>>,
+    {
         todo!()
     }
 
     unsafe fn transition_textures<'a, T>(&mut self, barriers: T)
     where
-        T: Iterator<Item = crate::TextureBarrier<'a, super::Texture>> {
+        T: Iterator<Item = crate::TextureBarrier<'a, super::Texture>>,
+    {
         todo!()
     }
 
@@ -44,7 +47,8 @@ impl crate::CommandEncoder for super::CommandEncoder {
         dst: &super::Buffer,
         regions: T,
     ) where
-        T: Iterator<Item = crate::BufferCopy> {
+        T: Iterator<Item = crate::BufferCopy>,
+    {
         todo!()
     }
 
@@ -55,7 +59,8 @@ impl crate::CommandEncoder for super::CommandEncoder {
         dst: &super::Texture,
         regions: T,
     ) where
-        T: Iterator<Item = crate::TextureCopy> {
+        T: Iterator<Item = crate::TextureCopy>,
+    {
         todo!()
     }
 
@@ -65,7 +70,8 @@ impl crate::CommandEncoder for super::CommandEncoder {
         dst: &super::Texture,
         regions: T,
     ) where
-        T: Iterator<Item = crate::BufferTextureCopy> {
+        T: Iterator<Item = crate::BufferTextureCopy>,
+    {
         todo!()
     }
 
@@ -76,7 +82,8 @@ impl crate::CommandEncoder for super::CommandEncoder {
         dst: &super::Buffer,
         regions: T,
     ) where
-        T: Iterator<Item = crate::BufferTextureCopy> {
+        T: Iterator<Item = crate::BufferTextureCopy>,
+    {
         todo!()
     }
 
@@ -285,10 +292,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
         todo!()
     }
 
-    unsafe fn begin_compute_pass(
-        &mut self,
-        desc: &crate::ComputePassDescriptor<super::QuerySet>,
-    ) {
+    unsafe fn begin_compute_pass(&mut self, desc: &crate::ComputePassDescriptor<super::QuerySet>) {
         todo!()
     }
 
@@ -304,19 +308,12 @@ impl crate::CommandEncoder for super::CommandEncoder {
         todo!()
     }
 
-    unsafe fn dispatch_indirect(
-        &mut self,
-        buffer: &super::Buffer,
-        offset: wgt::BufferAddress,
-    ) {
+    unsafe fn dispatch_indirect(&mut self, buffer: &super::Buffer, offset: wgt::BufferAddress) {
         todo!()
     }
 
-    unsafe fn build_acceleration_structures<'a, T>(
-        &mut self,
-        descriptor_count: u32,
-        descriptors: T,
-    ) where
+    unsafe fn build_acceleration_structures<'a, T>(&mut self, descriptor_count: u32, descriptors: T)
+    where
         Self::A: 'a,
         T: IntoIterator<
             Item = crate::BuildAccelerationStructureDescriptor<
@@ -324,7 +321,8 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 super::Buffer,
                 super::AccelerationStructure,
             >,
-        > {
+        >,
+    {
         todo!()
     }
 
@@ -342,5 +340,4 @@ impl crate::CommandEncoder for super::CommandEncoder {
     ) {
         todo!()
     }
-
 }

@@ -36,13 +36,15 @@ impl crate::Device for super::Device {
 
     unsafe fn flush_mapped_ranges<I>(&self, buffer: &super::Buffer, ranges: I)
     where
-        I: Iterator<Item = crate::MemoryRange> {
+        I: Iterator<Item = crate::MemoryRange>,
+    {
         todo!()
     }
 
     unsafe fn invalidate_mapped_ranges<I>(&self, buffer: &super::Buffer, ranges: I)
     where
-        I: Iterator<Item = crate::MemoryRange> {
+        I: Iterator<Item = crate::MemoryRange>,
+    {
         todo!()
     }
 

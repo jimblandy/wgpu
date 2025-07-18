@@ -6,6 +6,36 @@ if it does not. This `Api` wraps some other `Api` implementation, passing
 requests through to it to be actually executed. Think Vulkan's validation layer,
 but for `wgpu-hal`.
 
+This auditing layer is a work in progress: most of `wgpu_hal`'s safety
+requirements are not yet checked. Contributions of new checks are
+welcome.
+
+To get started, call [`new_auditing_instance`]. This takes an ordinary
+[`DynInstance`], called the "inner instance", and returns a new
+instance, called the "auditing instance", that passes all calls
+through to the inner instance, after first checking that `wgpu_hal`'s
+safety requirements are upheld. Violations are reported to a callback
+which you provide.
+
+An auditing instance enumerates "auditing adapters", which open
+"auditing devices", which create "auditing buffers", and so on. Each
+auditing resource checks that `wgpu_hal`'s rules are being followed,
+reports any volations, and then passes the call through to its
+corresponding "inner resource".
+
+When a violation of `wgpu_hal`'s rules is reported, if your callback
+function returns, then the call is passed through to `inner` anyway,
+and the program proceeds as normal. If you want violations to stop
+program execution, you must provide a callback that panics.
+
+There are a few callbacks implemented for you:
+
+- [`report_by_panic`] returns a callback that reports the
+  violation and panics.
+
+- [`report_by_log`] returns a callback that logs violations using
+  the `log` crate.
+
 This module is named `audit` because we have a lot of other things
 named "validation".
 
@@ -18,41 +48,25 @@ mod adapter;
 mod command_encoder;
 mod device;
 mod instance;
+mod location;
 mod queue;
+mod report;
 mod state;
 mod surface;
-
-use core::fmt;
 
 use state::State;
 
 use crate::{
-    DynAccelerationStructure,
-    DynAdapter,
-    DynBindGroup,
-    DynBindGroupLayout,
-    DynBuffer,
-    DynCommandBuffer,
-    DynCommandEncoder,
-    DynComputePipeline,
-    DynDevice,
-    DynFence,
-    DynInstance,
-    DynPipelineCache,
-    DynPipelineLayout,
-    DynQuerySet,
-    DynQueue,
-    DynRenderPipeline,
-    DynSampler,
-    DynShaderModule,
-    DynSurface,
-    DynSurfaceTexture,
-    DynTexture,
-    DynTextureView,
+    DynAccelerationStructure, DynAdapter, DynBindGroup, DynBindGroupLayout, DynBuffer,
+    DynCommandBuffer, DynCommandEncoder, DynComputePipeline, DynDevice, DynFence, DynInstance,
+    DynPipelineCache, DynPipelineLayout, DynQuerySet, DynQueue, DynRenderPipeline, DynSampler,
+    DynShaderModule, DynSurface, DynSurfaceTexture, DynTexture, DynTextureView,
 };
 
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::sync::Arc;
+use core::fmt;
 
 #[derive(Clone, Debug)]
 pub struct Api;
@@ -82,13 +96,40 @@ impl crate::Api for Api {
     type AccelerationStructure = AccelerationStructure;
 }
 
+/// A callback function for handling reports of violations.
+pub type ReportCallback = dyn FnMut(String) + Send + Sync + 'static;
+
+/// Return a new [`DynInstance`] that audits usage of `inner`.
+///
+/// Report violations of `wgpu_hal`'s safety requirements to `callback`.
+///
+/// The `backend` value should indicate what kind of backend `inner`
+/// is. This is used for diagnostics.
+pub fn new_auditing_instance(
+    inner: Box<dyn DynInstance>,
+    backend: wgpu_types::Backend,
+    callback: Box<ReportCallback>,
+) -> Box<dyn DynInstance> {
+    Box::new(Instance::new(inner, backend, callback))
+}
+
+/// Build a [`ReportCallback`] that logs violations at `level`.
+pub fn report_by_log(level: log::Level) -> Box<ReportCallback> {
+    Box::new(move |message| log::log!(level, "{message}"))
+}
+
+/// Build a [`ReportCallback`] that prints the violation and panics.
+pub fn report_by_panic() -> Box<ReportCallback> {
+    Box::new(|message| panic!("wgpu_hal::audit violation:\n{message}"))
+}
+
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct AuditId(pub u64);
+struct AuditId(pub u64);
 
 pub struct Audited<T: ?Sized> {
     inner: Box<T>,
     id: AuditId,
-    state: Arc<State>
+    state: Arc<State>,
 }
 
 pub type Instance = Audited<dyn DynInstance>;

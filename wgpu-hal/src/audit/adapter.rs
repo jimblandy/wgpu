@@ -1,8 +1,8 @@
 /*! Implementation of [`validation_layer::Adapter`]. */
 #![allow(unused_variables)]
 
-use crate::audit::state;
 use crate::audit::device;
+use crate::audit::state;
 use alloc::sync::Arc;
 
 impl crate::Adapter for super::Adapter {
@@ -14,13 +14,13 @@ impl crate::Adapter for super::Adapter {
         limits: &wgt::Limits,
         memory_hints: &wgt::MemoryHints,
     ) -> Result<crate::OpenDevice<super::Api>, crate::DeviceError> {
-        let crate::DynOpenDevice { device, queue } = unsafe {
-            self.inner.open(features, limits, memory_hints)?
-        };
+        let crate::DynOpenDevice { device, queue } =
+            unsafe { self.inner.open(features, limits, memory_hints)? };
         let queue_id = self.state.new_id();
         let device_kind = state::ResourceKind::Device(device::Detail { queue: queue_id });
         let device_id = self.state.register_resource(device_kind, self.id);
-        self.state.register_resource_with_id(queue_id, state::ResourceKind::Queue, device_id);
+        self.state
+            .register_resource_with_id(queue_id, state::ResourceKind::Queue, device_id);
         Ok(crate::OpenDevice {
             device: super::Device {
                 inner: device,

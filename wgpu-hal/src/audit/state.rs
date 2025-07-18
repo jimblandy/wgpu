@@ -7,7 +7,9 @@ state about objects created under the [`audit::Instance`].
 
 */
 
+use crate::audit::location::Location;
 use crate::audit::AuditId;
+use alloc::boxed::Box;
 use core::sync::atomic;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -21,15 +23,22 @@ pub struct State {
     /// All resources allocated in this instance.
     resources: Mutex<HashMap<AuditId, Resource>>,
 
+    /// The callback to report violations to.
+    report_callback: Box<crate::audit::ReportCallback>,
+
     /// The id to allocate to the next resource allocated.
     next_id: atomic::AtomicU64,
 }
 
 impl State {
-    pub fn new(backend: wgpu_types::Backend) -> Self {
+    pub fn new(
+        backend: wgpu_types::Backend,
+        report_callback: Box<crate::audit::ReportCallback>,
+    ) -> Self {
         Self {
             backend,
             resources: Mutex::new(HashMap::new()),
+            report_callback,
             next_id: atomic::AtomicU64::new(0),
         }
     }
@@ -52,10 +61,7 @@ impl State {
     }
 
     pub fn register_resource_with_id(&self, id: AuditId, kind: ResourceKind, parent: AuditId) {
-        let resource = Resource {
-            parent,
-            kind,
-        };
+        let resource = Resource::new(parent, kind);
         if let Some(prior) = self.resources.lock().insert(id, resource) {
             panic!("attempt to insert resource under duplicate id {id}: prior resource {prior:?}");
         }
@@ -65,6 +71,8 @@ impl State {
 #[derive(Debug)]
 struct Resource {
     parent: AuditId,
+    allocated_at: Location,
+    destroyed_at: Option<Location>,
     kind: ResourceKind,
 }
 
@@ -92,6 +100,21 @@ pub enum ResourceKind {
     ComputePipeline,
     PipelineCache,
     AccelerationStructure,
+}
+
+impl Resource {
+    fn new(parent: AuditId, kind: ResourceKind) -> Self {
+        Self {
+            parent,
+            allocated_at: Location::force_capture(),
+            destroyed_at: None,
+            kind,
+        }
+    }
+
+    fn is_alive(&self) -> bool {
+        self.destroyed_at.is_none()
+    }
 }
 
 impl ResourceKind {

@@ -9,8 +9,12 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 impl audit::Instance {
-    pub fn new(inner: Box<dyn DynInstance>, backend: wgpu_types::Backend) -> Self {
-        let state = state::State::new(backend);
+    pub(crate) fn new(
+        inner: Box<dyn DynInstance>,
+        backend: wgpu_types::Backend,
+        report_callback: Box<audit::ReportCallback>,
+    ) -> Self {
+        let state = state::State::new(backend, report_callback);
         let id = state.new_id();
         // Instances are their own parents.
         state.register_resource_with_id(id, state::ResourceKind::Instance, id);
