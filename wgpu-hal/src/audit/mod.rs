@@ -39,6 +39,21 @@ There are a few callbacks implemented for you:
 This module is named `audit` because we have a lot of other things
 named "validation".
 
+## Implementation note
+
+The current implementation of hal auditing uses a single mutex to
+synchronize all the audit state for a given instance, which will
+probably cause contention in highly concurrent applications. 
+
+However, our urgent use case for the auditing layer is to fuzz
+wgpu-core, which will not exercise concurrent access, and a single
+lock is much simpler: there is no need to assign an ordering to
+per-resource locks, for example.
+
+In either case, this decision doesn't affect the external interface of
+the auditing layer, so if it becomes necessary, it should be possible
+to rearchitect the auditing layer without affecting users.
+
 [`wgpu_hal::Api`]: crate::Api
 
 */
@@ -54,7 +69,7 @@ mod report;
 mod state;
 mod surface;
 
-use state::State;
+use state::Shared;
 
 use crate::{
     DynAccelerationStructure, DynAdapter, DynBindGroup, DynBindGroupLayout, DynBuffer,
@@ -65,7 +80,6 @@ use crate::{
 
 use alloc::boxed::Box;
 use alloc::string::String;
-use alloc::sync::Arc;
 use core::fmt;
 
 #[derive(Clone, Debug)]
@@ -126,12 +140,6 @@ pub fn report_by_panic() -> Box<ReportCallback> {
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct AuditId(pub u64);
 
-pub struct Audited<T: ?Sized> {
-    inner: Box<T>,
-    id: AuditId,
-    state: Arc<State>,
-}
-
 pub type Instance = Audited<dyn DynInstance>;
 pub type Surface = Audited<dyn DynSurface>;
 pub type Adapter = Audited<dyn DynAdapter>;
@@ -154,12 +162,24 @@ pub type ComputePipeline = Audited<dyn DynComputePipeline>;
 pub type PipelineCache = Audited<dyn DynPipelineCache>;
 pub type AccelerationStructure = Audited<dyn DynAccelerationStructure>;
 
+pub struct Audited<T: ?Sized> {
+    inner: Box<T>,
+    id: AuditId,
+    shared: Shared,
+}
+
+impl<T: ?Sized> Audited<T> {
+    fn check_alive(&self) {
+        self.shared.lock().check_alive(self.id);
+    }
+}
+
 // Ideally this would just be another `Audited` type, but we need the
 // `texture` field.
 pub struct SurfaceTexture {
     inner: Box<dyn DynSurfaceTexture>,
     id: AuditId,
-    state: Arc<State>,
+    shared: Shared,
 
     /// We need to be able to `std::borrow::Borrow` the original
     /// texture from a `SurfaceTexture`, and we can't just recreate a
@@ -223,12 +243,12 @@ impl fmt::Debug for AuditId {
 
 impl<T: ?Sized> fmt::Debug for Audited<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}#{}", self.state.id_type_name(self.id), self.id)
+        write!(f, "{}#{}", self.shared.lock().id_type_name(self.id), self.id)
     }
 }
 
 impl fmt::Debug for SurfaceTexture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}#{}", self.state.id_type_name(self.id), self.id)
+        write!(f, "{}#{}", self.shared.lock().id_type_name(self.id), self.id)
     }
 }

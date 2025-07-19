@@ -5,7 +5,6 @@ use crate::audit::state;
 
 use crate::{DynInstance, DynSurface};
 use alloc::boxed::Box;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 impl audit::Instance {
@@ -14,14 +13,18 @@ impl audit::Instance {
         backend: wgpu_types::Backend,
         report_callback: Box<audit::ReportCallback>,
     ) -> Self {
-        let state = state::State::new(backend, report_callback);
-        let id = state.new_id();
-        // Instances are their own parents.
-        state.register_resource_with_id(id, state::ResourceKind::Instance, id);
+        let shared = state::Shared::new(backend, report_callback);
+        let id;
+        {
+            let mut guard = shared.lock();
+            id = guard.new_id();
+            // Instances are their own parents.
+            guard.register_resource_with_id(id, state::ResourceKind::Instance, id);
+        }
         Self {
             inner,
             id,
-            state: Arc::new(state),
+            shared,
         }
     }
 }
@@ -38,10 +41,10 @@ impl crate::Instance for audit::Instance {
         display_handle: raw_window_handle::RawDisplayHandle,
         window_handle: raw_window_handle::RawWindowHandle,
     ) -> Result<audit::Surface, crate::InstanceError> {
-        let state = Arc::clone(&self.state);
+        let shared = self.shared.clone();
         let inner = unsafe { self.inner.create_surface(display_handle, window_handle)? };
-        let id = state.register_resource(state::ResourceKind::Surface, self.id);
-        Ok(audit::Surface { inner, id, state })
+        let id = shared.lock().register_resource(state::ResourceKind::Surface, self.id);
+        Ok(audit::Surface { inner, id, shared })
     }
 
     unsafe fn enumerate_adapters(
@@ -63,12 +66,12 @@ impl crate::Instance for audit::Instance {
                     features,
                     capabilities,
                 } = exposed_adapter;
-                let state = Arc::clone(&self.state);
-                let id = state.register_resource(state::ResourceKind::Adapter, self.id);
+                let shared = self.shared.clone();
+                let id = shared.lock().register_resource(state::ResourceKind::Adapter, self.id);
                 let adapter = super::Adapter {
                     inner: adapter,
                     id,
-                    state,
+                    shared,
                 };
                 crate::ExposedAdapter {
                     adapter,

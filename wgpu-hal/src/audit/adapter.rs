@@ -3,7 +3,6 @@
 
 use crate::audit::device;
 use crate::audit::state;
-use alloc::sync::Arc;
 
 impl crate::Adapter for super::Adapter {
     type A = super::Api;
@@ -14,23 +13,25 @@ impl crate::Adapter for super::Adapter {
         limits: &wgt::Limits,
         memory_hints: &wgt::MemoryHints,
     ) -> Result<crate::OpenDevice<super::Api>, crate::DeviceError> {
+        self.check_alive();
         let crate::DynOpenDevice { device, queue } =
             unsafe { self.inner.open(features, limits, memory_hints)? };
-        let queue_id = self.state.new_id();
+        let mut guard = self.shared.0.lock();
+        let queue_id = guard.new_id();
         let device_kind = state::ResourceKind::Device(device::Detail { queue: queue_id });
-        let device_id = self.state.register_resource(device_kind, self.id);
-        self.state
+        let device_id = guard.register_resource(device_kind, self.id);
+        guard
             .register_resource_with_id(queue_id, state::ResourceKind::Queue, device_id);
         Ok(crate::OpenDevice {
             device: super::Device {
                 inner: device,
                 id: device_id,
-                state: Arc::clone(&self.state),
+                shared: self.shared.clone(),
             },
             queue: super::Queue {
                 inner: queue,
                 id: queue_id,
-                state: Arc::clone(&self.state),
+                shared: self.shared.clone(),
             },
         })
     }
@@ -39,6 +40,7 @@ impl crate::Adapter for super::Adapter {
         &self,
         format: wgt::TextureFormat,
     ) -> crate::TextureFormatCapabilities {
+        self.check_alive();
         todo!()
     }
 
