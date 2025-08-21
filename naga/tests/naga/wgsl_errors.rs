@@ -715,13 +715,13 @@ fn reserved_keyword() {
     // global var
     check(
         r#"
-            var bool: bool = true;
+            var case: bool = true;
         "#,
-        r###"error: name `bool` is a reserved keyword
+        r###"error: name `case` is a reserved keyword
   ┌─ wgsl:2:17
   │
-2 │             var bool: bool = true;
-  │                 ^^^^ definition of `bool`
+2 │             var case: bool = true;
+  │                 ^^^^ definition of `case`
 
 "###,
     );
@@ -747,14 +747,14 @@ fn reserved_keyword() {
     check(
         r#"
             fn foo() {
-                let atomic: f32 = 1.0;
+                let enable: f32 = 1.0;
             }
         "#,
-        r###"error: name `atomic` is a reserved keyword
+        r###"error: name `enable` is a reserved keyword
   ┌─ wgsl:3:21
   │
-3 │                 let atomic: f32 = 1.0;
-  │                     ^^^^^^ definition of `atomic`
+3 │                 let enable: f32 = 1.0;
+  │                     ^^^^^^ definition of `enable`
 
 "###,
     );
@@ -763,14 +763,14 @@ fn reserved_keyword() {
     check(
         r#"
             fn foo() {
-                var sampler: f32 = 1.0;
+                var default: f32 = 1.0;
             }
         "#,
-        r###"error: name `sampler` is a reserved keyword
+        r###"error: name `default` is a reserved keyword
   ┌─ wgsl:3:21
   │
-3 │                 var sampler: f32 = 1.0;
-  │                     ^^^^^^^ definition of `sampler`
+3 │                 var default: f32 = 1.0;
+  │                     ^^^^^^^ definition of `default`
 
 "###,
     );
@@ -792,13 +792,13 @@ fn reserved_keyword() {
     // struct
     check(
         r#"
-            struct array {}
+            struct override {}
         "#,
-        r###"error: name `array` is a reserved keyword
+        r###"error: name `override` is a reserved keyword
   ┌─ wgsl:2:20
   │
-2 │             struct array {}
-  │                    ^^^^^ definition of `array`
+2 │             struct override {}
+  │                    ^^^^^^^^ definition of `override`
 
 "###,
     );
@@ -806,13 +806,13 @@ fn reserved_keyword() {
     // struct member
     check(
         r#"
-            struct Foo { sampler: f32 }
+            struct Foo { switch: f32 }
         "#,
-        r###"error: name `sampler` is a reserved keyword
+        r###"error: name `switch` is a reserved keyword
   ┌─ wgsl:2:26
   │
-2 │             struct Foo { sampler: f32 }
-  │                          ^^^^^^^ definition of `sampler`
+2 │             struct Foo { switch: f32 }
+  │                          ^^^^^^ definition of `switch`
 
 "###,
     );
