@@ -1313,6 +1313,23 @@ impl Parser {
         Ok((handle, self.pop_rule_span(lexer)))
     }
 
+    fn optionally_typed_ident<'a>(
+        &mut self,
+        lexer: &mut Lexer<'a>,
+        ctx: &mut ExpressionContext<'a, '_, '_>,
+    ) -> Result<'a, (ast::Ident<'a>, Option<Handle<ast::Type<'a>>>)> {
+        let name = lexer.next_ident()?;
+
+        let ty = if lexer.skip(Token::Separator(':')) {
+            Some(self.type_decl(lexer, ctx)?)
+        } else {
+            None
+        };
+
+        Ok((name, ty))
+    }
+
+    /// 'var' _disambiguate_template template_list? optionally_typed_ident
     fn variable_decl<'a>(
         &mut self,
         lexer: &mut Lexer<'a>,
@@ -1337,13 +1354,7 @@ impl Parser {
             };
             lexer.expect(Token::Paren('>'))?;
         }
-        let name = lexer.next_ident()?;
-
-        let ty = if lexer.skip(Token::Separator(':')) {
-            Some(self.type_decl(lexer, ctx)?)
-        } else {
-            None
-        };
+        let (name, ty) = self.optionally_typed_ident(lexer, ctx)?;
 
         let init = if lexer.skip(Token::Operation('=')) {
             let handle = self.general_expression(lexer, ctx)?;
@@ -2228,14 +2239,8 @@ impl Parser {
                         }
                         "let" => {
                             let _ = lexer.next();
-                            let name = lexer.next_ident()?;
+                            let (name, given_ty) = this.optionally_typed_ident(lexer, ctx)?;
 
-                            let given_ty = if lexer.skip(Token::Separator(':')) {
-                                let ty = this.type_decl(lexer, ctx)?;
-                                Some(ty)
-                            } else {
-                                None
-                            };
                             lexer.expect(Token::Operation('='))?;
                             let expr_id = this.general_expression(lexer, ctx)?;
                             lexer.expect(Token::Separator(';'))?;
@@ -2250,14 +2255,8 @@ impl Parser {
                         }
                         "const" => {
                             let _ = lexer.next();
-                            let name = lexer.next_ident()?;
+                            let (name, given_ty) = this.optionally_typed_ident(lexer, ctx)?;
 
-                            let given_ty = if lexer.skip(Token::Separator(':')) {
-                                let ty = this.type_decl(lexer, ctx)?;
-                                Some(ty)
-                            } else {
-                                None
-                            };
                             lexer.expect(Token::Operation('='))?;
                             let expr_id = this.general_expression(lexer, ctx)?;
                             lexer.expect(Token::Separator(';'))?;
@@ -2272,14 +2271,7 @@ impl Parser {
                         }
                         "var" => {
                             let _ = lexer.next();
-
-                            let name = lexer.next_ident()?;
-                            let ty = if lexer.skip(Token::Separator(':')) {
-                                let ty = this.type_decl(lexer, ctx)?;
-                                Some(ty)
-                            } else {
-                                None
-                            };
+                            let (name, ty) = this.optionally_typed_ident(lexer, ctx)?;
 
                             let init = if lexer.skip(Token::Operation('=')) {
                                 let init = this.general_expression(lexer, ctx)?;
@@ -3083,14 +3075,7 @@ impl Parser {
             (Token::Word("const"), _) => {
                 ensure_no_diag_attrs("`const`s".into(), diagnostic_filters)?;
 
-                let name = lexer.next_ident()?;
-
-                let ty = if lexer.skip(Token::Separator(':')) {
-                    let ty = self.type_decl(lexer, &mut ctx)?;
-                    Some(ty)
-                } else {
-                    None
-                };
+                let (name, ty) = self.optionally_typed_ident(lexer, &mut ctx)?;
 
                 lexer.expect(Token::Operation('='))?;
                 let init = self.general_expression(lexer, &mut ctx)?;
@@ -3106,13 +3091,7 @@ impl Parser {
             (Token::Word("override"), _) => {
                 ensure_no_diag_attrs("`override`s".into(), diagnostic_filters)?;
 
-                let name = lexer.next_ident()?;
-
-                let ty = if lexer.skip(Token::Separator(':')) {
-                    Some(self.type_decl(lexer, &mut ctx)?)
-                } else {
-                    None
-                };
+                let (name, ty) = self.optionally_typed_ident(lexer, &mut ctx)?;
 
                 let init = if lexer.skip(Token::Operation('=')) {
                     Some(self.general_expression(lexer, &mut ctx)?)
