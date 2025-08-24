@@ -1,7 +1,7 @@
 /*! Implementation of [`validation_layer::Device`]. */
 #![allow(unused_variables)]
 
-use crate::audit::AuditId;
+use crate::audit::Id;
 use alloc::vec::Vec;
 
 impl crate::Device for super::Device {
@@ -282,5 +282,5 @@ impl crate::Device for super::Device {
 
 #[derive(Debug)]
 pub struct Detail {
-    pub queue: AuditId,
+    pub queue: Id,
 }

@@ -64,12 +64,13 @@ mod command_encoder;
 mod device;
 mod instance;
 mod location;
+mod op;
 mod queue;
 mod report;
 mod state;
 mod surface;
 
-use state::Shared;
+use state::State;
 
 use crate::{
     DynAccelerationStructure, DynAdapter, DynBindGroup, DynBindGroupLayout, DynBuffer,
@@ -79,7 +80,7 @@ use crate::{
 };
 
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::sync::Arc;
 use core::fmt;
 
 #[derive(Clone, Debug)]
@@ -110,35 +111,81 @@ impl crate::Api for Api {
     type AccelerationStructure = AccelerationStructure;
 }
 
-/// A callback function for handling reports of violations.
-pub type ReportCallback = dyn FnMut(String) + Send + Sync + 'static;
+/// A callback function to which all hal activity is reported.
+///
+/// The first callback will always be a call to [`result`], passing
+/// [`Finished::NewInstance`] to report the successful creation of the
+/// instance.
+///
+/// Since both `operation` and `result` take `&mut self`, an `Auditor`
+/// implementations may assume that only one thread is invoking its
+/// methods at a time. However, `wgpu_hal` objects can generally be
+/// used from any thread, so if an auditor needs to pair up results
+/// with their operations, it will need to track operations in
+/// progress separately for each thread.
+///
+/// [`result`]: Self::result
+/// [`Finished::NewInstance`]: op::Finished::NewInstance
+pub trait Auditor {
+    /// An operation has been performed.
+    ///
+    /// An operation has been performed on the instance or some
+    /// resource created from it, as described by `op`.
+    ///
+    /// If the `wgpu_hal` operation has an interesting result, this
+    /// callback will be followed by a call to [`result`] on the same
+    /// thread, reporting how things turned out.
+    ///
+    /// [`result`]: Self::result
+    fn operation(&mut self, op: op::Op);
+
+    /// The underlying instance has completed an operation.
+    ///
+    /// Successful results provide an [`op::Finished`] value that has
+    /// the details.
+    ///
+    /// If the operation failed, this returns `Err(err)`. See
+    /// [`op::Error`] for details.
+    fn result(&mut self, result: Result<op::Finished, op::Error>);
+}
 
 /// Return a new [`DynInstance`] that audits usage of `inner`.
 ///
-/// Report violations of `wgpu_hal`'s safety requirements to `callback`.
+/// Every operation on the returned instance or any resource created
+/// from it is passed to `auditor`.
 ///
 /// The `backend` value should indicate what kind of backend `inner`
 /// is. This is used for diagnostics.
 pub fn new_auditing_instance(
     inner: Box<dyn DynInstance>,
     backend: wgpu_types::Backend,
-    callback: Box<ReportCallback>,
+    auditor: Box<dyn Auditor>,
 ) -> Box<dyn DynInstance> {
-    Box::new(Instance::new(inner, backend, callback))
+    Box::new(Instance::new(inner, backend, auditor))
 }
 
-/// Build a [`ReportCallback`] that logs violations at `level`.
-pub fn report_by_log(level: log::Level) -> Box<ReportCallback> {
-    Box::new(move |message| log::log!(level, "{message}"))
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Id<T: ?Sized> {
+    pub num: u64,
+    _marker: std::marker::PhantomData<T>,
 }
 
-/// Build a [`ReportCallback`] that prints the violation and panics.
-pub fn report_by_panic() -> Box<ReportCallback> {
-    Box::new(|message| panic!("wgpu_hal::audit violation:\n{message}"))
+impl<T: ?Sized> Id<T> {
+    fn new(num: u64) -> Self {
+        Self {
+            num,
+            _marker: std::marker::PhantomData,
+        }
+    }
 }
 
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct AuditId(pub u64);
+impl<T: ?Sized> Copy for Id<T> {}
+impl<T: ?Sized> Clone for Id<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
 
 pub type Instance = Audited<dyn DynInstance>;
 pub type Surface = Audited<dyn DynSurface>;
@@ -164,22 +211,16 @@ pub type AccelerationStructure = Audited<dyn DynAccelerationStructure>;
 
 pub struct Audited<T: ?Sized> {
     inner: Box<T>,
-    id: AuditId,
-    shared: Shared,
-}
-
-impl<T: ?Sized> Audited<T> {
-    fn check_alive(&self) {
-        self.shared.lock().check_alive(self.id);
-    }
+    id: Id<Self>,
+    shared: Arc<State>,
 }
 
 // Ideally this would just be another `Audited` type, but we need the
 // `texture` field.
 pub struct SurfaceTexture {
     inner: Box<dyn DynSurfaceTexture>,
-    id: AuditId,
-    shared: Shared,
+    id: Id<Self>,
+    shared: Arc<State>,
 
     /// We need to be able to `std::borrow::Borrow` the original
     /// texture from a `SurfaceTexture`, and we can't just recreate a
@@ -229,26 +270,26 @@ impl DynSurfaceTexture for SurfaceTexture {}
 impl DynTexture for Texture {}
 impl DynTextureView for TextureView {}
 
-impl fmt::Display for AuditId {
+impl<T: ?Sized> fmt::Display for Id<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "#{}", self.0)
+        write!(f, "{}#{}", core::any::type_name::<T>(), self.num)
     }
 }
 
-impl fmt::Debug for AuditId {
+impl<T: ?Sized> fmt::Debug for Id<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "#{}", self.0)
+        write!(f, "{}#{}", core::any::type_name::<T>(), self.num)
     }
 }
 
 impl<T: ?Sized> fmt::Debug for Audited<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}#{}", self.shared.lock().id_type_name(self.id), self.id)
+        self.id.fmt(f)
     }
 }
 
 impl fmt::Debug for SurfaceTexture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}#{}", self.shared.lock().id_type_name(self.id), self.id)
+        self.id.fmt(f)
     }
 }

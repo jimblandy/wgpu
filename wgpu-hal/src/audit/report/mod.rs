@@ -1,6 +1,6 @@
 //! Reporting violations of wgpu_hal safety requirements.
 
-use crate::audit::AuditId;
+use crate::audit::Id;
 use crate::audit::location::Location;
 use crate::audit::state::State;
 
@@ -19,12 +19,12 @@ pub struct Operation<'s> {
     pub name: &'static str,
 
     /// The object the operation was being applied to.
-    pub this: AuditId,
+    pub this: Id,
 }
 
 pub enum ReportKind {
-    UseAfterFree(AuditId),
-    DoubleFree(AuditId),
+    UseAfterFree(Id),
+    DoubleFree(Id),
 }
 
 impl ReportKind {
