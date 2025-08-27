@@ -2180,15 +2180,13 @@ impl Parser {
         lexer: &mut Lexer<'a>,
         context: &mut ExpressionContext<'a, '_, '_>,
         block: &mut ast::Block<'a>,
+        token: TokenSpan<'a>,
     ) -> Result<'a, ()> {
-        let span_start = lexer.start_byte_offset();
-        match lexer.next() {
-            token @ (Token::Word(name), span) => match lexer.peek() {
-                (Token::Paren('('), _) => {
-                    self.func_call_statement(lexer, name, span, span_start, context, block)
-                }
-                _ => self.variable_updating_statement(lexer, context, block, token),
-            },
+        let span_start = token.1.to_range().unwrap().start;
+        match token {
+            (Token::Word(name), span) if matches!(lexer.peek(), (Token::Paren('('), _)) => {
+                self.func_call_statement(lexer, name, span, span_start, context, block)
+            }
             token => self.variable_updating_statement(lexer, context, block, token),
         }
     }
@@ -2202,11 +2200,13 @@ impl Parser {
     ) -> Result<'a, ()> {
         self.track_recursion(|this| {
             this.push_rule_span(Rule::Statement, lexer);
+
+            // We peek here instead of eagerly getting the next token since
+            // `Parser::block` expects its first token to be `{`.
+            //
+            // Most callers have a single path leading to the start of the block;
+            // `statement` is the only exception where there are multiple choices.
             match lexer.peek() {
-                (Token::Separator(';'), _) => {
-                    let _ = lexer.next();
-                    this.pop_rule_span(lexer);
-                }
                 (token, _) if is_start_of_compound_statement(token) => {
                     let (inner, span) = this.block(lexer, ctx, brace_nesting_level)?;
                     block.stmts.push(ast::Statement {
@@ -2214,11 +2214,18 @@ impl Parser {
                         span,
                     });
                     this.pop_rule_span(lexer);
+                    return Ok(());
                 }
-                (Token::Word(word), _) => {
+                _ => {}
+            }
+
+            match lexer.next() {
+                (Token::Separator(';'), _) => {
+                    this.pop_rule_span(lexer);
+                }
+                token @ (Token::Word(word), span) => {
                     let kind = match word {
                         "let" => {
-                            let _ = lexer.next();
                             let (name, given_ty) = this.optionally_typed_ident(lexer, ctx)?;
 
                             lexer.expect(Token::Operation('='))?;
@@ -2234,7 +2241,6 @@ impl Parser {
                             }))
                         }
                         "const" => {
-                            let _ = lexer.next();
                             let (name, given_ty) = this.optionally_typed_ident(lexer, ctx)?;
 
                             lexer.expect(Token::Operation('='))?;
@@ -2250,7 +2256,6 @@ impl Parser {
                             }))
                         }
                         "var" => {
-                            let _ = lexer.next();
                             let (name, ty) = this.optionally_typed_ident(lexer, ctx)?;
 
                             let init = if lexer.skip(Token::Operation('=')) {
@@ -2271,7 +2276,6 @@ impl Parser {
                             }))
                         }
                         "return" => {
-                            let _ = lexer.next();
                             let value = if lexer.peek().0 != Token::Separator(';') {
                                 let handle = this.expression(lexer, ctx)?;
                                 Some(handle)
@@ -2282,7 +2286,6 @@ impl Parser {
                             ast::StatementKind::Return { value }
                         }
                         "if" => {
-                            let _ = lexer.next();
                             let condition = this.expression(lexer, ctx)?;
 
                             let accept = this.block(lexer, ctx, brace_nesting_level)?.0;
@@ -2331,7 +2334,6 @@ impl Parser {
                             }
                         }
                         "switch" => {
-                            let _ = lexer.next();
                             let selector = this.expression(lexer, ctx)?;
                             let brace_span = lexer.expect_span(Token::Paren('{'))?;
                             let brace_nesting_level =
@@ -2396,7 +2398,6 @@ impl Parser {
                         }
                         "loop" => this.r#loop(lexer, ctx, brace_nesting_level)?,
                         "while" => {
-                            let _ = lexer.next();
                             let mut body = ast::Block::default();
 
                             let (condition, span) =
@@ -2429,7 +2430,6 @@ impl Parser {
                             }
                         }
                         "for" => {
-                            let _ = lexer.next();
                             lexer.expect(Token::Paren('('))?;
 
                             ctx.local_table.push_scope();
@@ -2483,10 +2483,12 @@ impl Parser {
 
                             let mut continuing = ast::Block::default();
                             if !lexer.skip(Token::Paren(')')) {
+                                let token = lexer.next();
                                 this.func_call_or_variable_updating_statement(
                                     lexer,
                                     ctx,
                                     &mut continuing,
+                                    token,
                                 )?;
                                 lexer.expect(Token::Paren(')'))?;
                             }
@@ -2506,7 +2508,6 @@ impl Parser {
                             }
                         }
                         "break" => {
-                            let (_, span) = lexer.next();
                             // Check if the next token is an `if`, this indicates
                             // that the user tried to type out a `break if` which
                             // is illegal in this position.
@@ -2519,18 +2520,15 @@ impl Parser {
                             ast::StatementKind::Break
                         }
                         "continue" => {
-                            let _ = lexer.next();
                             lexer.expect(Token::Separator(';'))?;
                             ast::StatementKind::Continue
                         }
                         "discard" => {
-                            let _ = lexer.next();
                             lexer.expect(Token::Separator(';'))?;
                             ast::StatementKind::Kill
                         }
                         // https://www.w3.org/TR/WGSL/#const-assert-statement
                         "const_assert" => {
-                            let _ = lexer.next();
                             // parentheses are optional
                             let paren = lexer.skip(Token::Paren('('));
 
@@ -2544,7 +2542,9 @@ impl Parser {
                         }
                         // assignment or a function call
                         _ => {
-                            this.func_call_or_variable_updating_statement(lexer, ctx, block)?;
+                            this.func_call_or_variable_updating_statement(
+                                lexer, ctx, block, token,
+                            )?;
                             lexer.expect(Token::Separator(';'))?;
                             this.pop_rule_span(lexer);
                             return Ok(());
@@ -2554,8 +2554,7 @@ impl Parser {
                     let span = this.pop_rule_span(lexer);
                     block.stmts.push(ast::Statement { kind, span });
                 }
-                _ => {
-                    let token = lexer.next();
+                token => {
                     this.variable_updating_statement(lexer, ctx, block, token)?;
                     lexer.expect(Token::Separator(';'))?;
                     this.pop_rule_span(lexer);
@@ -2571,7 +2570,6 @@ impl Parser {
         ctx: &mut ExpressionContext<'a, '_, '_>,
         brace_nesting_level: u8,
     ) -> Result<'a, ast::StatementKind<'a>> {
-        let _ = lexer.next();
         let mut body = ast::Block::default();
         let mut continuing = ast::Block::default();
         let mut break_if = None;
