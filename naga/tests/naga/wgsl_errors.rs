@@ -396,11 +396,11 @@ fn bad_for_initializer() {
                 for ({};;) {}
             }
         "#,
-        r#"error: for(;;) initializer is not an assignment or a function call: `{}`
+        r#"error: expected assignment destination, found "{"
   ┌─ wgsl:3:22
   │
 3 │                 for ({};;) {}
-  │                      ^^ not an assignment or function call
+  │                      ^ expected assignment destination
 
 "#,
     );
@@ -2569,11 +2569,11 @@ fn binary_statement() {
             3 + 5;
         }
     ",
-        r###"error: expected lhs_expression, found "3"
+        r###"error: expected assignment destination, found "3"
   ┌─ wgsl:3:13
   │
 3 │             3 + 5;
-  │             ^ expected lhs_expression
+  │             ^ expected assignment destination
 
 "###,
     );
@@ -2587,11 +2587,11 @@ fn assign_to_expr() {
             3 + 5 = 10;
         }
         ",
-        r###"error: expected lhs_expression, found "3"
+        r###"error: expected assignment destination, found "3"
   ┌─ wgsl:3:13
   │
 3 │             3 + 5 = 10;
-  │             ^ expected lhs_expression
+  │             ^ expected assignment destination
 
 "###,
     );
