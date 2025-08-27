@@ -2141,7 +2141,7 @@ impl Parser {
 
     /// Parse a function call statement.
     /// Expects `ident` to be consumed (not in the lexer).
-    fn function_statement<'a>(
+    fn func_call_statement<'a>(
         &mut self,
         lexer: &mut Lexer<'a>,
         ident: &'a str,
@@ -2185,7 +2185,7 @@ impl Parser {
         match lexer.next() {
             token @ (Token::Word(name), span) => match lexer.peek() {
                 (Token::Paren('('), _) => {
-                    self.function_statement(lexer, name, span, span_start, context, block)
+                    self.func_call_statement(lexer, name, span, span_start, context, block)
                 }
                 _ => self.variable_updating_statement(lexer, context, block, token),
             },
