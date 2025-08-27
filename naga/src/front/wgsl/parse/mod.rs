@@ -771,7 +771,7 @@ impl Parser {
 
     /// Expects [`Rule::PrimaryExpr`] or [`Rule::SingularExpr`] on top; does not pop it.
     /// Expects `name` to be consumed (not in lexer).
-    fn function_call<'a>(
+    fn call_expression<'a>(
         &mut self,
         lexer: &mut Lexer<'a>,
         name: &'a str,
@@ -927,10 +927,10 @@ impl Parser {
                     }
                 } else if let Token::Paren('(') = lexer.peek().0 {
                     self.pop_rule_span(lexer);
-                    return self.function_call(lexer, word, span, ctx);
+                    return self.call_expression(lexer, word, span, ctx);
                 } else if word == "bitcast" {
                     self.pop_rule_span(lexer);
-                    return self.function_call(lexer, word, span, ctx);
+                    return self.call_expression(lexer, word, span, ctx);
                 } else {
                     let ident = self.ident_expr(word, span, ctx);
                     ast::Expression::Ident(ident)
