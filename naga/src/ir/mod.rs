@@ -320,14 +320,21 @@ pub enum ConservativeDepth {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 #[cfg_attr(feature = "deserialize", derive(Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
-#[allow(missing_docs)] // The names are self evident
 pub enum ShaderStage {
+    /// Render pipeline vertex shader.
     Vertex,
-    Fragment,
-    Compute,
-    // Mesh shader stages
+
+    /// Render pipeline task shader.
     Task,
+
+    /// Render pipeline mesh shader.
     Mesh,
+
+    /// Render pipeline fragment shader.
+    Fragment,
+
+    /// Compute pipeline shader.
+    Compute,
 }
 
 impl ShaderStage {
@@ -964,6 +971,9 @@ pub enum Binding {
 
     /// Indexed location.
     ///
+    /// This is a value passed to a [`Fragment`] shader from a [`Vertex`] or
+    /// [`Mesh`] shader.
+    ///
     /// Values passed from the [`Vertex`] stage to the [`Fragment`] stage must
     /// have their `interpolation` defaulted (i.e. not `None`) by the front end
     /// as appropriate for that language.
@@ -977,6 +987,7 @@ pub enum Binding {
     /// interpolation must be `Flat`.
     ///
     /// [`Vertex`]: crate::ShaderStage::Vertex
+    /// [`Mesh`]: crate::ShaderStage::Mesh
     /// [`Fragment`]: crate::ShaderStage::Fragment
     Location {
         location: u32,
@@ -1751,10 +1762,12 @@ pub enum Expression {
         query: Handle<Expression>,
         committed: bool,
     },
+
     /// Result of a [`SubgroupBallot`] statement.
     ///
     /// [`SubgroupBallot`]: Statement::SubgroupBallot
     SubgroupBallotResult,
+
     /// Result of a [`SubgroupCollectiveOperation`] or [`SubgroupGather`] statement.
     ///
     /// [`SubgroupCollectiveOperation`]: Statement::SubgroupCollectiveOperation
@@ -2343,7 +2356,9 @@ pub struct EntryPoint {
     pub workgroup_size_overrides: Option<[Option<Handle<Expression>>; 3]>,
     /// The entrance function.
     pub function: Function,
-    /// The information relating to a mesh shader
+    /// Information for [`Mesh`] shaders.
+    ///
+    /// [`Mesh`]: ShaderStage::Mesh
     pub mesh_info: Option<MeshStageInfo>,
     /// The unique global variable used as a task payload from task shader to mesh shader
     pub task_payload: Option<Handle<GlobalVariable>>,

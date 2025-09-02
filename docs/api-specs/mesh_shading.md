@@ -12,6 +12,7 @@ to breaking changes, suggestions for the API exposed by this should be posted on
 ## Mesh shaders overview
 
 ### What are mesh shaders
+
 Mesh shaders are a new kind of rasterization pipeline intended to address some of the shortfalls with the vertex shader pipeline. The core idea of mesh shaders is that the GPU decides how to render the many small parts of a scene instead of the CPU issuing a draw call for every small part or issuing an inefficient monolithic draw call for a large part of the scene.
 
 Mesh shaders are specifically designed to be used with **meshlet rendering**, a technique where every object is split into many subobjects called meshlets that are each rendered with their own parameters. With the standard vertex pipeline, each draw call specifies an exact number of primitives to render and the same parameters for all vertex shaders on an entire object (or even multiple objects). This doesn't leave room for different LODs for different parts of an object, for example a closer part having more detail, nor does it allow culling smaller sections (or primitives) of objects. With mesh shaders, each task workgroup might get assigned to a single object. It can then analyze the different meshlets(sections) of that object, determine which are visible and should actually be rendered, and for those meshlets determine what LOD to use based on the distance from the camera. It can then dispatch a mesh workgroup for each meshlet, with each mesh workgroup then reading the data for that specific LOD of its meshlet, determining which and how many vertices and primitives to output, determining which remaining primitives need to be culled, and passing the resulting primitives to the rasterizer.
@@ -21,7 +22,14 @@ Mesh shaders are most effective in scenes with many polygons. They can allow ski
 Mesh shaders were first shown off in [NVIDIA's asteroids demo](https://www.youtube.com/watch?v=CRfZYJ_sk5E). Now, they form the basis for [Unreal Engine's Nanite](https://www.unrealengine.com/en-US/blog/unreal-engine-5-is-now-available-in-preview#Nanite).
 
 ### Mesh shader pipeline
-A mesh shader pipeline is just like a standard render pipeline, except that the vertex shader stage is replaced by a mesh shader stage (and optionally a task shader stage). This functions as follows:
+
+A mesh draw command like `RenderPass::draw_mesh_tasks` uses a `RenderPipeline` created using
+`Device::create_mesh_pipeline`, which runs the following stages:
+
+- First, an optional **task shader stage** decides how many mesh shader grids to dispatch
+
+
+just like a standard render pipeline, except that the vertex shader stage is replaced by a mesh shader stage (and optionally a task shader stage). This functions as follows:
 
 * If there is a task shader stage, task shader workgroups are invoked first, with the number of workgroups determined by the draw call. Each task shader workgroup outputs a workgroup size and a task payload. A dispatch group of mesh shaders with the given workgroup size is then invoked with the task payload as a parameter.
 * Otherwise, a single dispatch group of mesh shaders with workgroup size given by the draw call is invoked.
@@ -99,9 +107,17 @@ Using any of these features in a `wgsl` program will require adding the `enable 
 Two new shader stages will be added to `WGSL`. Fragment shaders are also modified slightly. Both task shaders and mesh shaders are allowed to use any compute-specific functionality, such as subgroup operations.
 
 ### Task shader
-This shader stage can be selected by marking a function with `@task`. Task shaders must return a `vec3<u32>` as their output type. Similar to compute shaders, task shaders run in a workgroup. The output must be uniform across all threads in a workgroup.
 
-The output of this determines how many workgroups of mesh shaders will be dispatched. Once dispatched, global id variables will be local to the task shader workgroup dispatch, and mesh shaders won't know the position of their dispatch among all mesh shader dispatches unless this is passed through the payload. The output may be zero to skip dispatching any mesh shader workgroups for the task shader workgroup.
+A function with the `@task` attribute is a **task shader stage entry point**. A mesh shader pipeline may optionally specify a task shader entry point; if it does, then mesh draw commands using that pipeline dispatch a **mesh shader grid** of invocations running the task shader entry point to compute the sizes of mesh shader grids to dispatch, and to provide a payload value for each dispatch.
+
+Dispatching a task shader runs a grid of workgroups, like a compute shader dispatch. The mesh draw command determines the number of workgroups along each axis of the grid.
+
+A task shader entry point must return a `vec3<u32>`. All invocations within a task shader workgroup must return the same value, but different workgroups may return different values. After each task shader workgroup finishes, the implementation dispatches a grid of mesh shaders, whose size in workgroups is determined by the task shader workgroup's return value. If the task shader returns `vec3(0, 0, 0)`, then no mesh shaders are dispatched.
+
+Each task shader workgroup produces an independent dispatch grid of mesh shaders: `@builtin` values like `workgroup_id`, `global_invocation_id` describe the position of the workgroup and invocation within that grid. Mesh shaders dispatched for other task shader workgroups are not included in the count.
+Similarly, `@builtin(num_workgroups)` matches the task shader workgroup's return value.
+
+will be local to the task shader workgroup dispatch, and mesh shaders won't know the position of their dispatch among all mesh shader dispatches unless this is passed through the payload. The output may be zero to skip dispatching any mesh shader workgroups for the task shader workgroup.
 
 Task shaders must be marked with `@payload(someVar)`, where `someVar` is global variable declared like `var<task_payload> someVar: <type>`. Task shaders may use `someVar` as if it is a read-write workgroup storage variable. This payload is passed to the mesh shader workgroup that is invoked.
 
