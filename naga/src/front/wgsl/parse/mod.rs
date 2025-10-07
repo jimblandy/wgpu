@@ -809,7 +809,7 @@ impl Parser {
             }
         };
 
-        let span = lexer.span_from(name_span.to_range().unwrap().start);
+        let span = lexer.span_with_start(name_span);
         let expr = ctx.expressions.append(expr, span);
         Ok(expr)
     }
@@ -848,8 +848,6 @@ impl Parser {
         ) -> ast::Expression<'b> {
             ast::Expression::Literal(ast::Literal::Number(Number::U32(intersection as u32)))
         }
-
-        let start = token.1.to_range().unwrap().start;
 
         let expr = match token {
             (Token::Paren('('), _) => {
@@ -917,7 +915,7 @@ impl Parser {
             }
             (Token::Word(word), span) => {
                 if let Some(ty) = self.constructor_type(lexer, word, span, ctx)? {
-                    let ty_span = lexer.span_from(start);
+                    let ty_span = lexer.span_with_start(span);
                     let components = self.arguments(lexer, ctx)?;
                     ast::Expression::Construct {
                         ty,
@@ -944,14 +942,14 @@ impl Parser {
         };
 
         self.pop_rule_span(lexer);
-        let span = lexer.span_from(start);
+        let span = lexer.span_with_start(token.1);
         let expr = ctx.expressions.append(expr, span);
         Ok(expr)
     }
 
     fn component_or_swizzle_specifier<'a>(
         &mut self,
-        span_start: usize,
+        span_start: Span,
         lexer: &mut Lexer<'a>,
         ctx: &mut ExpressionContext<'a, '_, '_>,
         expr: Handle<ast::Expression<'a>>,
@@ -976,7 +974,7 @@ impl Parser {
                 _ => break,
             };
 
-            let span = lexer.span_from(span_start);
+            let span = lexer.span_with_start(span_start);
             expr = ctx.expressions.append(expression, span);
         }
 
@@ -1054,7 +1052,7 @@ impl Parser {
                 UnaryOp::Deref => ast::Expression::Deref(expr),
                 UnaryOp::AddrOf => ast::Expression::AddrOf(expr),
             };
-            let span = lexer.span_from(span.to_range().unwrap().start);
+            let span = lexer.span_with_start(span);
             expr = ctx.expressions.append(e, span);
         }
 
@@ -1075,7 +1073,6 @@ impl Parser {
         self.track_recursion(|this| {
             this.push_rule_span(Rule::LhsExpr, lexer);
             let token = token.unwrap_or_else(|| lexer.next());
-            let start = token.1.to_range().unwrap().start;
             let expr = match token {
                 (Token::Operation('*'), _) => {
                     let expr = this.lhs_expression(lexer, ctx, None)?;
@@ -1089,15 +1086,15 @@ impl Parser {
                     let span = this.peek_rule_span(lexer);
                     ctx.expressions.append(expr, span)
                 }
-                (Token::Paren('('), _) => {
+                (Token::Paren('('), span) => {
                     let expr = this.lhs_expression(lexer, ctx, None)?;
                     lexer.expect(Token::Paren(')'))?;
-                    this.component_or_swizzle_specifier(start, lexer, ctx, expr)?
+                    this.component_or_swizzle_specifier(span, lexer, ctx, expr)?
                 }
                 (Token::Word(word), span) => {
                     let ident = this.ident_expr(word, span, ctx);
                     let ident = ctx.expressions.append(ast::Expression::Ident(ident), span);
-                    this.component_or_swizzle_specifier(start, lexer, ctx, ident)?
+                    this.component_or_swizzle_specifier(span, lexer, ctx, ident)?
                 }
                 (_, span) => {
                     return Err(Box::new(Error::Unexpected(
@@ -1119,10 +1116,10 @@ impl Parser {
         ctx: &mut ExpressionContext<'a, '_, '_>,
         token: TokenSpan<'a>,
     ) -> Result<'a, Handle<ast::Expression<'a>>> {
-        let start = token.1.to_range().unwrap().start;
         self.push_rule_span(Rule::SingularExpr, lexer);
         let primary_expr = self.primary_expression(lexer, ctx, token)?;
-        let singular_expr = self.component_or_swizzle_specifier(start, lexer, ctx, primary_expr)?;
+        let singular_expr =
+            self.component_or_swizzle_specifier(token.1, lexer, ctx, primary_expr)?;
         self.pop_rule_span(lexer);
 
         Ok(singular_expr)
@@ -2051,12 +2048,11 @@ impl Parser {
         block: &mut ast::Block<'a>,
         token: TokenSpan<'a>,
     ) -> Result<'a, ()> {
-        let span_start = token.1.to_range().unwrap().start;
-        match token.0 {
-            Token::Word("_") => {
+        match token {
+            (Token::Word("_"), span) => {
                 lexer.expect(Token::Operation('='))?;
                 let expr = self.expression(lexer, ctx)?;
-                let span = lexer.span_from(span_start);
+                let span = lexer.span_with_start(span);
                 block.stmts.push(ast::Statement {
                     kind: ast::StatementKind::Phony(expr),
                     span,
@@ -2092,14 +2088,14 @@ impl Parser {
                 let value = self.expression(lexer, ctx)?;
                 (Some(op), value)
             }
-            token @ (Token::IncrementOperation | Token::DecrementOperation, _) => {
-                let op = match token.0 {
+            op_token @ (Token::IncrementOperation | Token::DecrementOperation, _) => {
+                let op = match op_token.0 {
                     Token::IncrementOperation => ast::StatementKind::Increment,
                     Token::DecrementOperation => ast::StatementKind::Decrement,
                     _ => unreachable!(),
                 };
 
-                let span = lexer.span_from(span_start);
+                let span = lexer.span_with_start(token.1);
                 block.stmts.push(ast::Statement {
                     kind: op(target),
                     span,
@@ -2109,7 +2105,7 @@ impl Parser {
             (_, span) => return Err(Box::new(Error::Unexpected(span, ExpectedToken::Assignment))),
         };
 
-        let span = lexer.span_from(span_start);
+        let span = lexer.span_with_start(token.1);
         block.stmts.push(ast::Statement {
             kind: ast::StatementKind::Assign { target, op, value },
             span,
@@ -2124,7 +2120,6 @@ impl Parser {
         lexer: &mut Lexer<'a>,
         ident: &'a str,
         ident_span: Span,
-        span_start: usize,
         context: &mut ExpressionContext<'a, '_, '_>,
         block: &mut ast::Block<'a>,
     ) -> Result<'a, ()> {
@@ -2135,7 +2130,7 @@ impl Parser {
             usage: ident_span,
         });
         let arguments = self.arguments(lexer, context)?;
-        let span = lexer.span_from(span_start);
+        let span = lexer.span_with_start(ident_span);
 
         block.stmts.push(ast::Statement {
             kind: ast::StatementKind::Call {
@@ -2161,10 +2156,9 @@ impl Parser {
         block: &mut ast::Block<'a>,
         token: TokenSpan<'a>,
     ) -> Result<'a, ()> {
-        let span_start = token.1.to_range().unwrap().start;
         match token {
             (Token::Word(name), span) if matches!(lexer.peek(), (Token::Paren('('), _)) => {
-                self.func_call_statement(lexer, name, span, span_start, context, block)
+                self.func_call_statement(lexer, name, span, context, block)
             }
             token => self.variable_updating_statement(lexer, context, block, token),
         }
@@ -2182,8 +2176,6 @@ impl Parser {
         block: &mut ast::Block<'a>,
         token: TokenSpan<'a>,
     ) -> Result<'a, ()> {
-        let span_start = token.1.to_range().unwrap().start;
-
         let local_decl = match token {
             (Token::Word("let"), _) => {
                 let (name, given_ty) = self.optionally_typed_ident(lexer, ctx)?;
@@ -2236,7 +2228,7 @@ impl Parser {
             }
         };
 
-        let span = lexer.span_from(span_start);
+        let span = lexer.span_with_start(token.1);
         block.stmts.push(ast::Statement {
             kind: ast::StatementKind::LocalDecl(local_decl),
             span,
