@@ -121,12 +121,12 @@ fn invalid_float() {
 #[test]
 fn invalid_texture_sample_type() {
     check(
-        "const x: texture_2d<bool>;",
+        "var x: texture_2d<bool>;",
         r###"error: texture sample type must be one of f32, i32 or u32, but found bool
-  ┌─ wgsl:1:21
+  ┌─ wgsl:1:19
   │
-1 │ const x: texture_2d<bool>;
-  │                     ^^^^ must be one of f32, i32 or u32
+1 │ var x: texture_2d<bool>;
+  │                   ^^^^ must be one of f32, i32 or u32
 
 "###,
     );
@@ -513,11 +513,11 @@ fn unknown_type() {
         r#"
             const a: Vec = 10;
         "#,
-        r#"error: unknown type: `Vec`
+        r#"error: no definition in scope for identifier: `Vec`
   ┌─ wgsl:2:22
   │
 2 │             const a: Vec = 10;
-  │                      ^^^ unknown type
+  │                      ^^^ unknown identifier
 
 "#,
     );
@@ -527,13 +527,13 @@ fn unknown_type() {
 fn unknown_storage_format() {
     check(
         r#"
-            const storage1: texture_storage_1d<rgba>;
+            var storage1: texture_storage_1d<rgba>;
         "#,
         r#"error: unknown storage format: `rgba`
-  ┌─ wgsl:2:48
+  ┌─ wgsl:2:46
   │
-2 │             const storage1: texture_storage_1d<rgba>;
-  │                                                ^^^^ unknown storage format
+2 │             var storage1: texture_storage_1d<rgba>;
+  │                                              ^^^^ unknown storage format
 
 "#,
     );
@@ -4340,10 +4340,10 @@ fn ray_query_vertex_return_enable_extension() {
         }
         "#,
         r#"error: the `wgpu_ray_query_vertex_return` enable extension is not enabled
-  ┌─ wgsl:4:20
+  ┌─ wgsl:4:30
   │
 4 │             var a: ray_query<vertex_return>;
-  │                    ^^^^^^^^^ the `wgpu_ray_query_vertex_return` "Enable Extension" is needed for this functionality, but it is not currently enabled.
+  │                              ^^^^^^^^^^^^^ the `wgpu_ray_query_vertex_return` "Enable Extension" is needed for this functionality, but it is not currently enabled.
   │
   = note: You can enable this extension by adding `enable wgpu_ray_query_vertex_return;` at the top of the shader, before any other items.
 
@@ -4359,15 +4359,15 @@ fn ray_query_vertex_return_enable_extension() {
     check_extension_validation!(
         Capabilities::RAY_HIT_VERTEX_POSITION,
         r#"enable wgpu_ray_query;
-        
+
         @group(0) @binding(0)
         var acc_struct: acceleration_structure<vertex_return>;
         "#,
         r#"error: the `wgpu_ray_query_vertex_return` enable extension is not enabled
-  ┌─ wgsl:4:25
+  ┌─ wgsl:4:48
   │
 4 │         var acc_struct: acceleration_structure<vertex_return>;
-  │                         ^^^^^^^^^^^^^^^^^^^^^^ the `wgpu_ray_query_vertex_return` "Enable Extension" is needed for this functionality, but it is not currently enabled.
+  │                                                ^^^^^^^^^^^^^ the `wgpu_ray_query_vertex_return` "Enable Extension" is needed for this functionality, but it is not currently enabled.
   │
   = note: You can enable this extension by adding `enable wgpu_ray_query_vertex_return;` at the top of the shader, before any other items.
 
