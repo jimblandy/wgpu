@@ -625,11 +625,6 @@ impl<'a> Lexer<'a> {
         self.expect(Token::Paren('('))
     }
 
-    pub(in crate::front::wgsl) fn close_arguments(&mut self) -> Result<'a, ()> {
-        let _ = self.next_if(Token::Separator(','));
-        self.expect(Token::Paren(')'))
-    }
-
     pub(in crate::front::wgsl) fn next_argument(&mut self) -> Result<'a, bool> {
         let paren = Token::Paren(')');
         if self.next_if(Token::Separator(',')) {

@@ -248,11 +248,11 @@ fn type_not_constructible() {
                 _ = atomic<i32>(0);
             }
         "#,
-        r#"error: type `atomic` is not constructible
+        r#"error: type `atomic<i32>` is not constructible
   ┌─ wgsl:3:21
   │
 3 │                 _ = atomic<i32>(0);
-  │                     ^^^^^^ type is not constructible
+  │                     ^^^^^^^^^^^ type is not constructible
 
 "#,
     );
@@ -2837,7 +2837,7 @@ fn function_returns_void() {
   ┌─ wgsl:7:18
   │
 7 │             let a = x();
-  │                     ^
+  │                     ^^^
   │
   = note: perhaps you meant to call the function in a separate statement?
 
