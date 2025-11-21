@@ -1,6 +1,4 @@
-use crate::front::wgsl::parse::directive::enable_extension::{
-    EnableExtensions, ImplementedEnableExtension,
-};
+use crate::front::wgsl::parse::directive::enable_extension::EnableExtensions;
 use crate::front::wgsl::{Error, Result, Scalar};
 use crate::Span;
 
@@ -21,12 +19,12 @@ pub fn map_address_space<'a>(
         "push_constant" => Ok(crate::AddressSpace::PushConstant),
         "function" => Ok(crate::AddressSpace::Function),
         "task_payload" => {
-            if enable_extensions.contains(ImplementedEnableExtension::WgpuMeshShader) {
+            if enable_extensions.contains(EnableExtensions::WGPU_MESH_SHADER) {
                 Ok(crate::AddressSpace::TaskPayload)
             } else {
                 Err(Box::new(Error::EnableExtensionNotEnabled {
                     span,
-                    kind: ImplementedEnableExtension::WgpuMeshShader.into(),
+                    kind: EnableExtensions::WGPU_MESH_SHADER,
                 }))
             }
         }
@@ -79,10 +77,10 @@ pub fn map_built_in(
     };
     match built_in {
         crate::BuiltIn::ClipDistance => {
-            if !enable_extensions.contains(ImplementedEnableExtension::ClipDistances) {
+            if !enable_extensions.contains(EnableExtensions::CLIP_DISTANCES) {
                 return Err(Box::new(Error::EnableExtensionNotEnabled {
                     span,
-                    kind: ImplementedEnableExtension::ClipDistances.into(),
+                    kind: EnableExtensions::CLIP_DISTANCES,
                 }));
             }
         }
@@ -94,10 +92,10 @@ pub fn map_built_in(
         | crate::BuiltIn::Vertices
         | crate::BuiltIn::PrimitiveCount
         | crate::BuiltIn::Primitives => {
-            if !enable_extensions.contains(ImplementedEnableExtension::WgpuMeshShader) {
+            if !enable_extensions.contains(EnableExtensions::WGPU_MESH_SHADER) {
                 return Err(Box::new(Error::EnableExtensionNotEnabled {
                     span,
-                    kind: ImplementedEnableExtension::WgpuMeshShader.into(),
+                    kind: EnableExtensions::WGPU_MESH_SHADER,
                 }));
             }
         }
@@ -216,12 +214,10 @@ pub fn get_scalar_type(
         _ => None,
     };
 
-    if matches!(scalar, Some(Scalar::F16))
-        && !enable_extensions.contains(ImplementedEnableExtension::F16)
-    {
+    if matches!(scalar, Some(Scalar::F16)) && !enable_extensions.contains(EnableExtensions::F16) {
         return Err(Box::new(Error::EnableExtensionNotEnabled {
             span,
-            kind: ImplementedEnableExtension::F16.into(),
+            kind: EnableExtensions::F16.into(),
         }));
     }
 

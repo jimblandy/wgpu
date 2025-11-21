@@ -1,12 +1,11 @@
 use alloc::{boxed::Box, vec::Vec};
-use directive::enable_extension::ImplementedEnableExtension;
 
 use crate::diagnostic_filter::{
     self, DiagnosticFilter, DiagnosticFilterMap, DiagnosticFilterNode, FilterableTriggeringRule,
     ShouldConflictOnFullDuplicate, StandardFilterableTriggeringRule,
 };
 use crate::front::wgsl::error::{DiagnosticAttributeNotSupportedPosition, Error, ExpectedToken};
-use crate::front::wgsl::parse::directive::enable_extension::{EnableExtension, EnableExtensions};
+use crate::front::wgsl::parse::directive::enable_extension::EnableExtensions;
 use crate::front::wgsl::parse::directive::language_extension::LanguageExtension;
 use crate::front::wgsl::parse::directive::DirectiveKind;
 use crate::front::wgsl::parse::lexer::{Lexer, Token};
@@ -225,11 +224,11 @@ impl<'a> BindingParser<'a> {
             "blend_src" => {
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::DualSourceBlending)
+                    .contains(EnableExtensions::DUAL_SOURCE_BLENDING)
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
                         span: name_span,
-                        kind: ImplementedEnableExtension::DualSourceBlending.into(),
+                        kind: EnableExtensions::DUAL_SOURCE_BLENDING.into(),
                     }));
                 }
 
@@ -242,11 +241,11 @@ impl<'a> BindingParser<'a> {
             "per_primitive" => {
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::WgpuMeshShader)
+                    .contains(EnableExtensions::WGPU_MESH_SHADER)
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
                         span: name_span,
-                        kind: ImplementedEnableExtension::WgpuMeshShader.into(),
+                        kind: EnableExtensions::WGPU_MESH_SHADER.into(),
                     }));
                 }
                 self.per_primitive.set((), name_span)?;
@@ -871,13 +870,12 @@ impl Parser {
                 let _ = lexer.next();
                 let num = res.map_err(|err| Error::BadNumber(span, err))?;
 
-                if let Some(enable_extension) = num.requires_enable_extension() {
-                    if !lexer.enable_extensions.contains(enable_extension) {
-                        return Err(Box::new(Error::EnableExtensionNotEnabled {
-                            kind: enable_extension.into(),
-                            span,
-                        }));
-                    }
+                let required_enable_extensions = num.required_enable_extensions();
+                if !lexer.enable_extensions.contains(required_enable_extensions) {
+                    return Err(Box::new(Error::EnableExtensionNotEnabled {
+                        kind: required_enable_extensions,
+                        span,
+                    }));
                 }
 
                 ast::Expression::Literal(ast::Literal::Number(num))
@@ -1932,25 +1930,21 @@ impl Parser {
             "acceleration_structure" => {
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::WgpuRayQuery)
+                    .contains(EnableExtensions::WGPU_RAY_QUERY)
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
-                        kind: EnableExtension::Implemented(
-                            ImplementedEnableExtension::WgpuRayQuery,
-                        ),
+                        kind: EnableExtensions::WGPU_RAY_QUERY,
                         span,
                     }));
                 }
                 let vertex_return = lexer.next_acceleration_structure_flags()?;
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::WgpuRayQueryVertexReturn)
+                    .contains(EnableExtensions::WGPU_RAY_QUERY_VERTEX_RETURN)
                     && vertex_return
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
-                        kind: EnableExtension::Implemented(
-                            ImplementedEnableExtension::WgpuRayQueryVertexReturn,
-                        ),
+                        kind: EnableExtensions::WGPU_RAY_QUERY_VERTEX_RETURN,
                         span,
                     }));
                 }
@@ -1959,25 +1953,21 @@ impl Parser {
             "ray_query" => {
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::WgpuRayQuery)
+                    .contains(EnableExtensions::WGPU_RAY_QUERY)
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
-                        kind: EnableExtension::Implemented(
-                            ImplementedEnableExtension::WgpuRayQuery,
-                        ),
+                        kind: EnableExtensions::WGPU_RAY_QUERY,
                         span,
                     }));
                 }
                 let vertex_return = lexer.next_acceleration_structure_flags()?;
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::WgpuRayQueryVertexReturn)
+                    .contains(EnableExtensions::WGPU_RAY_QUERY_VERTEX_RETURN)
                     && vertex_return
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
-                        kind: EnableExtension::Implemented(
-                            ImplementedEnableExtension::WgpuRayQueryVertexReturn,
-                        ),
+                        kind: EnableExtensions::WGPU_RAY_QUERY_VERTEX_RETURN,
                         span,
                     }));
                 }
@@ -1986,12 +1976,10 @@ impl Parser {
             "RayDesc" => {
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::WgpuRayQuery)
+                    .contains(EnableExtensions::WGPU_RAY_QUERY)
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
-                        kind: EnableExtension::Implemented(
-                            ImplementedEnableExtension::WgpuRayQuery,
-                        ),
+                        kind: EnableExtensions::WGPU_RAY_QUERY,
                         span,
                     }));
                 }
@@ -2000,12 +1988,10 @@ impl Parser {
             "RayIntersection" => {
                 if !lexer
                     .enable_extensions
-                    .contains(ImplementedEnableExtension::WgpuRayQuery)
+                    .contains(EnableExtensions::WGPU_RAY_QUERY)
                 {
                     return Err(Box::new(Error::EnableExtensionNotEnabled {
-                        kind: EnableExtension::Implemented(
-                            ImplementedEnableExtension::WgpuRayQuery,
-                        ),
+                        kind: EnableExtensions::WGPU_RAY_QUERY,
                         span,
                     }));
                 }
@@ -2948,11 +2934,11 @@ impl Parser {
                 "task" => {
                     if !lexer
                         .enable_extensions
-                        .contains(ImplementedEnableExtension::WgpuMeshShader)
+                        .contains(EnableExtensions::WGPU_MESH_SHADER)
                     {
                         return Err(Box::new(Error::EnableExtensionNotEnabled {
                             span: name_span,
-                            kind: ImplementedEnableExtension::WgpuMeshShader.into(),
+                            kind: EnableExtensions::WGPU_MESH_SHADER,
                         }));
                     }
                     stage.set(ShaderStage::Task, name_span)?;
@@ -2961,11 +2947,11 @@ impl Parser {
                 "mesh" => {
                     if !lexer
                         .enable_extensions
-                        .contains(ImplementedEnableExtension::WgpuMeshShader)
+                        .contains(EnableExtensions::WGPU_MESH_SHADER)
                     {
                         return Err(Box::new(Error::EnableExtensionNotEnabled {
                             span: name_span,
-                            kind: ImplementedEnableExtension::WgpuMeshShader.into(),
+                            kind: EnableExtensions::WGPU_MESH_SHADER,
                         }));
                     }
                     stage.set(ShaderStage::Mesh, name_span)?;
@@ -2978,11 +2964,11 @@ impl Parser {
                 "payload" => {
                     if !lexer
                         .enable_extensions
-                        .contains(ImplementedEnableExtension::WgpuMeshShader)
+                        .contains(EnableExtensions::WGPU_MESH_SHADER)
                     {
                         return Err(Box::new(Error::EnableExtensionNotEnabled {
                             span: name_span,
-                            kind: ImplementedEnableExtension::WgpuMeshShader.into(),
+                            kind: EnableExtensions::WGPU_MESH_SHADER,
                         }));
                     }
                     lexer.expect(Token::Paren('('))?;
@@ -3246,17 +3232,15 @@ impl Parser {
                     }
                     DirectiveKind::Enable => {
                         self.directive_ident_list(&mut lexer, |ident, span| {
-                            let kind = EnableExtension::from_ident(ident, span)?;
-                            let extension = match kind {
-                                EnableExtension::Implemented(kind) => kind,
-                                EnableExtension::Unimplemented(kind) => {
-                                    return Err(Box::new(Error::EnableExtensionNotYetImplemented {
-                                        kind,
-                                        span,
-                                    }))
-                                }
-                            };
-                            enable_extensions.add(extension);
+                            let extension = EnableExtensions::from_ident(ident)
+                                .ok_or_else(|| Error::UnknownEnableExtension(span, ident))?;
+                            if !EnableExtensions::IMPLEMENTED.contains(extension) {
+                                return Err(Box::new(Error::EnableExtensionNotYetImplemented {
+                                    kind: extension,
+                                    span,
+                                }));
+                            }
+                            enable_extensions.insert(extension);
                             Ok(())
                         })?;
                     }

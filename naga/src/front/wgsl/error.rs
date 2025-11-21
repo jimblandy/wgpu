@@ -6,7 +6,7 @@ use crate::error::replace_control_chars;
 use crate::proc::{Alignment, ConstantEvaluatorError, ResolveError};
 use crate::{Scalar, SourceLocation, Span};
 
-use super::parse::directive::enable_extension::{EnableExtension, UnimplementedEnableExtension};
+use super::parse::directive::enable_extension::EnableExtensions;
 use super::parse::directive::language_extension::{
     LanguageExtension, UnimplementedLanguageExtension,
 };
@@ -373,11 +373,11 @@ pub(crate) enum Error<'a> {
         directive_span: Span,
     },
     EnableExtensionNotYetImplemented {
-        kind: UnimplementedEnableExtension,
+        kind: EnableExtensions,
         span: Span,
     },
     EnableExtensionNotEnabled {
-        kind: EnableExtension,
+        kind: EnableExtensions,
         span: Span,
     },
     LanguageExtensionNotYetImplemented {
@@ -1180,7 +1180,7 @@ impl<'a> Error<'a> {
             Error::EnableExtensionNotYetImplemented { kind, span } => ParseError {
                 message: format!(
                     "the `{}` enable-extension is not yet supported",
-                    EnableExtension::Unimplemented(kind).to_ident()
+                    kind.to_ident(),
                 ),
                 labels: vec![(
                     span,
@@ -1196,7 +1196,7 @@ impl<'a> Error<'a> {
                         "<https://github.com/gfx-rs/wgpu/issues/{}>, ",
                         "so they can prioritize it!"
                     ),
-                    kind.tracking_issue_num()
+                    kind.tracking_issue_num().unwrap(),
                 )],
             },
             Error::EnableExtensionNotEnabled { kind, span } => ParseError {
@@ -1212,7 +1212,14 @@ impl<'a> Error<'a> {
                     )
                     .into(),
                 )],
-                notes: if let EnableExtension::Unimplemented(kind) = kind {
+                notes: if EnableExtensions::IMPLEMENTED.contains(kind) {
+                    vec![
+                        format!(
+                            "You can enable this extension by adding `enable {};` at the top of the shader, before any other items.",
+                            kind.to_ident()
+                        ),
+                    ]
+                } else {
                     vec![format!(
                         concat!(
                             "This \"Enable Extension\" is not yet implemented. ",
@@ -1220,15 +1227,8 @@ impl<'a> Error<'a> {
                             "<https://github.com/gfx-rs/wgpu/issues/{}>, ",
                             "so they can prioritize it!"
                         ),
-                        kind.tracking_issue_num()
+                        kind.tracking_issue_num().unwrap(),
                     )]
-                } else {
-                    vec![
-                        format!(
-                            "You can enable this extension by adding `enable {};` at the top of the shader, before any other items.",
-                            kind.to_ident()
-                        ),
-                    ]
                 },
             },
             Error::LanguageExtensionNotYetImplemented { kind, span } => ParseError {

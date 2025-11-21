@@ -196,21 +196,21 @@ bitflags::bitflags! {
 }
 
 impl Capabilities {
-    /// Returns the extension corresponding to this capability, if there is one.
+    /// Returns the WGSL enable extension corresponding to this capability, if there is one.
     ///
     /// This is used by integration tests.
     #[cfg(feature = "wgsl-in")]
     #[doc(hidden)]
-    pub const fn extension(&self) -> Option<crate::front::wgsl::ImplementedEnableExtension> {
-        use crate::front::wgsl::ImplementedEnableExtension as Ext;
+    pub const fn extension(&self) -> crate::front::wgsl::EnableExtensions {
+        use crate::front::wgsl::EnableExtensions as Ext;
         match *self {
-            Self::DUAL_SOURCE_BLENDING => Some(Ext::DualSourceBlending),
+            Self::DUAL_SOURCE_BLENDING => Ext::DUAL_SOURCE_BLENDING,
             // NOTE: `SHADER_FLOAT16_IN_FLOAT32` _does not_ require the `f16` extension
-            Self::SHADER_FLOAT16 => Some(Ext::F16),
-            Self::CLIP_DISTANCE => Some(Ext::ClipDistances),
-            Self::RAY_QUERY => Some(Ext::WgpuRayQuery),
-            Self::RAY_HIT_VERTEX_POSITION => Some(Ext::WgpuRayQueryVertexReturn),
-            _ => None,
+            Self::SHADER_FLOAT16 => Ext::F16,
+            Self::CLIP_DISTANCE => Ext::CLIP_DISTANCES,
+            Self::RAY_QUERY => Ext::WGPU_RAY_QUERY,
+            Self::RAY_HIT_VERTEX_POSITION => Ext::WGPU_RAY_QUERY_VERTEX_RETURN,
+            _ => Ext::empty(),
         }
     }
 }

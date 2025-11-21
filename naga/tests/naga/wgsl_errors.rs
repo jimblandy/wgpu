@@ -1032,38 +1032,30 @@ macro_rules! check_extension_validation {
     ( $caps:expr, $source:expr, $parse_err:expr, $val_err_pat:pat ) => {
         let caps = $caps;
         let source = $source;
-        let mut ext = None;
-        for cap in caps.iter() {
-            match cap.extension() {
-                Some(this_ext) if ext.is_none() => ext = Some(this_ext),
-                Some(this_ext) if ext.is_some_and(|ext| ext != this_ext) => {
-                    panic!(
-                        concat!(
-                            "the capabilities {:?} in `check_extension_validation` ",
-                            "are not all covered by the same extension ",
-                            "(found both {:?} and {:?})",
-                        ),
-                        caps, ext, this_ext,
-                    );
-                }
-                _ => {}
+        let extensions = naga::front::wgsl::EnableExtensions::from_iter(caps.iter().map(|cap| cap.extension()));
+        match extensions.bits().count_ones() {
+            0 => {
+                panic!(
+                    concat!(
+                        "None of the capabilities {:?} in `check_extension_validation` ",
+                        "are associated with an extension. ",
+                        "Use `check_validation!` to check validator behavior ",
+                        "when there isn't a corresponding parse error.",
+                    ),
+                    caps
+                );
             }
-        }
-        let Some(ext) = ext else {
-            panic!(
+            1 => {},
+            _more => panic!(
                 concat!(
-                    "None of the capabilities {:?} in `check_extension_validation` ",
-                    "are associated with an extension. ",
-                    "Use `check_validation!` to check validator behavior ",
-                    "when there isn't a corresponding parse error.",
+                    "the capabilities {:?} in `check_extension_validation` ",
+                    "are not all covered by the same extension ",
+                    "(found {:?})",
                 ),
-                caps
-            );
-        };
-        let directive = format!(
-            "enable {};",
-            naga::front::wgsl::EnableExtension::Implemented(ext).to_ident()
-        );
+                caps, extensions
+            ),
+        }
+        let directive = format!("enable {};", extensions.to_ident());
         assert!(
             !source.contains(&directive),
             "test case for `check_extension_validation!` should not contain the enable directive",
@@ -4100,41 +4092,31 @@ fn invalid_clip_distances() {
 
 #[test]
 fn recognized_but_unimplemented_enable_extension() {
-    for extension in [
-        naga::front::wgsl::UnimplementedEnableExtension::Subgroups,
-        naga::front::wgsl::UnimplementedEnableExtension::PrimitiveIndex,
-    ] {
-        // NOTE: We match exhaustively here to help maintainers add or remove variants to the above
-        // array.
-        let snapshot = match extension {
-            naga::front::wgsl::UnimplementedEnableExtension::Subgroups => "\
-error: the `subgroups` enable-extension is not yet supported
+    use naga::front::wgsl::EnableExtensions;
+    for extension in EnableExtensions::all().iter() {
+        match extension.tracking_issue_num() {
+            None => {
+                assert!(EnableExtensions::IMPLEMENTED.contains(extension));
+            }
+            Some(issue) => {
+                let wgsl = extension.to_ident();
+                let carets: String = wgsl.chars().map(|_| '^').collect();
+                let snapshot = format!("\
+error: the `{wgsl}` enable-extension is not yet supported
   ┌─ wgsl:1:8
   │
-1 │ enable subgroups;
-  │        ^^^^^^^^^ this enable-extension specifies standard functionality which is not yet implemented in Naga
+1 │ enable {wgsl};
+  │        {carets} this enable-extension specifies standard functionality which is not yet implemented in Naga
   │
-  = note: Let Naga maintainers know that you ran into this at <https://github.com/gfx-rs/wgpu/issues/5555>, so they can prioritize it!
+  = note: Let Naga maintainers know that you ran into this at <https://github.com/gfx-rs/wgpu/issues/{issue}>, so they can prioritize it!
 
-",
-            naga::front::wgsl::UnimplementedEnableExtension::PrimitiveIndex => "\
-error: the `primitive_index` enable-extension is not yet supported
-  ┌─ wgsl:1:8
-  │
-1 │ enable primitive_index;
-  │        ^^^^^^^^^^^^^^^ this enable-extension specifies standard functionality which is not yet implemented in Naga
-  │
-  = note: Let Naga maintainers know that you ran into this at <https://github.com/gfx-rs/wgpu/issues/8236>, so they can prioritize it!
+");
 
-",
-        };
+                let shader = format!("enable {wgsl};");
 
-        let shader = {
-            let extension = naga::front::wgsl::EnableExtension::Unimplemented(extension);
-            format!("enable {};", extension.to_ident())
-        };
-
-        check(&shader, snapshot);
+                check(&shader, &snapshot);
+            }
+        }
     }
 }
 
