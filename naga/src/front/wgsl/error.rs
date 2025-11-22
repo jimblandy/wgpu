@@ -7,9 +7,7 @@ use crate::proc::{Alignment, ConstantEvaluatorError, ResolveError};
 use crate::{Scalar, SourceLocation, Span};
 
 use super::parse::directive::enable_extension::EnableExtensions;
-use super::parse::directive::language_extension::{
-    LanguageExtension, UnimplementedLanguageExtension,
-};
+use super::parse::directive::language_extension::LanguageExtensions;
 use super::parse::lexer::Token;
 
 use codespan_reporting::diagnostic::{Diagnostic, Label};
@@ -381,7 +379,7 @@ pub(crate) enum Error<'a> {
         span: Span,
     },
     LanguageExtensionNotYetImplemented {
-        kind: UnimplementedLanguageExtension,
+        kind: LanguageExtensions,
         span: Span,
     },
     DiagnosticInvalidSeverity {
@@ -1234,7 +1232,7 @@ impl<'a> Error<'a> {
             Error::LanguageExtensionNotYetImplemented { kind, span } => ParseError {
                 message: format!(
                     "the `{}` language extension is not yet supported",
-                    LanguageExtension::Unimplemented(kind).to_ident()
+                    kind.to_ident()
                 ),
                 labels: vec![(span, "".into())],
                 notes: vec![format!(
@@ -1243,7 +1241,7 @@ impl<'a> Error<'a> {
                         "<https://github.com/gfx-rs/wgpu/issues/{}>, ",
                         "so they can prioritize it!"
                     ),
-                    kind.tracking_issue_num()
+                    kind.tracking_issue_num().unwrap(),
                 )],
             },
             Error::DiagnosticInvalidSeverity {

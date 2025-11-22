@@ -12,11 +12,9 @@ mod parse;
 mod tests;
 
 pub use parse::directive::enable_extension::EnableExtensions;
+pub use parse::directive::language_extension::LanguageExtensions;
 
 pub use crate::front::wgsl::error::ParseError;
-pub use crate::front::wgsl::parse::directive::language_extension::{
-    ImplementedLanguageExtension, LanguageExtension, UnimplementedLanguageExtension,
-};
 pub use crate::front::wgsl::parse::Options;
 
 use alloc::boxed::Box;

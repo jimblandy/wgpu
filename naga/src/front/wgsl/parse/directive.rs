@@ -2,6 +2,59 @@
 //!
 //! See also <https://www.w3.org/TR/WGSL/#directives>.
 
+/// Define a bitflags type representing a set of extensions, with their source names.
+///
+/// This is used to define bitflags types for language and enable
+/// extensions.
+///
+/// An invocation of this macro defines a `bitflags` type that
+/// implements `Copy` and `Eq`, with methods `from_ident` and
+/// `to_ident` that convert to and from the WGSL source name for the
+/// extension.
+macro_rules! define_extensions {
+    {
+        $( #[ $( $meta:meta )* ] )*
+        pub struct $typename:ident: $type:ty
+        {
+            $(
+                $( #[ $inner:ident $( $args:tt )* ] )*
+                const $name:ident, $wgsl:literal = $value:expr ;
+            )*
+        }
+    } => {
+        bitflags::bitflags! {
+            $( #[ $( $meta )* ] )*
+            #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+            pub struct $typename: $type {
+                $(
+                    $( #[ $inner $( $args )* ] )*
+                    const $name = $value ;
+                )*
+            }
+        }
+
+        impl $typename {
+            pub fn from_ident(wgsl: &str) -> Option<Self> {
+                match wgsl {
+                    $(
+                        $wgsl => Some($typename :: $name),
+                    )*
+                    _ => None,
+                }
+            }
+
+            pub fn to_ident(self) -> &'static str {
+                match self {
+                    $(
+                        $typename :: $name => $wgsl,
+                    )*
+                    _ => unreachable!("should have exactly one extension bit set"),
+                }
+            }
+        }
+    }
+}
+
 pub mod enable_extension;
 pub(crate) mod language_extension;
 

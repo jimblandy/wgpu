@@ -2,51 +2,7 @@
 //!
 //! The focal point of this module is the [`EnableExtensions`] bitflags type.
 
-macro_rules! define_enable_extensions {
-    {
-        $( #[ $( $meta:meta )* ] )*
-        pub struct $typename:ident: $type:ty
-        {
-            $(
-                $( #[ $inner:ident $( $args:tt )* ] )*
-                const $name:ident, $wgsl:literal = $value:expr ;
-            )*
-        }
-    } => {
-        bitflags::bitflags! {
-            $( #[ $( $meta )* ] )*
-            #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-            pub struct $typename: $type {
-                $(
-                    $( #[ $inner $( $args )* ] )*
-                    const $name = $value ;
-                )*
-            }
-        }
-
-        impl $typename {
-            pub fn from_ident(wgsl: &str) -> Option<Self> {
-                match wgsl {
-                    $(
-                        $wgsl => Some($typename :: $name),
-                    )*
-                    _ => None,
-                }
-            }
-
-            pub fn to_ident(self) -> &'static str {
-                match self {
-                    $(
-                        $typename :: $name => $wgsl,
-                    )*
-                    _ => unreachable!("should have exactly one extension bit set"),
-                }
-            }
-        }
-    }
-}
-
-define_enable_extensions! {
+define_extensions! {
     /// All enable extensions known to Naga.
     ///
     /// This includes extensions that Naga does not implement; the [`IMPLEMENTED`]

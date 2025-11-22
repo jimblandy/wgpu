@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, vec::Vec};
+use directive::language_extension::LanguageExtensions;
 
 use crate::diagnostic_filter::{
     self, DiagnosticFilter, DiagnosticFilterMap, DiagnosticFilterNode, FilterableTriggeringRule,
@@ -6,7 +7,6 @@ use crate::diagnostic_filter::{
 };
 use crate::front::wgsl::error::{DiagnosticAttributeNotSupportedPosition, Error, ExpectedToken};
 use crate::front::wgsl::parse::directive::enable_extension::EnableExtensions;
-use crate::front::wgsl::parse::directive::language_extension::LanguageExtension;
 use crate::front::wgsl::parse::directive::DirectiveKind;
 use crate::front::wgsl::parse::lexer::{Lexer, Token};
 use crate::front::wgsl::parse::number::Number;
@@ -3246,22 +3246,19 @@ impl Parser {
                     }
                     DirectiveKind::Requires => {
                         self.directive_ident_list(&mut lexer, |ident, span| {
-                            match LanguageExtension::from_ident(ident) {
-                                Some(LanguageExtension::Implemented(_kind)) => {
-                                    // NOTE: No further validation is needed for an extension, so
-                                    // just throw parsed information away. If we ever want to apply
-                                    // what we've parsed to diagnostics, maybe we'll want to refer
-                                    // to enabled extensions later?
-                                    Ok(())
-                                }
-                                Some(LanguageExtension::Unimplemented(kind)) => {
-                                    Err(Box::new(Error::LanguageExtensionNotYetImplemented {
-                                        kind,
-                                        span,
-                                    }))
-                                }
-                                None => Err(Box::new(Error::UnknownLanguageExtension(span, ident))),
+                            let extension = LanguageExtensions::from_ident(ident)
+                                .ok_or_else(|| Error::UnknownLanguageExtension(span, ident))?;
+                            if !LanguageExtensions::IMPLEMENTED.contains(extension) {
+                                return Err(Box::new(Error::LanguageExtensionNotYetImplemented {
+                                    kind: extension,
+                                    span,
+                                }));
                             }
+                            // NOTE: No further validation is needed for an extension, so
+                            // just throw parsed information away. If we ever want to apply
+                            // what we've parsed to diagnostics, maybe we'll want to refer
+                            // to enabled extensions later?
+                            Ok(())
                         })?;
                     }
                 }
