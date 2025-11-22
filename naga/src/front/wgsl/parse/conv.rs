@@ -1,4 +1,4 @@
-use crate::front::wgsl::parse::directive::enable_extension::EnableExtensions;
+use crate::front::wgsl::parse::directive::EnableExtensions;
 use crate::front::wgsl::{Error, Result, Scalar};
 use crate::Span;
 

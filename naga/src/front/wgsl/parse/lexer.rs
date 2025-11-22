@@ -1,6 +1,6 @@
 use super::{number::consume_number, Error, ExpectedToken, Result};
 use crate::front::wgsl::error::NumberError;
-use crate::front::wgsl::parse::directive::enable_extension::EnableExtensions;
+use crate::front::wgsl::parse::directive::EnableExtensions;
 use crate::front::wgsl::parse::{conv, Number};
 use crate::front::wgsl::Scalar;
 use crate::Span;

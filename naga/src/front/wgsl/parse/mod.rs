@@ -1,12 +1,11 @@
 use alloc::{boxed::Box, vec::Vec};
-use directive::language_extension::LanguageExtensions;
+use directive::{EnableExtensions, LanguageExtensions};
 
 use crate::diagnostic_filter::{
     self, DiagnosticFilter, DiagnosticFilterMap, DiagnosticFilterNode, FilterableTriggeringRule,
     ShouldConflictOnFullDuplicate, StandardFilterableTriggeringRule,
 };
 use crate::front::wgsl::error::{DiagnosticAttributeNotSupportedPosition, Error, ExpectedToken};
-use crate::front::wgsl::parse::directive::enable_extension::EnableExtensions;
 use crate::front::wgsl::parse::directive::DirectiveKind;
 use crate::front::wgsl::parse::lexer::{Lexer, Token};
 use crate::front::wgsl::parse::number::Number;

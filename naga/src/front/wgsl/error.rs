@@ -6,8 +6,7 @@ use crate::error::replace_control_chars;
 use crate::proc::{Alignment, ConstantEvaluatorError, ResolveError};
 use crate::{Scalar, SourceLocation, Span};
 
-use super::parse::directive::enable_extension::EnableExtensions;
-use super::parse::directive::language_extension::LanguageExtensions;
+use super::parse::directive::{EnableExtensions, LanguageExtensions};
 use super::parse::lexer::Token;
 
 use codespan_reporting::diagnostic::{Diagnostic, Label};
