@@ -396,11 +396,11 @@ fn bad_for_initializer() {
                 for ({};;) {}
             }
         "#,
-        r#"error: expected assignment destination, found "{"
+        r#"error: expected for loop initializer statement (`var`/`let`/`const` declaration, assignment, `i++`/`i--` statement, function call), found "{"
   ┌─ wgsl:3:22
   │
 3 │                 for ({};;) {}
-  │                      ^ expected assignment destination
+  │                      ^ expected for loop initializer statement (`var`/`let`/`const` declaration, assignment, `i++`/`i--` statement, function call)
 
 "#,
     );
@@ -2569,11 +2569,11 @@ fn binary_statement() {
             3 + 5;
         }
     ",
-        r###"error: expected assignment destination, found "3"
+        r###"error: expected statement, found "3"
   ┌─ wgsl:3:13
   │
 3 │             3 + 5;
-  │             ^ expected assignment destination
+  │             ^ expected statement
 
 "###,
     );
@@ -2587,11 +2587,11 @@ fn assign_to_expr() {
             3 + 5 = 10;
         }
         ",
-        r###"error: expected assignment destination, found "3"
+        r###"error: expected statement, found "3"
   ┌─ wgsl:3:13
   │
 3 │             3 + 5 = 10;
-  │             ^ expected assignment destination
+  │             ^ expected statement
 
 "###,
     );
