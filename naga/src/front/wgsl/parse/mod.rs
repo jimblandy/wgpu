@@ -1028,7 +1028,8 @@ impl Parser {
 
     /// Parses assignment, increment and decrement statements
     ///
-    /// This does not consume the final `;` token.
+    /// This does not consume or require a final `;` token. In the update
+    /// expression of a C-style `for` loop header, there is no terminating `;`.
     fn variable_updating_statement<'a>(
         &mut self,
         lexer: &mut Lexer<'a>,
@@ -1104,8 +1105,10 @@ impl Parser {
 
     /// Parse a function call statement.
     ///
-    /// This assumes that `token` has been consumed from the lexer. It
-    /// does not consume the statement's final `;` token.
+    /// This assumes that `token` has been consumed from the lexer.
+    ///
+    /// This does not consume or require a final `;` token. In the update
+    /// expression of a C-style `for` loop header, there is no terminating `;`.
     fn maybe_func_call_statement<'a>(
         &mut self,
         lexer: &mut Lexer<'a>,
@@ -1147,7 +1150,8 @@ impl Parser {
 
     /// Parses func_call_statement and variable_updating_statement
     ///
-    /// This does not consume the final `;` token.
+    /// This does not consume or require a final `;` token. In the update
+    /// expression of a C-style `for` loop header, there is no terminating `;`.
     fn func_call_or_variable_updating_statement<'a>(
         &mut self,
         lexer: &mut Lexer<'a>,
@@ -1168,7 +1172,7 @@ impl Parser {
     /// but it's also used for parsing these forms when they appear within a block,
     /// hence the longer name.
     ///
-    /// This does not consume the final `;` token.
+    /// This does not consume the following `;` token.
     fn variable_or_value_or_func_call_or_variable_updating_statement<'a>(
         &mut self,
         lexer: &mut Lexer<'a>,
