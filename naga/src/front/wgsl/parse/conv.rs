@@ -402,62 +402,66 @@ pub fn map_predeclared_type(
     span: Span,
     word: &str,
 ) -> Result<'static, Option<PredeclaredType>> {
+    use Scalar as Sc;
+    use TypeInner as Ti;
+    use VectorSize as Vs;
+
     #[rustfmt::skip]
     let ty = match word {
         // predeclared types
 
         // scalars
-        "bool" => TypeInner::Scalar(Scalar::BOOL).into(),
-        "i32" => TypeInner::Scalar(Scalar::I32).into(),
-        "u32" => TypeInner::Scalar(Scalar::U32).into(),
-        "f32" => TypeInner::Scalar(Scalar::F32).into(),
-        "f16" => TypeInner::Scalar(Scalar::F16).into(),
-        "i64" => TypeInner::Scalar(Scalar::I64).into(),
-        "u64" => TypeInner::Scalar(Scalar::U64).into(),
-        "f64" => TypeInner::Scalar(Scalar::F64).into(),
+        "bool" => Ti::Scalar(Sc::BOOL).into(),
+        "i32" => Ti::Scalar(Sc::I32).into(),
+        "u32" => Ti::Scalar(Sc::U32).into(),
+        "f32" => Ti::Scalar(Sc::F32).into(),
+        "f16" => Ti::Scalar(Sc::F16).into(),
+        "i64" => Ti::Scalar(Sc::I64).into(),
+        "u64" => Ti::Scalar(Sc::U64).into(),
+        "f64" => Ti::Scalar(Sc::F64).into(),
         // vector aliases
-        "vec2i" => TypeInner::Vector { size: VectorSize::Bi,   scalar: Scalar::I32 }.into(),
-        "vec3i" => TypeInner::Vector { size: VectorSize::Tri,  scalar: Scalar::I32 }.into(),
-        "vec4i" => TypeInner::Vector { size: VectorSize::Quad, scalar: Scalar::I32 }.into(),
-        "vec2u" => TypeInner::Vector { size: VectorSize::Bi,   scalar: Scalar::U32 }.into(),
-        "vec3u" => TypeInner::Vector { size: VectorSize::Tri,  scalar: Scalar::U32 }.into(),
-        "vec4u" => TypeInner::Vector { size: VectorSize::Quad, scalar: Scalar::U32 }.into(),
-        "vec2f" => TypeInner::Vector { size: VectorSize::Bi,   scalar: Scalar::F32 }.into(),
-        "vec3f" => TypeInner::Vector { size: VectorSize::Tri,  scalar: Scalar::F32 }.into(),
-        "vec4f" => TypeInner::Vector { size: VectorSize::Quad, scalar: Scalar::F32 }.into(),
-        "vec2h" => TypeInner::Vector { size: VectorSize::Bi,   scalar: Scalar::F16 }.into(),
-        "vec3h" => TypeInner::Vector { size: VectorSize::Tri,  scalar: Scalar::F16 }.into(),
-        "vec4h" => TypeInner::Vector { size: VectorSize::Quad, scalar: Scalar::F16 }.into(),
+        "vec2i" => Ti::Vector { size: Vs::Bi,   scalar: Sc::I32 }.into(),
+        "vec3i" => Ti::Vector { size: Vs::Tri,  scalar: Sc::I32 }.into(),
+        "vec4i" => Ti::Vector { size: Vs::Quad, scalar: Sc::I32 }.into(),
+        "vec2u" => Ti::Vector { size: Vs::Bi,   scalar: Sc::U32 }.into(),
+        "vec3u" => Ti::Vector { size: Vs::Tri,  scalar: Sc::U32 }.into(),
+        "vec4u" => Ti::Vector { size: Vs::Quad, scalar: Sc::U32 }.into(),
+        "vec2f" => Ti::Vector { size: Vs::Bi,   scalar: Sc::F32 }.into(),
+        "vec3f" => Ti::Vector { size: Vs::Tri,  scalar: Sc::F32 }.into(),
+        "vec4f" => Ti::Vector { size: Vs::Quad, scalar: Sc::F32 }.into(),
+        "vec2h" => Ti::Vector { size: Vs::Bi,   scalar: Sc::F16 }.into(),
+        "vec3h" => Ti::Vector { size: Vs::Tri,  scalar: Sc::F16 }.into(),
+        "vec4h" => Ti::Vector { size: Vs::Quad, scalar: Sc::F16 }.into(),
         // matrix aliases
-        "mat2x2f" => TypeInner::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Bi,   scalar: Scalar::F32 }.into(),
-        "mat2x3f" => TypeInner::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Tri,  scalar: Scalar::F32 }.into(),
-        "mat2x4f" => TypeInner::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Quad, scalar: Scalar::F32 }.into(),
-        "mat3x2f" => TypeInner::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Bi,   scalar: Scalar::F32 }.into(),
-        "mat3x3f" => TypeInner::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Tri,  scalar: Scalar::F32 }.into(),
-        "mat3x4f" => TypeInner::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Quad, scalar: Scalar::F32 }.into(),
-        "mat4x2f" => TypeInner::Matrix { columns: VectorSize::Quad, rows: VectorSize::Bi,   scalar: Scalar::F32 }.into(),
-        "mat4x3f" => TypeInner::Matrix { columns: VectorSize::Quad, rows: VectorSize::Tri,  scalar: Scalar::F32 }.into(),
-        "mat4x4f" => TypeInner::Matrix { columns: VectorSize::Quad, rows: VectorSize::Quad, scalar: Scalar::F32 }.into(),
-        "mat2x2h" => TypeInner::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Bi,   scalar: Scalar::F16 }.into(),
-        "mat2x3h" => TypeInner::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Tri,  scalar: Scalar::F16 }.into(),
-        "mat2x4h" => TypeInner::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Quad, scalar: Scalar::F16 }.into(),
-        "mat3x2h" => TypeInner::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Bi,   scalar: Scalar::F16 }.into(),
-        "mat3x3h" => TypeInner::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Tri,  scalar: Scalar::F16 }.into(),
-        "mat3x4h" => TypeInner::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Quad, scalar: Scalar::F16 }.into(),
-        "mat4x2h" => TypeInner::Matrix { columns: VectorSize::Quad, rows: VectorSize::Bi,   scalar: Scalar::F16 }.into(),
-        "mat4x3h" => TypeInner::Matrix { columns: VectorSize::Quad, rows: VectorSize::Tri,  scalar: Scalar::F16 }.into(),
-        "mat4x4h" => TypeInner::Matrix { columns: VectorSize::Quad, rows: VectorSize::Quad, scalar: Scalar::F16 }.into(),
+        "mat2x2f" => Ti::Matrix { columns: Vs::Bi,   rows: Vs::Bi,   scalar: Sc::F32 }.into(),
+        "mat2x3f" => Ti::Matrix { columns: Vs::Bi,   rows: Vs::Tri,  scalar: Sc::F32 }.into(),
+        "mat2x4f" => Ti::Matrix { columns: Vs::Bi,   rows: Vs::Quad, scalar: Sc::F32 }.into(),
+        "mat3x2f" => Ti::Matrix { columns: Vs::Tri,  rows: Vs::Bi,   scalar: Sc::F32 }.into(),
+        "mat3x3f" => Ti::Matrix { columns: Vs::Tri,  rows: Vs::Tri,  scalar: Sc::F32 }.into(),
+        "mat3x4f" => Ti::Matrix { columns: Vs::Tri,  rows: Vs::Quad, scalar: Sc::F32 }.into(),
+        "mat4x2f" => Ti::Matrix { columns: Vs::Quad, rows: Vs::Bi,   scalar: Sc::F32 }.into(),
+        "mat4x3f" => Ti::Matrix { columns: Vs::Quad, rows: Vs::Tri,  scalar: Sc::F32 }.into(),
+        "mat4x4f" => Ti::Matrix { columns: Vs::Quad, rows: Vs::Quad, scalar: Sc::F32 }.into(),
+        "mat2x2h" => Ti::Matrix { columns: Vs::Bi,   rows: Vs::Bi,   scalar: Sc::F16 }.into(),
+        "mat2x3h" => Ti::Matrix { columns: Vs::Bi,   rows: Vs::Tri,  scalar: Sc::F16 }.into(),
+        "mat2x4h" => Ti::Matrix { columns: Vs::Bi,   rows: Vs::Quad, scalar: Sc::F16 }.into(),
+        "mat3x2h" => Ti::Matrix { columns: Vs::Tri,  rows: Vs::Bi,   scalar: Sc::F16 }.into(),
+        "mat3x3h" => Ti::Matrix { columns: Vs::Tri,  rows: Vs::Tri,  scalar: Sc::F16 }.into(),
+        "mat3x4h" => Ti::Matrix { columns: Vs::Tri,  rows: Vs::Quad, scalar: Sc::F16 }.into(),
+        "mat4x2h" => Ti::Matrix { columns: Vs::Quad, rows: Vs::Bi,   scalar: Sc::F16 }.into(),
+        "mat4x3h" => Ti::Matrix { columns: Vs::Quad, rows: Vs::Tri,  scalar: Sc::F16 }.into(),
+        "mat4x4h" => Ti::Matrix { columns: Vs::Quad, rows: Vs::Quad, scalar: Sc::F16 }.into(),
         // samplers
-        "sampler" =>            TypeInner::Sampler { comparison: false }.into(),
-        "sampler_comparison" => TypeInner::Sampler { comparison: true }.into(),
+        "sampler" =>            Ti::Sampler { comparison: false }.into(),
+        "sampler_comparison" => Ti::Sampler { comparison: true }.into(),
         // depth textures
-        "texture_depth_2d" =>              TypeInner::Image { dim: ImageDimension::D2,   arrayed: false, class: ImageClass::Depth { multi: false } }.into(),
-        "texture_depth_2d_array" =>        TypeInner::Image { dim: ImageDimension::D2,   arrayed: true,  class: ImageClass::Depth { multi: false } }.into(),
-        "texture_depth_cube" =>            TypeInner::Image { dim: ImageDimension::Cube, arrayed: false, class: ImageClass::Depth { multi: false } }.into(),
-        "texture_depth_cube_array" =>      TypeInner::Image { dim: ImageDimension::Cube, arrayed: true,  class: ImageClass::Depth { multi: false } }.into(),
-        "texture_depth_multisampled_2d" => TypeInner::Image { dim: ImageDimension::D2,   arrayed: false, class: ImageClass::Depth { multi: true  } }.into(),
+        "texture_depth_2d" =>              Ti::Image { dim: ImageDimension::D2,   arrayed: false, class: ImageClass::Depth { multi: false } }.into(),
+        "texture_depth_2d_array" =>        Ti::Image { dim: ImageDimension::D2,   arrayed: true,  class: ImageClass::Depth { multi: false } }.into(),
+        "texture_depth_cube" =>            Ti::Image { dim: ImageDimension::Cube, arrayed: false, class: ImageClass::Depth { multi: false } }.into(),
+        "texture_depth_cube_array" =>      Ti::Image { dim: ImageDimension::Cube, arrayed: true,  class: ImageClass::Depth { multi: false } }.into(),
+        "texture_depth_multisampled_2d" => Ti::Image { dim: ImageDimension::D2,   arrayed: false, class: ImageClass::Depth { multi: true  } }.into(),
         // external texture
-        "texture_external" => TypeInner::Image { dim: ImageDimension::D2, arrayed: false, class: ImageClass::External }.into(),
+        "texture_external" => Ti::Image { dim: ImageDimension::D2, arrayed: false, class: ImageClass::External }.into(),
         // ray desc
         "RayDesc" => PredeclaredType::RayDesc,
         // ray intersection
@@ -466,19 +470,19 @@ pub fn map_predeclared_type(
         // predeclared type generators
 
         // vector
-        "vec2" => TypeGenerator::Vector { size: VectorSize::Bi   }.into(),
-        "vec3" => TypeGenerator::Vector { size: VectorSize::Tri  }.into(),
-        "vec4" => TypeGenerator::Vector { size: VectorSize::Quad }.into(),
+        "vec2" => TypeGenerator::Vector { size: Vs::Bi   }.into(),
+        "vec3" => TypeGenerator::Vector { size: Vs::Tri  }.into(),
+        "vec4" => TypeGenerator::Vector { size: Vs::Quad }.into(),
         // matrix
-        "mat2x2" => TypeGenerator::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Bi   }.into(),
-        "mat2x3" => TypeGenerator::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Tri  }.into(),
-        "mat2x4" => TypeGenerator::Matrix { columns: VectorSize::Bi,   rows: VectorSize::Quad }.into(),
-        "mat3x2" => TypeGenerator::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Bi   }.into(),
-        "mat3x3" => TypeGenerator::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Tri  }.into(),
-        "mat3x4" => TypeGenerator::Matrix { columns: VectorSize::Tri,  rows: VectorSize::Quad }.into(),
-        "mat4x2" => TypeGenerator::Matrix { columns: VectorSize::Quad, rows: VectorSize::Bi   }.into(),
-        "mat4x3" => TypeGenerator::Matrix { columns: VectorSize::Quad, rows: VectorSize::Tri  }.into(),
-        "mat4x4" => TypeGenerator::Matrix { columns: VectorSize::Quad, rows: VectorSize::Quad }.into(),
+        "mat2x2" => TypeGenerator::Matrix { columns: Vs::Bi,   rows: Vs::Bi   }.into(),
+        "mat2x3" => TypeGenerator::Matrix { columns: Vs::Bi,   rows: Vs::Tri  }.into(),
+        "mat2x4" => TypeGenerator::Matrix { columns: Vs::Bi,   rows: Vs::Quad }.into(),
+        "mat3x2" => TypeGenerator::Matrix { columns: Vs::Tri,  rows: Vs::Bi   }.into(),
+        "mat3x3" => TypeGenerator::Matrix { columns: Vs::Tri,  rows: Vs::Tri  }.into(),
+        "mat3x4" => TypeGenerator::Matrix { columns: Vs::Tri,  rows: Vs::Quad }.into(),
+        "mat4x2" => TypeGenerator::Matrix { columns: Vs::Quad, rows: Vs::Bi   }.into(),
+        "mat4x3" => TypeGenerator::Matrix { columns: Vs::Quad, rows: Vs::Tri  }.into(),
+        "mat4x4" => TypeGenerator::Matrix { columns: Vs::Quad, rows: Vs::Quad }.into(),
         // array
         "array" => TypeGenerator::Array.into(),
         // atomic
@@ -507,7 +511,7 @@ pub fn map_predeclared_type(
         _ => return Ok(None),
     };
 
-    if matches!(ty, PredeclaredType::TypeInner(ref ty) if ty.scalar() == Some(Scalar::F16))
+    if matches!(ty, PredeclaredType::TypeInner(ref ty) if ty.scalar() == Some(Sc::F16))
         && !enable_extensions.contains(ImplementedEnableExtension::F16)
     {
         return Err(Box::new(Error::EnableExtensionNotEnabled {
