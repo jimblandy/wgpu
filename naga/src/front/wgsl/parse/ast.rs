@@ -257,8 +257,14 @@ pub struct ResourceBinding<'a> {
 #[derive(Debug)]
 pub struct GlobalVariable<'a> {
     pub name: Ident<'a>,
+
+    /// The template list parameters for the `var`, giving the variable's
+    /// address space and access mode, if present.
     pub template_list: Vec<Handle<Expression<'a>>>,
+
+    /// The `@group` and `@binding` attributes, if present.
     pub binding: Option<ResourceBinding<'a>>,
+
     pub ty: Option<TemplateElaboratedIdent<'a>>,
     pub init: Option<Handle<Expression<'a>>>,
     pub doc_comments: Vec<&'a str>,
