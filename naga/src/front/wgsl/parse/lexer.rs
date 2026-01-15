@@ -223,9 +223,10 @@ fn discover_template_lists<'a>(
 
         looking_for_template_start = false;
 
-        // The WGSL spec's template list discovery algorithm processes
-        // the entire source at once, but Naga would rather limit its
-        // lookahead to the actual text that needs to be
+        // The WGSL spec's template list discovery algorithm processes the
+        // entire source at once, but Naga would rather limit its lookahead to
+        // the actual text that could possibly be a template parameter list.
+        // This is usually less than a line.
         if pending.is_empty() {
             break;
         }
