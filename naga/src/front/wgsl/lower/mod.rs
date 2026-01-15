@@ -2681,11 +2681,11 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             conv::PredeclaredType::TypeGenerator(type_generator) => {
                 let ty_inner = match type_generator {
                     conv::TypeGenerator::Vector { size } => {
-                        let (scalar, _) = tl.scalar(self, ctx)?;
+                        let (scalar, _) = tl.scalar_ty(self, ctx)?;
                         ir::TypeInner::Vector { size, scalar }
                     }
                     conv::TypeGenerator::Matrix { columns, rows } => {
-                        let (scalar, span) = tl.scalar(self, ctx)?;
+                        let (scalar, span) = tl.scalar_ty(self, ctx)?;
                         if scalar.kind != ir::ScalarKind::Float {
                             return Err(Box::new(Error::BadMatrixScalarKind(span, scalar)));
                         }
@@ -2715,7 +2715,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                         ir::TypeInner::Array { base, size, stride }
                     }
                     conv::TypeGenerator::Atomic => {
-                        let (scalar, _) = tl.scalar(self, ctx)?;
+                        let (scalar, _) = tl.scalar_ty(self, ctx)?;
                         ir::TypeInner::Atomic(scalar)
                     }
                     conv::TypeGenerator::Pointer => {
@@ -2729,7 +2729,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                         arrayed,
                         multi,
                     } => {
-                        let (scalar, span) = tl.scalar(self, ctx)?;
+                        let (scalar, span) = tl.scalar_ty(self, ctx)?;
                         let ir::Scalar { kind, width } = scalar;
                         if width != 4 {
                             return Err(Box::new(Error::BadTextureSampleType { span, scalar }));

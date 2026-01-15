@@ -63,7 +63,7 @@ impl<'iter, 'source> TemplateListIter<'iter, 'source> {
         lowerer.type_expression(expr, ctx)
     }
 
-    pub fn scalar(
+    pub fn scalar_ty(
         &mut self,
         lowerer: &mut Lowerer<'source, '_>,
         ctx: &mut ExpressionContext<'source, '_, '_>,
