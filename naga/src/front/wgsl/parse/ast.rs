@@ -64,11 +64,11 @@ pub enum IdentExpr<'a> {
     /// Whenever you create one of these values, you almost certainly want to
     /// insert the `&str` into [`ExpressionContext::unresolved`][ECu], to ensure
     /// that [indexing] knows that the name's declaration must be lowered before
-    /// the one containing this use. Using [`ExpressionContext::ident_expr`][ie]
-    /// to build `IdentExpr` will take care of that for you.
+    /// the one containing this use. Using [`Parser::ident_expr`][ie] to build
+    /// `IdentExpr` will take care of that for you.
     ///
     /// [ECu]: super::ExpressionContext::unresolved
-    /// [ie]: super::ExpressionContext::ident_expr
+    /// [ie]: super::Parser::ident_expr
     /// [indexing]: crate::front::wgsl::index::Index::generate
     Unresolved(&'a str),
 
