@@ -2639,6 +2639,20 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
         Ok(ty)
     }
 
+    /// Construct an [`ir::Type`] from a [`conv::PredeclaredType`] and a list of
+    /// template parameters.
+    ///
+    /// For example, when parsing `vec3<f32>`, the caller would pass:
+    ///
+    /// - for `ty`, [`TypeGenerator::Vector`], and
+    ///
+    /// - for `tl`, an iterator producing a single [`Expression::Ident`] representing `f32`.
+    ///
+    /// From those arguments this function will return a handle for the
+    /// [`ir::Type`] representing `vec3<f32>`.
+    ///
+    /// [`TypeGenerator::Vector`]: conv::TypeGenerator::Vector
+    /// [`Expression::Ident`]: crate::front::wgsl::parse::ast::Expression::Ident
     fn finalize_type(
         &mut self,
         ctx: &mut ExpressionContext<'source, '_, '_>,
