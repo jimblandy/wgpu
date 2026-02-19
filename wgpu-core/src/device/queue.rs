@@ -664,7 +664,7 @@ impl Queue {
         if buffer_offset > buffer.size {
             return Err(TransferError::BufferStartOffsetOverrun {
                 start_offset: buffer_offset,
-                buffer_size: buffer_size.get(),
+                buffer_size: buffer.size,
                 side: CopySide::Destination,
             });
         }

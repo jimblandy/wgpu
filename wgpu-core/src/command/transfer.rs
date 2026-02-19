@@ -354,7 +354,7 @@ pub(crate) fn validate_linear_texture_data(
     if offset > buffer_size {
         return Err(TransferError::BufferStartOffsetOverrun {
             start_offset: offset,
-            buffer_size: bytes_in_copy,
+            buffer_size,
             side: buffer_side,
         });
     }
@@ -1002,9 +1002,9 @@ pub(super) fn copy_buffer_to_buffer(
     // TODO: This check isn't part of the spec., but it looks like it should be.
     if source_offset > src_buffer.size {
         return Err(TransferError::BufferStartOffsetOverrun {
-            start_offset: destination_offset,
-            buffer_size: dst_buffer.size,
-            side: CopySide::Destination,
+            start_offset: source_offset,
+            buffer_size: src_buffer.size,
+            side: CopySide::Source,
         }
         .into());
     }
