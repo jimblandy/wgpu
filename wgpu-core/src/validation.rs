@@ -1366,10 +1366,10 @@ impl Interface {
         let mut resources = naga::Arena::new();
         let mut resource_mapping = FastHashMap::default();
         for (var_handle, var) in module.global_variables.iter() {
-            let bind = match var.binding {
-                Some(br) => br,
-                _ => continue,
-            };
+            let Some(bind) = var.binding else {
+                continue;
+            }
+
             let naga_ty = &module.types[var.ty].inner;
 
             let inner_ty = match *naga_ty {
@@ -1392,7 +1392,9 @@ impl Interface {
                     ResourceType::AccelerationStructure { vertex_return }
                 }
                 ref other => ResourceType::Buffer {
-                    minimum_binding_size: wgt::BufferSize::new(other.size(module.to_ctx()) as u64)
+                    minimum_binding_size: wgt::BufferSize::new(
+                        other.size(module.to_ctx()) as u64
+                    )
                         .unwrap(),
                 },
             };
