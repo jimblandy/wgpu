@@ -1246,7 +1246,7 @@ fn int64_capability() {
     check_validation! {
         "var input: u64;",
         "var input: i64;":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability {flag: "SHADER_INT64",..}),
             ..
         })
@@ -1265,7 +1265,7 @@ fn per_vertex_capability() {
             }
         "#:
             Err(
-        naga::valid::ValidationErrorInner::EntryPoint {
+        naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Fragment,
             source: valid::EntryPointError::Argument(
                 0,
@@ -1309,7 +1309,7 @@ fn float16_capability_and_enable() {
   = note: You can enable this extension by adding `enable f16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability { flag: "FLOAT16", .. }),
             ..
         })
@@ -1331,7 +1331,7 @@ fn float16_capability_and_enable() {
   = note: You can enable this extension by adding `enable f16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::Expression {
                 source: naga::valid::ExpressionError::Literal(
                     naga::valid::LiteralError::Width(
@@ -1357,7 +1357,7 @@ fn float16_capability_and_enable() {
   = note: You can enable this extension by adding `enable f16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability { flag: "FLOAT16", .. }),
             ..
         })
@@ -1378,7 +1378,7 @@ fn float16_capability_and_enable() {
   = note: You can enable this extension by adding `enable f16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability { flag: "FLOAT16", .. }),
             ..
         })
@@ -1395,7 +1395,7 @@ fn float16_capability_and_enable() {
   = note: You can enable this extension by adding `enable f16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability { flag: "FLOAT16", .. }),
             ..
         })
@@ -1406,7 +1406,7 @@ fn float16_capability_and_enable() {
         "fn foo() -> f32 { return quantizeToF16(1.0f); }",
         "fn foo() -> u32 { return pack2x16float(vec2(1.0f, 2.0f)); }",
         "fn foo() -> vec2<f32> { return unpack2x16float(0x7c007c00); }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::Expression {
                 source: naga::valid::ExpressionError::MissingCapabilities(Capabilities::SHADER_FLOAT16_IN_FLOAT32),
                 ..
@@ -1434,7 +1434,7 @@ fn int16_capability_and_enable() {
   = note: You can enable this extension by adding `enable wgpu_int16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability { flag: "SHADER_INT16", .. }),
             ..
         })
@@ -1456,7 +1456,7 @@ fn int16_capability_and_enable() {
   = note: You can enable this extension by adding `enable wgpu_int16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::Expression {
                 source: naga::valid::ExpressionError::Literal(
                     naga::valid::LiteralError::Width(
@@ -1482,7 +1482,7 @@ fn int16_capability_and_enable() {
   = note: You can enable this extension by adding `enable wgpu_int16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability { flag: "SHADER_INT16", .. }),
             ..
         })
@@ -1501,7 +1501,7 @@ fn int16_capability_and_enable() {
   = note: You can enable this extension by adding `enable wgpu_int16;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::WidthError(naga::valid::WidthError::MissingCapability { flag: "SHADER_INT16", .. }),
             ..
         })
@@ -1513,7 +1513,7 @@ fn int16_in_atomic() {
     check_validation! {
         "enable wgpu_int16; @group(0) @binding(0) var<storage> a: atomic<u16>;",
         "enable wgpu_int16; @group(0) @binding(0) var<storage> a: atomic<i16>;":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::InvalidAtomicWidth(_, 2),
             ..
         }),
@@ -1528,7 +1528,7 @@ fn int16_subgroup_bitwise_rejected() {
         "enable wgpu_int16; @compute @workgroup_size(1) fn main() { var v = i16(1); v = subgroupOr(v); }",
         "enable wgpu_int16; @compute @workgroup_size(1) fn main() { var v = i16(1); v = subgroupXor(v); }",
         "enable wgpu_int16; @compute @workgroup_size(1) fn main() { var v = u16(1); v = subgroupAnd(v); }":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             source: naga::valid::EntryPointError::Function(
                 naga::valid::FunctionError::InvalidSubgroup(
                     naga::valid::SubgroupError::InvalidOperand(_),
@@ -1547,7 +1547,7 @@ fn int16_in_immediate() {
         "enable wgpu_int16; var<immediate> input: u16;",
         "enable wgpu_int16; var<immediate> input: vec2<i16>;",
         "enable wgpu_int16; struct S { a: u16 }; var<immediate> input: S;":
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::InvalidImmediateType(
                 naga::valid::ImmediateError::InvalidScalar(_)
             ),
@@ -1565,7 +1565,7 @@ fn float16_in_immediate() {
         "enable f16; var<immediate> input: mat4x4<f16>;",
         "enable f16; struct S { a: f16 }; var<immediate> input: S;",
         "enable f16; struct S1 { a: f16 }; struct S2 { a : S1 } var<immediate> input: S2;":
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::InvalidImmediateType(
                 naga::valid::ImmediateError::InvalidScalar(
                     naga::Scalar::F16
@@ -1581,7 +1581,7 @@ fn float16_in_immediate() {
 fn float16_in_atomic() {
     check_validation! {
         "enable f16; var<storage> a: atomic<f16>;":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::InvalidAtomicWidth(
                 naga::ScalarKind::Float,
                 2
@@ -1598,7 +1598,7 @@ fn invalid_arrays() {
         "alias Bad = array<array<f32>, 4>;",
         "alias Bad = array<sampler, 4>;",
         "alias Bad = array<texture_2d<f32>, 4>;":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::InvalidArrayBaseType(_),
             ..
         })
@@ -1607,7 +1607,7 @@ fn invalid_arrays() {
     check_validation! {
         "var<uniform> input: array<u64, 2>;",
         "var<uniform> input: array<vec2<u32>, 2>;":
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::Alignment(naga::AddressSpace::Uniform,_,_),
             ..
         }),
@@ -1622,7 +1622,7 @@ fn invalid_arrays() {
             }
         "#:
         Err(
-            naga::valid::ValidationErrorInner::Function {
+            naga::valid::ValidationError::Function {
                 name,
                 source: naga::valid::FunctionError::Expression {
                     source: naga::valid::ExpressionError::NegativeIndex(_),
@@ -1691,7 +1691,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         discard;
     }
 }":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Compute,
             source: naga::valid::EntryPointError::ForbiddenStageOperations,
             ..
@@ -1706,7 +1706,7 @@ fn main() -> @builtin(position) vec4<f32> {
     }
     return vec4<f32>();
 }":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Vertex,
             source: naga::valid::EntryPointError::ForbiddenStageOperations,
             ..
@@ -1719,7 +1719,7 @@ fn invalid_structs() {
     check_validation! {
         "struct Bad { data: sampler }",
         "struct Bad { data: texture_2d<f32> }":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::InvalidData(_),
             ..
         })
@@ -1727,7 +1727,7 @@ fn invalid_structs() {
 
     check_validation! {
         "struct Bad { data: array<f32>, other: f32, }":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::InvalidDynamicArray(_, _),
             ..
         })
@@ -1735,7 +1735,7 @@ fn invalid_structs() {
 
     check_validation! {
         "struct Empty {}":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::EmptyStruct,
             ..
         })
@@ -1753,7 +1753,7 @@ fn struct_type_mismatch_in_assignment() {
             x = Foo(1);
         }
         ":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             handle: _,
             name: function_name,
             source: naga::valid::FunctionError::InvalidStoreTypes { .. },
@@ -1793,7 +1793,7 @@ fn struct_type_mismatch_in_return_value() {
             return Foo(1);
         }
         ":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             handle: _,
             name: function_name,
             source: naga::valid::FunctionError::InvalidReturnType { .. }
@@ -1812,7 +1812,7 @@ fn struct_type_mismatch_in_argument() {
             bar(Foo(1));
         }
         ":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             name: function_name,
             source: naga::valid::FunctionError::InvalidCall {
                 function: _,
@@ -1871,7 +1871,7 @@ fn invalid_functions() {
         struct Unsized { data: array<f32> }
         fn unacceptable_unsized(arg: Unsized) { }
         ":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             name: function_name,
             source: naga::valid::FunctionError::InvalidArgumentType {
                 index: 0,
@@ -1889,7 +1889,7 @@ fn invalid_functions() {
         struct Unsized { data: array<f32> }
         fn unacceptable_unsized(arg: ptr<workgroup, Unsized>) { }
         ":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::InvalidPointerToUnsized {
                 base: _,
                 space: naga::AddressSpace::WorkGroup,
@@ -1901,7 +1901,7 @@ fn invalid_functions() {
     // Pointers of these address spaces cannot be passed as arguments.
     check_validation! {
         "fn unacceptable_ptr_space(arg: ptr<storage, array<f32>>) { }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             name: function_name,
             source: naga::valid::FunctionError::InvalidArgumentPointerSpace {
                 index: 0,
@@ -1914,7 +1914,7 @@ fn invalid_functions() {
     }
     check_validation! {
         "fn unacceptable_ptr_space(arg: ptr<uniform, f32>) { }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             name: function_name,
             source: naga::valid::FunctionError::InvalidArgumentPointerSpace {
                 index: 0,
@@ -1927,7 +1927,7 @@ fn invalid_functions() {
     }
     check_validation! {
         "fn unacceptable_ptr_space(arg: ptr<workgroup, f32>) { }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             name: function_name,
             source: naga::valid::FunctionError::InvalidArgumentPointerSpace {
                 index: 0,
@@ -1951,7 +1951,7 @@ fn invalid_functions() {
            return &float.said_float;
         }
         ":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             name: function_name,
             source: naga::valid::FunctionError::NonConstructibleReturnType,
             ..
@@ -1971,7 +1971,7 @@ fn invalid_functions() {
            return atom;
         }
         ":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             name: function_name,
             source: naga::valid::FunctionError::NonConstructibleReturnType,
             ..
@@ -1984,7 +1984,7 @@ fn invalid_functions() {
 fn invalid_return_type() {
     check_validation! {
         "fn invalid_return_type() -> i32 { return 0u; }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::InvalidReturnType { .. },
             ..
         })
@@ -2017,7 +2017,7 @@ fn missing_bindings() {
            return _input;
         }
         ":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Fragment,
             source: naga::valid::EntryPointError::Argument(
                 0,
@@ -2034,7 +2034,7 @@ fn missing_bindings() {
            return _input + more_input;
         }
         ":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Fragment,
             source: naga::valid::EntryPointError::Argument(
                 1,
@@ -2051,7 +2051,7 @@ fn missing_bindings() {
            return _input;
         }
         ":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Fragment,
             source: naga::valid::EntryPointError::Result(
                 naga::valid::VaryingError::MissingBinding,
@@ -2072,7 +2072,7 @@ fn missing_bindings() {
            return _input.pos;
         }
         ":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Fragment,
             source: naga::valid::EntryPointError::Argument(
                 0,
@@ -2090,7 +2090,7 @@ fn missing_bindings2() {
         @vertex
         fn vertex() {}
         ":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Vertex,
             source: naga::valid::EntryPointError::MissingVertexOutputPosition,
             ..
@@ -2108,7 +2108,7 @@ fn missing_bindings2() {
             return VertexOut(vec4<f32>());
         }
         ":
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Vertex,
             source: naga::valid::EntryPointError::MissingVertexOutputPosition,
             ..
@@ -2118,7 +2118,7 @@ fn missing_bindings2() {
 
 #[test]
 fn invalid_blend_src() {
-    use naga::valid::{TypeError, ValidationErrorInner, VaryingError};
+    use naga::valid::{TypeError, ValidationError, VaryingError};
 
     // Missing capability or enable directive
     check_extension_validation! {
@@ -2141,7 +2141,7 @@ fn invalid_blend_src() {
 
 "###,
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::MissingCapability(Capabilities::DUAL_SOURCE_BLENDING),
                 ..
             },
@@ -2156,7 +2156,7 @@ fn invalid_blend_src() {
         fn main(@location(0) @blend_src(0) input: f32) -> vec4f { return vec4f(0.0); }
         ":
         Err(
-            ValidationErrorInner::EntryPoint {
+            ValidationError::EntryPoint {
                 stage: naga::ShaderStage::Fragment,
                 source: naga::valid::EntryPointError::Argument(
                     0,
@@ -2180,7 +2180,7 @@ fn invalid_blend_src() {
         fn main() -> VertexOutput { return VertexOutput(vec4(0.0), vec4(1.0)); }
         ":
         Err(
-            ValidationErrorInner::EntryPoint {
+            ValidationError::EntryPoint {
                 stage: naga::ShaderStage::Vertex,
                 source: naga::valid::EntryPointError::Result(
                     VaryingError::InvalidAttributeInStage("blend_src", naga::ShaderStage::Vertex),
@@ -2203,7 +2203,7 @@ fn invalid_blend_src() {
         fn main() -> FragmentOutput { return FragmentOutput(vec4(0.0), vec4(1.0)); }
         ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::InvalidBlendSrcIndex {
                         location: 0,
@@ -2228,7 +2228,7 @@ fn invalid_blend_src() {
         fn main() -> FragmentOutput { return FragmentOutput(vec4(0.0), vec4(1.0)); }
         ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::InvalidBlendSrcIndex {
                         location: 1,
@@ -2253,7 +2253,7 @@ fn invalid_blend_src() {
         fn main() -> FragmentOutput { return FragmentOutput(vec4(0.0), vec4(1.0)); }
         ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::BindingCollisionBlendSrc { blend_src: 1 }
                 ),
@@ -2275,7 +2275,7 @@ fn invalid_blend_src() {
         fn main() -> FragmentOutput { return FragmentOutput(vec4(0.0), vec4(1.0)); }
         ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::IncompleteBlendSrcUsage {
                         present_blend_src: 0,
@@ -2298,7 +2298,7 @@ fn invalid_blend_src() {
             fn main() -> FragmentOutput { return FragmentOutput(vec4(0.0)); }
             ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::IncompleteBlendSrcUsage{
                         present_blend_src: 1,
@@ -2322,7 +2322,7 @@ fn invalid_blend_src() {
             fn main() -> FragmentOutput { return FragmentOutput(vec4(0.0), 1.0); }
             ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::BlendSrcOutputTypeMismatch { .. }
                 ),
@@ -2358,7 +2358,7 @@ fn invalid_blend_src() {
         }
         ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::IncompleteBlendSrcUsage {
                         present_blend_src: 0,
@@ -2383,7 +2383,7 @@ fn invalid_blend_src() {
         fn main() -> FragmentOutput { return FragmentOutput(vec4(0.0), vec4(1.0), vec4(2.0)); }
         ":
         Err(
-            ValidationErrorInner::Type {
+            ValidationError::Type {
                 source: TypeError::InvalidBlendSrc(
                     VaryingError::InvalidBlendSrcWithOtherBindings { location: 1 }
                 ),
@@ -2403,7 +2403,7 @@ fn invalid_access() {
                 return a[3];
             }
         "#:
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::Expression {
                 source: naga::valid::ExpressionError::IndexOutOfBounds(_, _),
                 ..
@@ -2458,7 +2458,7 @@ fn invalid_local_vars() {
             var not_okay: ptr<storage, array<f32>> = &(*okay).data;
         }
         ":
-        Err(valid::ValidationErrorInner::Function {
+        Err(valid::ValidationError::Function {
             source: valid::FunctionError::LocalVariable {
                 name: local_var_name,
                 source: valid::LocalVariableError::InvalidType(_),
@@ -2475,7 +2475,7 @@ fn invalid_local_vars() {
             var x: atomic<u32>;
         }
         ":
-        Err(valid::ValidationErrorInner::Function {
+        Err(valid::ValidationError::Function {
             source: valid::FunctionError::LocalVariable {
                 name: local_var_name,
                 source: valid::LocalVariableError::InvalidType(_),
@@ -2599,7 +2599,7 @@ fn invalid_runtime_sized_arrays() {
            return outer._unsized.arr[i];
         }
         ":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             name: struct_name,
             source: naga::valid::TypeError::InvalidDynamicArray(member_name, _),
             ..
@@ -2726,7 +2726,7 @@ fn missing_default_case() {
         }
         ":
         Err(
-            naga::valid::ValidationErrorInner::Function {
+            naga::valid::ValidationError::Function {
                 source: naga::valid::FunctionError::MissingDefaultCase,
                 ..
             },
@@ -2764,7 +2764,7 @@ fn wrong_access_mode() {
             }
         ":
         Err(
-            naga::valid::ValidationErrorInner::Function {
+            naga::valid::ValidationError::Function {
                 name,
                 source: naga::valid::FunctionError::InvalidStorePointer(_),
                 ..
@@ -2800,7 +2800,7 @@ fn io_shareable_types() {
                           fn f(@location(0) arg: {ty}) -> @builtin(position) vec4<f32>
                           {{ return vec4<f32>(0.0); }}"),
             Err(
-                naga::valid::ValidationErrorInner::EntryPoint {
+                naga::valid::ValidationError::EntryPoint {
                     stage: naga::ShaderStage::Vertex,
                     name,
                     source: naga::valid::EntryPointError::Argument(
@@ -2851,7 +2851,7 @@ fn host_shareable_types() {
         check_one_validation! {
             &format!("@group(0) @binding(0) var<storage> sbuf: {ty};"),
             Err(
-                naga::valid::ValidationErrorInner::GlobalVariable {
+                naga::valid::ValidationError::GlobalVariable {
                     name,
                     handle: _,
                     source: naga::valid::GlobalVariableError::MissingTypeFlags { .. },
@@ -2862,7 +2862,7 @@ fn host_shareable_types() {
 
         check_one_validation! {
             &format!("@group(0) @binding(0) var<uniform> ubuf: {ty};"),
-            Err(naga::valid::ValidationErrorInner::GlobalVariable {
+            Err(naga::valid::ValidationError::GlobalVariable {
                     name,
                     handle: _,
                     source: naga::valid::GlobalVariableError::MissingTypeFlags { .. },
@@ -2880,7 +2880,7 @@ fn var_init() {
         var<workgroup> initialized: u32 = 0u;
         ":
         Err(
-            naga::valid::ValidationErrorInner::GlobalVariable {
+            naga::valid::ValidationError::GlobalVariable {
                 source: naga::valid::GlobalVariableError::InitializerNotAllowed(naga::AddressSpace::WorkGroup),
                 ..
             },
@@ -2921,7 +2921,7 @@ fn break_if_bad_condition() {
         }
         ":
         Err(
-            naga::valid::ValidationErrorInner::Function {
+            naga::valid::ValidationError::Function {
                 source: naga::valid::FunctionError::InvalidIfType(_),
                 ..
             },
@@ -3427,7 +3427,7 @@ fn function_must_return_value() {
     check_validation!(
         "fn func() -> i32 {
         }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::InvalidReturnType { .. },
             ..
         })
@@ -3436,7 +3436,7 @@ fn function_must_return_value() {
         "fn func(x: i32) -> i32 {
             let y = x + 10;
         }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::InvalidReturnType { .. },
             ..
         })
@@ -3502,7 +3502,7 @@ fn binding_array_non_struct() {
     check_validation! {
         "enable wgpu_binding_array;
          var<storage> x: binding_array<i32, 4>;":
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::BindingArrayBaseTypeNotStruct(_),
             ..
         })
@@ -3515,7 +3515,7 @@ fn binding_array_non_struct() {
             @group(0) @binding(0)
             var<storage> ray_query_array: binding_array<ray_query, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::BindingArrayBaseTypeNotStruct(_),
             ..
         }),
@@ -4326,7 +4326,7 @@ fn subgroup_capability() {
                     _ = subgroupBallot();
                 }}
             "),
-            Err(naga::valid::ValidationErrorInner::EntryPoint {
+            Err(naga::valid::ValidationError::EntryPoint {
                 stage: err_stage,
                 source: naga::valid::EntryPointError::Function(
                     naga::valid::FunctionError::MissingCapability(Capabilities::SUBGROUP)
@@ -4395,7 +4395,7 @@ fn subgroup_capability() {
                     subgroupBarrier();
                 }
             "#:
-            Err(naga::valid::ValidationErrorInner::EntryPoint {
+            Err(naga::valid::ValidationError::EntryPoint {
                 stage: naga::ShaderStage::Compute,
                 source: naga::valid::EntryPointError::Function(
                     naga::valid::FunctionError::MissingCapability(required_caps)
@@ -4415,7 +4415,7 @@ fn subgroup_capability() {
                 return vec4();
             }
         "#:
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Vertex,
             source: naga::valid::EntryPointError::ForbiddenStageOperations,
             ..
@@ -4431,7 +4431,7 @@ fn subgroup_capability() {
                 subgroupBarrier();
             }
         "#:
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Fragment,
             source: naga::valid::EntryPointError::ForbiddenStageOperations,
             ..
@@ -4448,7 +4448,7 @@ fn subgroup_capability() {
             fn main(@builtin(subgroup_id) subgroup_id: u32) {{
             }}
         ",
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Compute,
             source: naga::valid::EntryPointError::Argument(
                 _,
@@ -4477,7 +4477,7 @@ fn subgroup_invalid_broadcast() {
                 _ = subgroupBroadcast(123, id);
             }
         "#:
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::InvalidSubgroup(
                 naga::valid::SubgroupError::InvalidInvocationIdExprType(_),
             ),
@@ -4491,7 +4491,7 @@ fn subgroup_invalid_broadcast() {
                 _ = quadBroadcast(123, id);
             }
         "#:
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::InvalidSubgroup(
                 naga::valid::SubgroupError::InvalidInvocationIdExprType(_),
             ),
@@ -4522,7 +4522,7 @@ fn invalid_clip_distances() {
   = note: You can enable this extension by adding `enable clip_distances;` at the top of the shader, before any other items.
 
 "###,
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Vertex,
             source: naga::valid::EntryPointError::Result(
                 naga::valid::VaryingError::UnsupportedCapability(Capabilities::CLIP_DISTANCES)
@@ -4546,7 +4546,7 @@ fn invalid_clip_distances() {
                 return out;
             }
         "#:
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             stage: naga::ShaderStage::Vertex,
             source: naga::valid::EntryPointError::Result(
                 naga::valid::VaryingError::InvalidBuiltInType(naga::ir::BuiltIn::ClipDistances, _)
@@ -4589,7 +4589,7 @@ fn max_type_size_large_array() {
     // don't get spans so the error isn't very helpful.
     check_validation! {
         "alias LargeArray = array<u32, 1 << 29>;":
-        Err(naga::valid::ValidationErrorInner::Layouter(
+        Err(naga::valid::ValidationError::Layouter(
                 naga::proc::LayoutError {
                     inner: naga::proc::LayoutErrorInner::TooLarge,
                     ..
@@ -4641,7 +4641,7 @@ fn max_type_size_override_array() {
     };
     assert!(matches!(
         err.into_inner().as_ref(),
-        naga::valid::ValidationErrorInner::Layouter(naga::proc::LayoutError {
+        naga::valid::ValidationError::Layouter(naga::proc::LayoutError {
             inner: naga::proc::LayoutErrorInner::TooLarge,
             ..
         }),
@@ -4707,7 +4707,7 @@ fn max_type_size_array_of_structs() {
             }
             alias BigArrayOfStructs = array<NotVeryBigStruct, 1 << 29>;
         "#:
-        Err(naga::valid::ValidationErrorInner::Layouter(
+        Err(naga::valid::ValidationError::Layouter(
                 naga::proc::LayoutError {
                     inner: naga::proc::LayoutErrorInner::TooLarge,
                     ..
@@ -4805,7 +4805,7 @@ fn ray_types_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_ray_query;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::MissingCapability(Capabilities::RAY_QUERY),
             ..
         })
@@ -4826,7 +4826,7 @@ fn ray_types_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_ray_query;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::MissingCapability(Capabilities::RAY_QUERY),
             ..
         }),
@@ -4846,7 +4846,7 @@ fn ray_types_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_ray_query;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::MissingCapability(Capabilities::RAY_QUERY),
             ..
         }),
@@ -4873,7 +4873,7 @@ fn ray_query_vertex_return_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_ray_query_vertex_return;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::MissingCapability(
                 Capabilities::RAY_HIT_VERTEX_POSITION
             ),
@@ -4897,7 +4897,7 @@ fn ray_query_vertex_return_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_ray_query_vertex_return;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::MissingCapability(
                 Capabilities::RAY_HIT_VERTEX_POSITION
             ),
@@ -4924,7 +4924,7 @@ var<uniform> uniform_array: binding_array<UniformBuffer, 5>;"#,
   = note: You can enable this extension by adding `enable wgpu_binding_array;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::BUFFER_BINDING_ARRAY
             ),
@@ -4946,7 +4946,7 @@ var<storage, read> storage_array: binding_array<Buffer, 5>;"#,
   = note: You can enable this extension by adding `enable wgpu_binding_array;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::STORAGE_BUFFER_BINDING_ARRAY
             ),
@@ -4968,7 +4968,7 @@ var<storage, read> storage_array: binding_array<Buffer, 5>;"#,
   = note: You can enable this extension by adding `enable wgpu_binding_array;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::TEXTURE_AND_SAMPLER_BINDING_ARRAY
             ),
@@ -4989,7 +4989,7 @@ var<storage, read> storage_array: binding_array<Buffer, 5>;"#,
   = note: You can enable this extension by adding `enable wgpu_binding_array;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::TEXTURE_AND_SAMPLER_BINDING_ARRAY
             ),
@@ -5010,7 +5010,7 @@ var<storage, read> storage_array: binding_array<Buffer, 5>;"#,
   = note: You can enable this extension by adding `enable wgpu_binding_array;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::TEXTURE_AND_SAMPLER_BINDING_ARRAY
             ),
@@ -5031,7 +5031,7 @@ var<storage, read> storage_array: binding_array<Buffer, 5>;"#,
   = note: You can enable this extension by adding `enable wgpu_binding_array;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::TEXTURE_AND_SAMPLER_BINDING_ARRAY
             ),
@@ -5052,7 +5052,7 @@ var<storage, read> storage_array: binding_array<Buffer, 5>;"#,
   = note: You can enable this extension by adding `enable wgpu_binding_array;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::STORAGE_TEXTURE_BINDING_ARRAY
             ),
@@ -5070,7 +5070,7 @@ fn binding_array_requires_capability() {
             @group(0) @binding(0)
             var<storage> storage_array: binding_array<Buffer, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::STORAGE_BUFFER_BINDING_ARRAY
             ),
@@ -5085,7 +5085,7 @@ fn binding_array_requires_capability() {
             @group(0) @binding(0)
             var<uniform> uniform_array: binding_array<Buffer, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::BUFFER_BINDING_ARRAY
             ),
@@ -5099,7 +5099,7 @@ fn binding_array_requires_capability() {
             @group(0) @binding(0)
             var storage_texture_array: binding_array<texture_storage_2d<rgba8unorm, write>, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::STORAGE_TEXTURE_BINDING_ARRAY
             ),
@@ -5113,7 +5113,7 @@ fn binding_array_requires_capability() {
             @group(0) @binding(0)
             var sampled_texture_array: binding_array<texture_2d<f32>, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::TEXTURE_AND_SAMPLER_BINDING_ARRAY
             ),
@@ -5127,7 +5127,7 @@ fn binding_array_requires_capability() {
             @group(0) @binding(0)
             var sampler_array: binding_array<sampler, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::TEXTURE_AND_SAMPLER_BINDING_ARRAY
             ),
@@ -5142,7 +5142,7 @@ fn binding_array_requires_capability() {
             @group(0) @binding(0)
             var external_texture_array: binding_array<texture_external, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::Type {
+        Err(naga::valid::ValidationError::Type {
             source: naga::valid::TypeError::BindingArrayBaseExternalTextures,
             ..
         }),
@@ -5157,7 +5157,7 @@ fn binding_array_requires_capability() {
             @group(0) @binding(0)
             var acc_struct_array: binding_array<acceleration_structure, 10>;
         "#:
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::ACCELERATION_STRUCTURE_BINDING_ARRAY
             ),
@@ -5192,7 +5192,7 @@ fn cooperative_matrix_enable_extension() {
 
 "#,
             ),
-            Err(naga::valid::ValidationErrorInner::Type {
+            Err(naga::valid::ValidationError::Type {
                 source: naga::valid::TypeError::MissingCapability(Capabilities::COOPERATIVE_MATRIX),
                 ..
             })
@@ -5218,7 +5218,7 @@ fn cooperative_matrix_enable_extension() {
 
 "#,
             ),
-            Err(naga::valid::ValidationErrorInner::Type {
+            Err(naga::valid::ValidationError::Type {
                 source: naga::valid::TypeError::MissingCapability(Capabilities::COOPERATIVE_MATRIX),
                 ..
             })
@@ -5251,7 +5251,7 @@ fn mesh_shader_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_mesh_shader;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             source: naga::valid::EntryPointError::UnsupportedCapability(Capabilities::MESH_SHADER),
             ..
         })
@@ -5274,7 +5274,7 @@ fn mesh_shader_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_mesh_shader;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             source: naga::valid::EntryPointError::UnsupportedCapability(Capabilities::MESH_SHADER),
             ..
         })
@@ -5298,7 +5298,7 @@ fn mesh_shader_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_mesh_shader;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             source: naga::valid::EntryPointError::Argument(
                 _,
                 naga::valid::VaryingError::UnsupportedCapability(Capabilities::MESH_SHADER)
@@ -5347,7 +5347,7 @@ fn mesh_shader_enable_extension() {
   = note: You can enable this extension by adding `enable wgpu_mesh_shader;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::GlobalVariable {
+        Err(naga::valid::ValidationError::GlobalVariable {
             source: naga::valid::GlobalVariableError::UnsupportedCapability(
                 Capabilities::MESH_SHADER
             ),
@@ -5376,7 +5376,7 @@ fn fs_main(@location(0) @interpolate(per_vertex) v: array<f32, 3>) -> @location(
   = note: You can enable this extension by adding `enable wgpu_per_vertex;` at the top of the shader, before any other items.
 
 "#,
-        Err(naga::valid::ValidationErrorInner::EntryPoint {
+        Err(naga::valid::ValidationError::EntryPoint {
             source: naga::valid::EntryPointError::Argument(
                 0,
                 naga::valid::VaryingError::UnsupportedCapability(
@@ -5413,7 +5413,7 @@ fn check_ray_tracing_pipeline_bindings() {
             fn main(@builtin({builtin}) v: {ty}) {{}}
             "
                 ),
-                Err(naga::valid::ValidationErrorInner::EntryPoint {
+                Err(naga::valid::ValidationError::EntryPoint {
                     source: naga::valid::EntryPointError::Argument(
                         0,
                         naga::valid::VaryingError::InvalidBuiltInStage(_),
@@ -5441,7 +5441,7 @@ fn check_ray_tracing_pipeline_ray_generation() {
   = note: You can enable this extension by adding `enable wgpu_ray_tracing_pipeline;` at the top of the shader, before any other items.
 
 ",
-            Err(naga::valid::ValidationErrorInner::EntryPoint {
+            Err(naga::valid::ValidationError::EntryPoint {
                 source: naga::valid::EntryPointError::UnsupportedCapability(naga::valid::Capabilities::RAY_TRACING_PIPELINE),
                 ..
             },)
@@ -5465,7 +5465,7 @@ fn check_ray_tracing_pipeline_payload() {
   = note: You can enable this extension by adding `enable wgpu_ray_tracing_pipeline;` at the top of the shader, before any other items.
 
 "),
-            Err(naga::valid::ValidationErrorInner::GlobalVariable {
+            Err(naga::valid::ValidationError::GlobalVariable {
                 source: naga::valid::GlobalVariableError::UnsupportedCapability(naga::valid::Capabilities::RAY_TRACING_PIPELINE),
                 ..
             },)
@@ -5515,7 +5515,7 @@ fn check_ray_tracing_pipeline_payload_disallowed() {
 
             {stage} fn main() {output} {{_ = payload; {stmt}}}"
             ),
-            Err(naga::valid::ValidationErrorInner::EntryPoint {
+            Err(naga::valid::ValidationError::EntryPoint {
                 source: naga::valid::EntryPointError::RayPayloadInInvalidStage(_),
                 ..
             },),
@@ -5598,7 +5598,7 @@ fn bitwise_shift_errors() {
         "fn foo() { var x: i32; var n = x >> 32; }",
         "fn foo() { var x: u32; var n = x << 32; }",
         "fn foo() { var x: i32; var n = x << 32; }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::Expression {
                 source: naga::valid::ExpressionError::ShiftAmountTooLarge { .. },
                 ..
@@ -5623,7 +5623,7 @@ fn bitwise_shift_errors() {
         "fn foo() { var x: i64; var n = x << 64; }",
         "fn foo() { var x: u64; var n = x >> 64; }",
         "fn foo() { var x: i64; var n = x >> 64; }":
-        Err(naga::valid::ValidationErrorInner::Function {
+        Err(naga::valid::ValidationError::Function {
             source: naga::valid::FunctionError::Expression {
                 source: naga::valid::ExpressionError::ShiftAmountTooLarge { .. },
                 ..

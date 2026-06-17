@@ -12,7 +12,7 @@ mod interface;
 mod r#type;
 
 use alloc::{boxed::Box, string::String, vec, vec::Vec};
-use core::ops::{self, Deref, DerefMut};
+use core::ops;
 
 use bit_set::BitSet;
 
@@ -474,35 +474,7 @@ pub enum OverrideError {
 
 #[derive(Clone, Debug, thiserror::Error)]
 #[cfg_attr(test, derive(PartialEq))]
-#[error(transparent)]
-pub struct ValidationError(Box<ValidationErrorInner>);
-
-impl<T> From<T> for ValidationError
-where
-    T: Into<ValidationErrorInner>,
-{
-    fn from(value: T) -> Self {
-        ValidationError(Box::new(value.into()))
-    }
-}
-
-impl Deref for ValidationError {
-    type Target = Box<ValidationErrorInner>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ValidationError {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[derive(Clone, Debug, thiserror::Error)]
-#[cfg_attr(test, derive(PartialEq))]
-pub enum ValidationErrorInner {
+pub enum ValidationError {
     #[error(transparent)]
     InvalidHandle(#[from] InvalidHandleError),
     #[error(transparent)]
@@ -761,7 +733,7 @@ impl Validator {
     pub fn validate(
         &mut self,
         module: &crate::Module,
-    ) -> Result<ModuleInfo, WithSpan<ValidationError>> {
+    ) -> Result<ModuleInfo, WithSpan<Box<ValidationError>>> {
         self.overrides_resolved = false;
         self.validate_impl(module)
     }
@@ -776,7 +748,7 @@ impl Validator {
     pub fn validate_resolved_overrides(
         &mut self,
         module: &crate::Module,
-    ) -> Result<ModuleInfo, WithSpan<ValidationError>> {
+    ) -> Result<ModuleInfo, WithSpan<Box<ValidationError>>> {
         self.overrides_resolved = true;
         self.validate_impl(module)
     }
@@ -784,15 +756,15 @@ impl Validator {
     fn validate_impl(
         &mut self,
         module: &crate::Module,
-    ) -> Result<ModuleInfo, WithSpan<ValidationError>> {
+    ) -> Result<ModuleInfo, WithSpan<Box<ValidationError>>> {
         self.reset();
         self.reset_types(module.types.len());
 
-        Self::validate_module_handles(module).map_err(|e| ValidationError::from(e).with_span())?;
+        Self::validate_module_handles(module).map_err(|e| e.with_span())?;
 
         self.layouter.update(module.to_ctx()).map_err(|e| {
             let handle = e.ty;
-            ValidationError::from(e).with_span_handle(handle, &module.types)
+            Box::new(ValidationError::from(e)).with_span_handle(handle, &module.types)
         })?;
 
         // These should all get overwritten.
@@ -813,7 +785,7 @@ impl Validator {
             let ty_info = self
                 .validate_type(handle, module.to_ctx())
                 .map_err(|source| {
-                    ValidationError::from(ValidationErrorInner::Type {
+                    Box::new(ValidationError::Type {
                         handle,
                         name: ty.name.clone().unwrap_or_default(),
                         source,
@@ -835,7 +807,7 @@ impl Validator {
                 mod_info
                     .process_const_expression(handle, &resolve_context, module.to_ctx())
                     .map_err(|source| {
-                        ValidationError::from(ValidationErrorInner::ConstExpression {
+                        Box::new(ValidationError::ConstExpression {
                             handle,
                             source,
                         })
@@ -855,7 +827,7 @@ impl Validator {
                     &global_expr_kind,
                 )
                 .map_err(|source| {
-                    ValidationError::from(ValidationErrorInner::ConstExpression { handle, source })
+                    Box::new(ValidationError::ConstExpression { handle, source })
                         .with_span_handle(handle, &module.global_expressions)
                 })?
             }
@@ -863,7 +835,7 @@ impl Validator {
             for (handle, constant) in module.constants.iter() {
                 self.validate_constant(handle, module.to_ctx(), &mod_info, &global_expr_kind)
                     .map_err(|source| {
-                        ValidationError::from(ValidationErrorInner::Constant {
+                        Box::new(ValidationError::Constant {
                             handle,
                             name: constant.name.clone().unwrap_or_default(),
                             source,
@@ -875,7 +847,7 @@ impl Validator {
             for (handle, r#override) in module.overrides.iter() {
                 self.validate_override(handle, module.to_ctx(), &mod_info)
                     .map_err(|source| {
-                        ValidationError::from(ValidationErrorInner::Override {
+                        Box::new(ValidationError::Override {
                             handle,
                             name: r#override.name.clone().unwrap_or_default(),
                             source,
@@ -888,7 +860,7 @@ impl Validator {
         for (var_handle, var) in module.global_variables.iter() {
             self.validate_global_var(var, module.to_ctx(), &mod_info, &global_expr_kind)
                 .map_err(|source| {
-                    ValidationError::from(ValidationErrorInner::GlobalVariable {
+                    Box::new(ValidationError::GlobalVariable {
                         handle: var_handle,
                         name: var.name.clone().unwrap_or_default(),
                         source,
@@ -902,7 +874,7 @@ impl Validator {
                 Ok(info) => mod_info.functions.push(info),
                 Err(error) => {
                     return Err(error.and_then(|source| {
-                        ValidationError::from(ValidationErrorInner::Function {
+                        Box::new(ValidationError::Function {
                             handle,
                             name: fun.name.clone().unwrap_or_default(),
                             source,
@@ -916,7 +888,7 @@ impl Validator {
         let mut ep_map = FastHashSet::default();
         for ep in module.entry_points.iter() {
             if !ep_map.insert((ep.stage, &ep.name)) {
-                return Err(ValidationError::from(ValidationErrorInner::EntryPoint {
+                return Err(Box::new(ValidationError::EntryPoint {
                     stage: ep.stage,
                     name: ep.name.clone(),
                     source: EntryPointError::Conflict,
@@ -928,7 +900,7 @@ impl Validator {
                 Ok(info) => mod_info.entry_points.push(info),
                 Err(error) => {
                     return Err(error.and_then(|source| {
-                        ValidationError::from(ValidationErrorInner::EntryPoint {
+                        Box::new(ValidationError::EntryPoint {
                             stage: ep.stage,
                             name: ep.name.clone(),
                             source,
