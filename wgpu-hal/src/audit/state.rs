@@ -18,7 +18,9 @@ use parking_lot::Mutex;
 /// The id to assign to the next audited resource created.
 ///
 /// This is process-global, rather than associated with a given
-/// instance,
+/// instance, so that distinct instances have disjoint sets of ids,
+/// ensuring that using an id with the wrong instance causes a
+/// problem.
 static NEXT_ID: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 
 pub struct State {
