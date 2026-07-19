@@ -65,4 +65,4 @@ pub enum Finished {
 }
 
 /// Some sort of underlying error.
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+pub type Error = Box<dyn core::error::Error + Send + Sync + 'static>;

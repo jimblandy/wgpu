@@ -75,18 +75,25 @@ use state::State;
 use crate::{
     DynAccelerationStructure, DynAdapter, DynBindGroup, DynBindGroupLayout, DynBuffer,
     DynCommandBuffer, DynCommandEncoder, DynComputePipeline, DynDevice, DynFence, DynInstance,
-    DynPipelineCache, DynPipelineLayout, DynQuerySet, DynQueue, DynRenderPipeline, DynSampler,
-    DynShaderModule, DynSurface, DynSurfaceTexture, DynTexture, DynTextureView,
+    DynPipelineCache, DynPipelineLayout, DynQuerySet, DynQueue, DynRayTracingPipeline,
+    DynRenderPipeline, DynSampler, DynShaderModule, DynSurface, DynSurfaceTexture, DynTexture,
+    DynTextureView,
 };
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::fmt;
+use core::marker::PhantomData;
 
 #[derive(Clone, Debug)]
 pub struct Api;
 
 impl crate::Api for Api {
+    // This wrapper works with any backend; there is no single `Backend`
+    // value that correctly describes it. This constant is required by the
+    // `Api` trait but is not meaningfully used for this type.
+    const VARIANT: wgt::Backend = wgt::Backend::Noop;
+
     type Instance = Instance;
     type Surface = Surface;
     type Adapter = Adapter;
@@ -107,6 +114,7 @@ impl crate::Api for Api {
     type ShaderModule = ShaderModule;
     type RenderPipeline = RenderPipeline;
     type ComputePipeline = ComputePipeline;
+    type RayTracingPipeline = RayTracingPipeline;
     type PipelineCache = PipelineCache;
     type AccelerationStructure = AccelerationStructure;
 }
@@ -126,7 +134,7 @@ impl crate::Api for Api {
 ///
 /// [`result`]: Self::result
 /// [`Finished::NewInstance`]: op::Finished::NewInstance
-pub trait Auditor {
+pub trait Auditor: Send {
     /// An operation has been performed.
     ///
     /// An operation has been performed on the instance or some
@@ -149,6 +157,47 @@ pub trait Auditor {
     fn result(&mut self, result: Result<op::Finished, op::Error>);
 }
 
+/// Return an [`Auditor`] that logs every operation and result via the
+/// `log` crate, at the given level.
+pub fn report_by_log(level: log::Level) -> Box<dyn Auditor> {
+    struct LogAuditor {
+        level: log::Level,
+    }
+
+    impl Auditor for LogAuditor {
+        fn operation(&mut self, op: op::Op) {
+            log::debug!("{op:?}");
+        }
+
+        fn result(&mut self, result: Result<op::Finished, op::Error>) {
+            match result {
+                Ok(finished) => log::debug!("{finished:?}"),
+                Err(err) => log::log!(self.level, "wgpu_hal::audit: {err}"),
+            }
+        }
+    }
+
+    Box::new(LogAuditor { level })
+}
+
+/// Return an [`Auditor`] that panics as soon as a `wgpu_hal` operation
+/// reports an error.
+pub fn report_by_panic() -> Box<dyn Auditor> {
+    struct PanicAuditor;
+
+    impl Auditor for PanicAuditor {
+        fn operation(&mut self, _op: op::Op) {}
+
+        fn result(&mut self, result: Result<op::Finished, op::Error>) {
+            if let Err(err) = result {
+                panic!("wgpu_hal::audit: {err}");
+            }
+        }
+    }
+
+    Box::new(PanicAuditor)
+}
+
 /// Return a new [`DynInstance`] that audits usage of `inner`.
 ///
 /// Every operation on the returned instance or any resource created
@@ -167,14 +216,14 @@ pub fn new_auditing_instance(
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id<T: ?Sized> {
     pub num: u64,
-    _marker: std::marker::PhantomData<T>,
+    _marker: PhantomData<T>,
 }
 
 impl<T: ?Sized> Id<T> {
     fn new(num: u64) -> Self {
         Self {
             num,
-            _marker: std::marker::PhantomData,
+            _marker: PhantomData,
         }
     }
 }
@@ -206,6 +255,7 @@ pub type PipelineLayout = Audited<dyn DynPipelineLayout>;
 pub type ShaderModule = Audited<dyn DynShaderModule>;
 pub type RenderPipeline = Audited<dyn DynRenderPipeline>;
 pub type ComputePipeline = Audited<dyn DynComputePipeline>;
+pub type RayTracingPipeline = Audited<dyn DynRayTracingPipeline>;
 pub type PipelineCache = Audited<dyn DynPipelineCache>;
 pub type AccelerationStructure = Audited<dyn DynAccelerationStructure>;
 
@@ -249,6 +299,7 @@ crate::impl_dyn_resource!(
     ShaderModule,
     RenderPipeline,
     ComputePipeline,
+    RayTracingPipeline,
     PipelineCache,
     AccelerationStructure
 );
@@ -260,6 +311,7 @@ impl DynBuffer for Buffer {}
 impl DynCommandBuffer for CommandBuffer {}
 impl DynComputePipeline for ComputePipeline {}
 impl DynFence for Fence {}
+impl DynRayTracingPipeline for RayTracingPipeline {}
 impl DynPipelineCache for PipelineCache {}
 impl DynPipelineLayout for PipelineLayout {}
 impl DynQuerySet for QuerySet {}

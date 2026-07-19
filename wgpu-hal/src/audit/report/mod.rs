@@ -1,12 +1,14 @@
 //! Reporting violations of wgpu_hal safety requirements.
 
-use crate::audit::Id;
 use crate::audit::location::Location;
 use crate::audit::state::State;
+use crate::audit::Id;
+use crate::DynResource;
 
+use alloc::format;
 use alloc::string::String;
-use core::writeln;
 use core::fmt::Write as _;
+use core::writeln;
 
 /// A specific violation of a `wgpu_hal` safety requirement.
 pub struct Operation<'s> {
@@ -19,12 +21,13 @@ pub struct Operation<'s> {
     pub name: &'static str,
 
     /// The object the operation was being applied to.
-    pub this: Id,
+    pub this: Id<dyn DynResource>,
 }
 
 pub enum ReportKind {
-    UseAfterFree(Id),
-    DoubleFree(Id),
+    InvalidId(Id<dyn DynResource>),
+    UseAfterFree(Id<dyn DynResource>),
+    DoubleFree(Id<dyn DynResource>),
 }
 
 impl ReportKind {

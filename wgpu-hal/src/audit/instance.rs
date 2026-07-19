@@ -15,7 +15,7 @@ impl audit::Instance {
         backend: wgpu_types::Backend,
         auditor: Box<dyn audit::Auditor>,
     ) -> Self {
-        let state = state::State::new(auditor);
+        let state = state::State::new(auditor, backend);
         let id = state.new_id();
         state.result(Ok(op::Finished::NewInstance { id, backend }));
         Self {
@@ -29,7 +29,7 @@ impl audit::Instance {
 impl crate::Instance for audit::Instance {
     type A = super::Api;
 
-    unsafe fn init(_desc: &crate::InstanceDescriptor) -> Result<Self, crate::InstanceError> {
+    unsafe fn init(_desc: &crate::InstanceDescriptor<'_>) -> Result<Self, crate::InstanceError> {
         panic!("Call `validation_layer::Instance::` new instead");
     }
 
@@ -95,7 +95,7 @@ impl crate::Instance for audit::Instance {
             auditing_adapters.push(crate::ExposedAdapter {
                 adapter: auditing_adapter,
                 info: info.clone(),
-                features: features.clone(),
+                features,
                 capabilities: capabilities.clone(),
             });
             finished_adapters.push(op::OpExposedAdapter {

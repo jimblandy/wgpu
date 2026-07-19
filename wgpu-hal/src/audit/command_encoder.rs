@@ -106,10 +106,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
         todo!()
     }
 
-    unsafe fn set_push_constants(
+    unsafe fn set_immediates(
         &mut self,
         layout: &super::PipelineLayout,
-        stages: wgt::ShaderStages,
         offset_bytes: u32,
         data: &[u32],
     ) {
@@ -304,11 +303,44 @@ impl crate::CommandEncoder for super::CommandEncoder {
         todo!()
     }
 
-    unsafe fn dispatch(&mut self, count: [u32; 3]) {
+    unsafe fn dispatch_workgroups(&mut self, count: [u32; 3]) {
         todo!()
     }
 
-    unsafe fn dispatch_indirect(&mut self, buffer: &super::Buffer, offset: wgt::BufferAddress) {
+    unsafe fn dispatch_workgroups_indirect(
+        &mut self,
+        buffer: &super::Buffer,
+        offset: wgt::BufferAddress,
+    ) {
+        todo!()
+    }
+
+    unsafe fn begin_ray_tracing_pass(&mut self, desc: &crate::RayTracingPassDescriptor<'_>) {
+        todo!()
+    }
+
+    unsafe fn end_ray_tracing_pass(&mut self) {
+        todo!()
+    }
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &super::RayTracingPipeline) {
+        todo!()
+    }
+
+    unsafe fn trace_rays<'a>(
+        &mut self,
+        count: [u32; 3],
+        ray_generation_group_data: crate::PipelineGroupData<'a, super::Buffer>,
+        miss_group_data: crate::PipelineGroupData<'a, super::Buffer>,
+        intersection_group_data: crate::PipelineGroupData<'a, super::Buffer>,
+    ) {
+        todo!()
+    }
+
+    unsafe fn set_acceleration_structure_dependencies(
+        command_buffers: &[&super::CommandBuffer],
+        dependencies: &[&super::AccelerationStructure],
+    ) {
         todo!()
     }
 

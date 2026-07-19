@@ -1,7 +1,6 @@
 /*! Implementation of [`validation_layer::Device`]. */
 #![allow(unused_variables)]
 
-use crate::audit::Id;
 use alloc::vec::Vec;
 
 impl crate::Device for super::Device {
@@ -155,17 +154,6 @@ impl crate::Device for super::Device {
         todo!()
     }
 
-    unsafe fn create_mesh_pipeline(
-        &self,
-        desc: &crate::MeshPipelineDescriptor<
-            super::PipelineLayout,
-            super::ShaderModule,
-            super::PipelineCache,
-        >,
-    ) -> Result<super::RenderPipeline, crate::PipelineError> {
-        todo!()
-    }
-
     unsafe fn destroy_render_pipeline(&self, pipeline: super::RenderPipeline) {
         todo!()
     }
@@ -182,6 +170,29 @@ impl crate::Device for super::Device {
     }
 
     unsafe fn destroy_compute_pipeline(&self, pipeline: super::ComputePipeline) {
+        todo!()
+    }
+
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &crate::RayTracingPipelineDescriptor<
+            super::PipelineLayout,
+            super::ShaderModule,
+            super::PipelineCache,
+        >,
+    ) -> Result<super::RayTracingPipeline, crate::PipelineError> {
+        todo!()
+    }
+
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: super::RayTracingPipeline) {
+        todo!()
+    }
+
+    unsafe fn get_raytracing_pipeline_group_data(
+        &self,
+        pipeline: &super::RayTracingPipeline,
+        groups: core::ops::Range<u32>,
+    ) -> Result<Vec<u8>, crate::DeviceError> {
         todo!()
     }
 
@@ -226,7 +237,7 @@ impl crate::Device for super::Device {
         &self,
         fence: &super::Fence,
         value: crate::FenceValue,
-        timeout_ms: u32,
+        timeout: Option<core::time::Duration>,
     ) -> Result<bool, crate::DeviceError> {
         todo!()
     }
@@ -278,9 +289,4 @@ impl crate::Device for super::Device {
     fn check_if_oom(&self) -> Result<(), crate::DeviceError> {
         todo!()
     }
-}
-
-#[derive(Debug)]
-pub struct Detail {
-    pub queue: Id,
 }

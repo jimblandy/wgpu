@@ -198,7 +198,7 @@ impl Instance {
                 let mut instance: Box<dyn hal::DynInstance> = Box::new(instance);
 
                 // If requested, wrap the new instance in the hal auditing layer.
-                if instance_desc.flags.contains(wgt::InstanceFlags::AUDIT_HAL_USAGE) {
+                if instance_desc.flags.contains(InstanceFlags::AUDIT_HAL_USAGE) {
                     let logger = hal::audit::report_by_log(log::Level::Error);
                     instance = hal::audit::new_auditing_instance(instance, A::VARIANT, logger);
                 }

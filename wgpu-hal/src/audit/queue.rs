@@ -8,7 +8,7 @@ impl crate::Queue for super::Queue {
         &self,
         command_buffers: &[&super::CommandBuffer],
         surface_textures: &[&super::SurfaceTexture],
-        signal_fence: (&mut super::Fence, crate::FenceValue),
+        signal_fence: (&super::Fence, crate::FenceValue),
     ) -> Result<(), crate::DeviceError> {
         todo!()
     }
@@ -18,6 +18,10 @@ impl crate::Queue for super::Queue {
         surface: &super::Surface,
         texture: super::SurfaceTexture,
     ) -> Result<(), crate::SurfaceError> {
+        todo!()
+    }
+
+    unsafe fn wait_for_idle(&self) -> Result<(), crate::DeviceError> {
         todo!()
     }
 

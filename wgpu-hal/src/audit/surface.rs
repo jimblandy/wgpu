@@ -24,7 +24,7 @@ impl crate::Surface for audit::Surface {
         &self,
         timeout: Option<core::time::Duration>,
         fence: &audit::Fence,
-    ) -> Result<Option<crate::AcquiredSurfaceTexture<audit::Api>>, crate::SurfaceError> {
+    ) -> Result<crate::AcquiredSurfaceTexture<audit::Api>, crate::SurfaceError> {
         todo!()
     }
 

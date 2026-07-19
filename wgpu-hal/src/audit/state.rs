@@ -22,13 +22,17 @@ use parking_lot::Mutex;
 static NEXT_ID: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 
 pub struct State {
+    /// The backend that the audited instance is wrapping.
+    pub backend: wgpu_types::Backend,
+
     /// The auditor to report operations to.
     pub auditor: Mutex<Box<dyn Auditor>>,
 }
 
 impl State {
-    pub fn new(auditor: Box<dyn Auditor>) -> Self {
+    pub fn new(auditor: Box<dyn Auditor>, backend: wgpu_types::Backend) -> Self {
         Self {
+            backend,
             auditor: Mutex::new(auditor),
         }
     }
