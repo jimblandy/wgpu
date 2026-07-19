@@ -29,7 +29,7 @@ impl crate::Instance for audit::Instance {
     type A = super::Api;
 
     unsafe fn init(_desc: &crate::InstanceDescriptor<'_>) -> Result<Self, crate::InstanceError> {
-        panic!("Call `validation_layer::Instance::` new instead");
+        panic!("Call `wgpu_hal::audit::Instance::new` instead");
     }
 
     unsafe fn create_surface(
