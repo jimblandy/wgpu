@@ -20,7 +20,7 @@ which you provide.
 An auditing instance enumerates "auditing adapters", which open
 "auditing devices", which create "auditing buffers", and so on. Each
 auditing resource checks that `wgpu_hal`'s rules are being followed,
-reports any volations, and then passes the call through to its
+reports any violations, and then passes the call through to its
 corresponding "inner resource".
 
 When a violation of `wgpu_hal`'s rules is reported, if your callback
@@ -64,7 +64,6 @@ mod command_encoder;
 mod device;
 mod instance;
 mod location;
-mod op;
 mod queue;
 mod report;
 mod state;
@@ -74,16 +73,18 @@ use state::State;
 
 use crate::{
     DynAccelerationStructure, DynAdapter, DynBindGroup, DynBindGroupLayout, DynBuffer,
-    DynCommandBuffer, DynCommandEncoder, DynComputePipeline, DynDevice, DynFence, DynInstance,
+    DynCommandBuffer, DynCommandEncoder, DynComputePipeline, DynFence, DynInstance,
     DynPipelineCache, DynPipelineLayout, DynQuerySet, DynQueue, DynRayTracingPipeline,
-    DynRenderPipeline, DynSampler, DynShaderModule, DynSurface, DynSurfaceTexture, DynTexture,
-    DynTextureView,
+    DynRenderPipeline, DynResource, DynSampler, DynShaderModule, DynSurface, DynSurfaceTexture,
+    DynTexture, DynTextureView,
 };
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use core::fmt;
 use core::marker::PhantomData;
+use parking_lot::Mutex;
 
 #[derive(Clone, Debug)]
 pub struct Api;
@@ -119,79 +120,44 @@ impl crate::Api for Api {
     type AccelerationStructure = AccelerationStructure;
 }
 
-/// A callback function to which all hal activity is reported.
+/// A callback to which `wgpu_hal` safety violations are reported.
 ///
-/// The first callback will always be a call to [`result`], passing
-/// [`Finished::NewInstance`] to report the successful creation of the
-/// instance.
-///
-/// Since both `operation` and `result` take `&mut self`, an `Auditor`
-/// implementations may assume that only one thread is invoking its
-/// methods at a time. However, `wgpu_hal` objects can generally be
-/// used from any thread, so if an auditor needs to pair up results
-/// with their operations, it will need to track operations in
-/// progress separately for each thread.
-///
-/// [`result`]: Self::result
-/// [`Finished::NewInstance`]: op::Finished::NewInstance
+/// See the [module documentation](self) for the callbacks provided for
+/// you: [`report_by_panic`] and [`report_by_log`].
 pub trait Auditor: Send {
-    /// An operation has been performed.
+    /// `wgpu_hal` was used in a way that violates its documented safety
+    /// requirements, as described by `violation`.
     ///
-    /// An operation has been performed on the instance or some
-    /// resource created from it, as described by `op`.
-    ///
-    /// If the `wgpu_hal` operation has an interesting result, this
-    /// callback will be followed by a call to [`result`] on the same
-    /// thread, reporting how things turned out.
-    ///
-    /// [`result`]: Self::result
-    fn operation(&mut self, op: op::Op);
-
-    /// The underlying instance has completed an operation.
-    ///
-    /// Successful results provide an [`op::Finished`] value that has
-    /// the details.
-    ///
-    /// If the operation failed, this returns `Err(err)`. See
-    /// [`op::Error`] for details.
-    fn result(&mut self, result: Result<op::Finished, op::Error>);
+    /// If this method returns, the call that triggered the violation is
+    /// passed through to the real backend anyway, and the program
+    /// proceeds as normal. If you want violations to stop program
+    /// execution, panic here instead of returning.
+    fn violation(&mut self, violation: report::Violation);
 }
 
-/// Return an [`Auditor`] that logs every operation and result via the
-/// `log` crate, at the given level.
+/// Return an [`Auditor`] that logs violations via the `log` crate, at
+/// the given level.
 pub fn report_by_log(level: log::Level) -> Box<dyn Auditor> {
     struct LogAuditor {
         level: log::Level,
     }
 
     impl Auditor for LogAuditor {
-        fn operation(&mut self, op: op::Op) {
-            log::debug!("{op:?}");
-        }
-
-        fn result(&mut self, result: Result<op::Finished, op::Error>) {
-            match result {
-                Ok(finished) => log::debug!("{finished:?}"),
-                Err(err) => log::log!(self.level, "wgpu_hal::audit: {err}"),
-            }
+        fn violation(&mut self, violation: report::Violation) {
+            log::log!(self.level, "{violation}");
         }
     }
 
     Box::new(LogAuditor { level })
 }
 
-/// Return an [`Auditor`] that panics as soon as a `wgpu_hal` operation
-/// reports an error.
+/// Return an [`Auditor`] that panics as soon as a violation is reported.
 pub fn report_by_panic() -> Box<dyn Auditor> {
     struct PanicAuditor;
 
     impl Auditor for PanicAuditor {
-        fn operation(&mut self, _op: op::Op) {}
-
-        fn result(&mut self, result: Result<op::Finished, op::Error>) {
-            if let Err(err) = result {
-                panic!("wgpu_hal::audit: {err}");
-            }
+        fn violation(&mut self, violation: report::Violation) {
+            panic!("wgpu_hal::audit: {violation}");
         }
     }
 
@@ -213,7 +179,6 @@ pub fn new_auditing_instance(
     Box::new(Instance::new(inner, backend, auditor))
 }
 
-#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id<T: ?Sized> {
     pub num: u64,
     _marker: PhantomData<T>,
@@ -235,15 +200,51 @@ impl<T: ?Sized> Clone for Id<T> {
     }
 }
 
+// These are all written by hand, rather than derived, because deriving
+// them would add a spurious `T: Trait` bound: equality, ordering, and
+// hashing for an `Id<T>` only ever depend on its `num`, never on `T`
+// itself, which `T` (e.g. `Audited<dyn DynBuffer>`) usually doesn't
+// implement anyway.
+impl<T: ?Sized> PartialEq for Id<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.num == other.num
+    }
+}
+impl<T: ?Sized> Eq for Id<T> {}
+impl<T: ?Sized> PartialOrd for Id<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<T: ?Sized> Ord for Id<T> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.num.cmp(&other.num)
+    }
+}
+impl<T: ?Sized> core::hash::Hash for Id<T> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.num.hash(state);
+    }
+}
+
 
 pub type Instance = Audited<dyn DynInstance>;
 pub type Surface = Audited<dyn DynSurface>;
 pub type Adapter = Audited<dyn DynAdapter>;
-pub type Device = Audited<dyn DynDevice>;
+
+// `Device` is defined in `device.rs`, not as an `Audited` alias here —
+// see the note on `Audited` for why.
+pub use device::Device;
+
 pub type Queue = Audited<dyn DynQueue>;
 pub type CommandEncoder = Audited<dyn DynCommandEncoder>;
 pub type CommandBuffer = Audited<dyn DynCommandBuffer>;
-pub type Buffer = Audited<dyn DynBuffer>;
+
+/// A `Buffer` remembers which `Device` created it, so that any method
+/// it's passed to can check it's being used with the right one. See
+/// [`OwnedByDevice`].
+pub type Buffer = Audited<dyn DynBuffer, OwnedByDevice>;
+
 pub type Texture = Audited<dyn DynTexture>;
 pub type TextureView = Audited<dyn DynTextureView>;
 pub type Sampler = Audited<dyn DynSampler>;
@@ -259,20 +260,38 @@ pub type RayTracingPipeline = Audited<dyn DynRayTracingPipeline>;
 pub type PipelineCache = Audited<dyn DynPipelineCache>;
 pub type AccelerationStructure = Audited<dyn DynAccelerationStructure>;
 
-pub struct Audited<T: ?Sized> {
+/// An audited `wgpu_hal` resource of some `dyn DynX` type `T`.
+///
+/// `M` is metadata specific to this *kind* of resource, recording
+/// whatever relationships to other resources are worth checking on
+/// every use. `Buffer`'s `M` is [`OwnedByDevice`], recording the single
+/// `Device` that created it. Resources with nothing to check yet just
+/// use `M = ()`.
+///
+/// `Device` is *not* one of these: it needs a `Drop` impl (see
+/// [`DeviceResources`]), and every `destroy_*` method on every other
+/// resource kind needs to move its `inner` out of `self` by value —
+/// which Rust forbids for any type with a `Drop` impl. Since `Drop`
+/// can't be specialized to just one instantiation of a generic type
+/// either, `Audited<T, M>` as a whole has to stay `Drop`-free, and
+/// `Device` has to be its own struct, defined in `device.rs`.
+pub struct Audited<T: ?Sized, M = ()> {
     inner: Box<T>,
     id: Id<Self>,
     shared: Arc<State>,
+    metadata: M,
 }
 
-impl<T: ?Sized> Audited<T> {
+impl<T: ?Sized, M> Audited<T, M> {
     /// Wrap a freshly created inner resource, allocating a new id for it.
-    ///
-    /// This is the standard way to construct an [`Audited`] resource
-    /// that transparently passes calls through to `inner`.
-    fn wrap(inner: Box<T>, shared: Arc<State>) -> Self {
+    fn wrap_with(inner: Box<T>, shared: Arc<State>, metadata: M) -> Self {
         let id = shared.new_id();
-        Self { inner, id, shared }
+        Self {
+            inner,
+            id,
+            shared,
+            metadata,
+        }
     }
 
     /// Borrow the inner resource as its erased dynamic type.
@@ -282,11 +301,76 @@ impl<T: ?Sized> Audited<T> {
     fn as_dyn(&self) -> &T {
         &self.inner
     }
+
+    /// This resource's id, with its specific type erased.
+    ///
+    /// Useful for embedding in a [`report::Violation`], which shouldn't
+    /// need a type parameter for every resource kind it can mention.
+    fn erased_id(&self) -> Id<dyn DynResource> {
+        Id::new(self.id.num)
+    }
+}
+
+impl<T: ?Sized> Audited<T> {
+    /// Wrap a freshly created inner resource that has no metadata to
+    /// track, allocating a new id for it.
+    ///
+    /// This is the standard way to construct an [`Audited`] resource
+    /// that transparently passes calls through to `inner`.
+    fn wrap(inner: Box<T>, shared: Arc<State>) -> Self {
+        Self::wrap_with(inner, shared, ())
+    }
+}
+
+impl<T: ?Sized> Audited<T, OwnedByDevice> {
+    /// The device that created this resource.
+    fn device(&self) -> Id<Device> {
+        self.metadata.device
+    }
+}
+
+/// Metadata for a resource created by, and owned by, a single
+/// [`Device`].
+///
+/// Most device-created resources (buffers, textures, pipelines, ...)
+/// will eventually want this.
+#[derive(Debug)]
+pub struct OwnedByDevice {
+    device: Id<Device>,
+}
+
+impl OwnedByDevice {
+    fn new(device: Id<Device>) -> Self {
+        Self { device }
+    }
+}
+
+/// The resources a [`Device`] has created that have not
+/// yet been destroyed.
+///
+/// `wgpu_hal` requires that a `Device` not be dropped while any
+/// resource it created still exists; `Device`'s `Drop` impl in
+/// `device.rs` checks this. Nothing else needs to consult this
+/// directly: `Device::create_buffer` and friends register here, and
+/// their `destroy_*` counterparts unregister.
+#[derive(Debug, Default)]
+pub struct DeviceResources {
+    live: Mutex<BTreeSet<Id<dyn DynResource>>>,
+}
+
+impl DeviceResources {
+    fn register(&self, id: Id<dyn DynResource>) {
+        self.live.lock().insert(id);
+    }
+
+    fn unregister(&self, id: Id<dyn DynResource>) {
+        self.live.lock().remove(&id);
+    }
 }
 
 /// Convert acceleration-structure build entries referring to audited
 /// buffers into ones referring to the erased dynamic type expected by
-/// `self.inner`. Shared by [`device::Device`] and
+/// `self.inner`. Shared by [`Device`] and
 /// [`command_encoder::CommandEncoder`].
 fn convert_entries<'a>(
     entries: &crate::AccelerationStructureEntries<'a, Buffer>,
@@ -414,7 +498,7 @@ impl<T: ?Sized> fmt::Debug for Id<T> {
     }
 }
 
-impl<T: ?Sized> fmt::Debug for Audited<T> {
+impl<T: ?Sized, M> fmt::Debug for Audited<T, M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.id.fmt(f)
     }

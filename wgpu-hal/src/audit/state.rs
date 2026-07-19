@@ -8,24 +8,24 @@ and allocates ids for resources.
 
 */
 
-use crate::audit::{Auditor, Id};
-use crate::audit::op;
+use crate::audit::location::Location;
+use crate::audit::report::Violation;
+use crate::audit::{Audited, Auditor, Device, Id, OwnedByDevice};
 use alloc::boxed::Box;
-use core::result::Result;
 use core::sync::atomic;
 use parking_lot::Mutex;
 
 /// The id to assign to the next audited resource created.
 ///
 /// This is process-global, rather than associated with a given
-/// instance, 
+/// instance,
 static NEXT_ID: atomic::AtomicU64 = atomic::AtomicU64::new(0);
 
 pub struct State {
     /// The backend that the audited instance is wrapping.
     pub backend: wgpu_types::Backend,
 
-    /// The auditor to report operations to.
+    /// The auditor to report violations to.
     pub auditor: Mutex<Box<dyn Auditor>>,
 }
 
@@ -42,11 +42,30 @@ impl State {
         Id::new(next_id)
     }
 
-    pub fn operation(&self, op: op::Op) {
-        self.auditor.lock().operation(op);
+    pub fn violation(&self, violation: Violation) {
+        self.auditor.lock().violation(violation);
     }
 
-    pub fn result(&self, result: Result<op::Finished, op::Error>) {
-        self.auditor.lock().result(result);
+    /// Report a violation if `resource` was not created by
+    /// `expected_device`.
+    ///
+    /// `method` names the `wgpu_hal` trait and method being called,
+    /// e.g. `"Device::destroy_buffer"`, for diagnostics.
+    pub fn check_owned<T: ?Sized>(
+        &self,
+        method: &'static str,
+        expected_device: Id<Device>,
+        resource: &Audited<T, OwnedByDevice>,
+    ) {
+        let actual_device = resource.device();
+        if actual_device != expected_device {
+            self.violation(Violation::WrongDevice {
+                method,
+                resource: resource.erased_id(),
+                actual_device,
+                expected_device,
+                location: Location::force_capture(),
+            });
+        }
     }
 }

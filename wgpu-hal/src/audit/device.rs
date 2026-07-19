@@ -1,7 +1,77 @@
 /*! Implementation of [`validation_layer::Device`]. */
 #![allow(unused_variables)]
 
+use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::fmt;
+
+use crate::audit::location::Location;
+use crate::audit::state::State;
+use crate::audit::{report, DeviceResources, Id};
+use crate::{DynDevice, DynResource};
+
+/// A `Device` doesn't just wrap calls through to `inner`: it also
+/// tracks which resources it has created (in `metadata`), so its `Drop`
+/// impl can catch the device being torn down while any of them still
+/// exist. It can't be an `Audited<dyn DynDevice, DeviceResources>` like
+/// other resources are — see the note on `Audited` in `mod.rs`.
+pub struct Device {
+    inner: Box<dyn DynDevice>,
+    id: Id<Self>,
+    shared: Arc<State>,
+    metadata: DeviceResources,
+}
+
+impl Device {
+    // `pub(super)`, not private: unlike the other resource kinds'
+    // `wrap`/`as_dyn`, which live alongside `Audited` in `mod.rs` and
+    // so are automatically visible to every sibling module, `Device`'s
+    // live here in `device.rs`, so `adapter.rs` (which constructs one)
+    // and `surface.rs` (which borrows one dynamically) need it exposed
+    // to the rest of `crate::audit`.
+    pub(super) fn wrap(inner: Box<dyn DynDevice>, shared: Arc<State>) -> Self {
+        let id = shared.new_id();
+        Self {
+            inner,
+            id,
+            shared,
+            metadata: DeviceResources::default(),
+        }
+    }
+
+    pub(super) fn as_dyn(&self) -> &dyn DynDevice {
+        &*self.inner
+    }
+
+    fn erased_id(&self) -> Id<dyn DynResource> {
+        Id::new(self.id.num)
+    }
+}
+
+impl fmt::Debug for Device {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
+impl Drop for Device {
+    /// `wgpu_hal` requires that every resource this `Device` created be
+    /// destroyed before the `Device` itself is dropped — that's what
+    /// lets backends' resource types avoid keeping their own reference
+    /// to the device alive. Catch any that were left behind.
+    fn drop(&mut self) {
+        let live = self.metadata.live.lock();
+        if !live.is_empty() {
+            self.shared
+                .violation(report::Violation::DeviceDroppedWithLiveResources {
+                    device: self.erased_id(),
+                    resources: live.iter().copied().collect(),
+                    location: Location::force_capture(),
+                });
+        }
+    }
+}
 
 /// Convert a `ProgrammableStage` referring to audited shader modules into
 /// one referring to the erased dynamic type expected by `self.inner`.
@@ -16,7 +86,7 @@ fn convert_stage<'a>(
     }
 }
 
-impl crate::Device for super::Device {
+impl crate::Device for Device {
     type A = super::Api;
 
     unsafe fn create_buffer(
@@ -24,14 +94,22 @@ impl crate::Device for super::Device {
         desc: &crate::BufferDescriptor,
     ) -> Result<super::Buffer, crate::DeviceError> {
         let inner = unsafe { self.inner.create_buffer(desc)? };
-        Ok(super::Buffer::wrap(inner, self.shared.clone()))
+        let buffer =
+            super::Buffer::wrap_with(inner, self.shared.clone(), super::OwnedByDevice::new(self.id));
+        self.metadata.register(buffer.erased_id());
+        Ok(buffer)
     }
 
     unsafe fn destroy_buffer(&self, buffer: super::Buffer) {
+        self.shared
+            .check_owned("Device::destroy_buffer", self.id, &buffer);
+        self.metadata.unregister(buffer.erased_id());
         unsafe { self.inner.destroy_buffer(buffer.inner) }
     }
 
     unsafe fn add_raw_buffer(&self, buffer: &super::Buffer) {
+        self.shared
+            .check_owned("Device::add_raw_buffer", self.id, buffer);
         unsafe { self.inner.add_raw_buffer(buffer.as_dyn()) }
     }
 
@@ -40,10 +118,13 @@ impl crate::Device for super::Device {
         buffer: &super::Buffer,
         range: crate::MemoryRange,
     ) -> Result<crate::BufferMapping, crate::DeviceError> {
+        self.shared.check_owned("Device::map_buffer", self.id, buffer);
         unsafe { self.inner.map_buffer(buffer.as_dyn(), range) }
     }
 
     unsafe fn unmap_buffer(&self, buffer: &super::Buffer) {
+        self.shared
+            .check_owned("Device::unmap_buffer", self.id, buffer);
         unsafe { self.inner.unmap_buffer(buffer.as_dyn()) }
     }
 
@@ -51,6 +132,8 @@ impl crate::Device for super::Device {
     where
         I: Iterator<Item = crate::MemoryRange>,
     {
+        self.shared
+            .check_owned("Device::flush_mapped_ranges", self.id, buffer);
         let ranges: Vec<_> = ranges.collect();
         unsafe { self.inner.flush_mapped_ranges(buffer.as_dyn(), &ranges) }
     }
@@ -59,6 +142,8 @@ impl crate::Device for super::Device {
     where
         I: Iterator<Item = crate::MemoryRange>,
     {
+        self.shared
+            .check_owned("Device::invalidate_mapped_ranges", self.id, buffer);
         let ranges: Vec<_> = ranges.collect();
         unsafe {
             self.inner.invalidate_mapped_ranges(buffer.as_dyn(), &ranges)
