@@ -12,19 +12,9 @@ impl crate::Adapter for super::Adapter {
     ) -> Result<crate::OpenDevice<super::Api>, crate::DeviceError> {
         let crate::DynOpenDevice { device, queue } =
             unsafe { self.inner.open(features, limits, memory_hints)? };
-        let device_id = self.shared.new_id();
-        let queue_id = self.shared.new_id();
         Ok(crate::OpenDevice {
-            device: super::Device {
-                inner: device,
-                id: device_id,
-                shared: self.shared.clone(),
-            },
-            queue: super::Queue {
-                inner: queue,
-                id: queue_id,
-                shared: self.shared.clone(),
-            },
+            device: super::Device::wrap(device, self.shared.clone()),
+            queue: super::Queue::wrap(queue, self.shared.clone()),
         })
     }
 
@@ -32,25 +22,25 @@ impl crate::Adapter for super::Adapter {
         &self,
         format: wgt::TextureFormat,
     ) -> crate::TextureFormatCapabilities {
-        todo!()
+        unsafe { self.inner.texture_format_capabilities(format) }
     }
 
     unsafe fn surface_capabilities(
         &self,
         surface: &<super::Api as crate::Api>::Surface,
     ) -> Option<crate::SurfaceCapabilities> {
-        todo!()
+        unsafe { self.inner.surface_capabilities(surface.as_dyn()) }
     }
 
     unsafe fn get_presentation_timestamp(&self) -> wgt::PresentationTimestamp {
-        todo!()
+        unsafe { self.inner.get_presentation_timestamp() }
     }
 
     fn get_ordered_buffer_usages(&self) -> wgt::BufferUses {
-        todo!()
+        self.inner.get_ordered_buffer_usages()
     }
 
     fn get_ordered_texture_usages(&self) -> wgt::TextureUses {
-        todo!()
+        self.inner.get_ordered_texture_usages()
     }
 }

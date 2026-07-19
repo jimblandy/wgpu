@@ -202,6 +202,10 @@ name = "halmark"
 name = "raw-gles"
 required-features = ["gles"]
 
+[[example]]
+name = "audit_smoke"
+required-features = ["vulkan"]
+
 #####################
 ### Platform: All ###
 #####################

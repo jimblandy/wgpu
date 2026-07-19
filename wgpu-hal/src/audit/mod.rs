@@ -265,6 +265,86 @@ pub struct Audited<T: ?Sized> {
     shared: Arc<State>,
 }
 
+impl<T: ?Sized> Audited<T> {
+    /// Wrap a freshly created inner resource, allocating a new id for it.
+    ///
+    /// This is the standard way to construct an [`Audited`] resource
+    /// that transparently passes calls through to `inner`.
+    fn wrap(inner: Box<T>, shared: Arc<State>) -> Self {
+        let id = shared.new_id();
+        Self { inner, id, shared }
+    }
+
+    /// Borrow the inner resource as its erased dynamic type.
+    ///
+    /// This never fails: `inner` is already stored as the appropriate
+    /// `dyn DynX` type, so no downcasting is needed.
+    fn as_dyn(&self) -> &T {
+        &self.inner
+    }
+}
+
+/// Convert acceleration-structure build entries referring to audited
+/// buffers into ones referring to the erased dynamic type expected by
+/// `self.inner`. Shared by [`device::Device`] and
+/// [`command_encoder::CommandEncoder`].
+fn convert_entries<'a>(
+    entries: &crate::AccelerationStructureEntries<'a, Buffer>,
+) -> crate::AccelerationStructureEntries<'a, dyn DynBuffer> {
+    match entries {
+        crate::AccelerationStructureEntries::Instances(instances) => {
+            crate::AccelerationStructureEntries::Instances(crate::AccelerationStructureInstances {
+                buffer: instances.buffer.map(|b| b.as_dyn()),
+                offset: instances.offset,
+                count: instances.count,
+            })
+        }
+        crate::AccelerationStructureEntries::Triangles(triangles) => {
+            crate::AccelerationStructureEntries::Triangles(
+                triangles
+                    .iter()
+                    .map(|t| crate::AccelerationStructureTriangles {
+                        vertex_buffer: t.vertex_buffer.map(|b| b.as_dyn()),
+                        vertex_format: t.vertex_format,
+                        first_vertex: t.first_vertex,
+                        vertex_count: t.vertex_count,
+                        vertex_stride: t.vertex_stride,
+                        indices: t.indices.as_ref().map(|i| {
+                            crate::AccelerationStructureTriangleIndices {
+                                buffer: i.buffer.map(|b| b.as_dyn()),
+                                format: i.format,
+                                offset: i.offset,
+                                count: i.count,
+                            }
+                        }),
+                        transform: t.transform.as_ref().map(|t| {
+                            crate::AccelerationStructureTriangleTransform {
+                                buffer: t.buffer.as_dyn(),
+                                offset: t.offset,
+                            }
+                        }),
+                        flags: t.flags,
+                    })
+                    .collect(),
+            )
+        }
+        crate::AccelerationStructureEntries::AABBs(entries) => {
+            crate::AccelerationStructureEntries::AABBs(
+                entries
+                    .iter()
+                    .map(|e| crate::AccelerationStructureAABBs {
+                        buffer: e.buffer.map(|b| b.as_dyn()),
+                        offset: e.offset,
+                        count: e.count,
+                        stride: e.stride,
+                        flags: e.flags,
+                    })
+                    .collect(),
+            )
+        }
+    }
+}
+
 // Ideally this would just be another `Audited` type, but we need the
 // `texture` field.
 pub struct SurfaceTexture {
