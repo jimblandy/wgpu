@@ -63,7 +63,7 @@ impl State {
         if actual_device != expected_device {
             self.violation(Violation::WrongDevice {
                 method,
-                resource: resource.erased_id(),
+                resource: resource.described(),
                 actual_device,
                 expected_device,
                 location: Location::force_capture(),

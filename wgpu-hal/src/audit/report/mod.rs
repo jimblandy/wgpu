@@ -1,7 +1,7 @@
 //! Reporting violations of `wgpu_hal` safety requirements.
 
 use crate::audit::location::Location;
-use crate::audit::{Device, Id};
+use crate::audit::{Described, Device, Id};
 use crate::DynResource;
 
 use alloc::vec::Vec;
@@ -17,7 +17,7 @@ pub enum Violation {
         /// `"Device::destroy_buffer"`.
         method: &'static str,
         /// The resource that was passed in.
-        resource: Id<dyn DynResource>,
+        resource: Described<dyn DynResource>,
         /// The device that actually created `resource`.
         actual_device: Id<Device>,
         /// The device the method was called on.
@@ -35,7 +35,7 @@ pub enum Violation {
         device: Id<dyn DynResource>,
         /// The resources that were still alive when `device` was
         /// dropped.
-        resources: Vec<Id<dyn DynResource>>,
+        resources: Vec<Described<dyn DynResource>>,
         location: Location,
     },
 }

@@ -81,6 +81,7 @@ use crate::{
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
+use alloc::string::String;
 use alloc::sync::Arc;
 use core::fmt;
 use core::marker::PhantomData;
@@ -227,6 +228,66 @@ impl<T: ?Sized> core::hash::Hash for Id<T> {
     }
 }
 
+/// An [`Id`], plus whatever label its resource had at the time this was
+/// captured, for use in diagnostics.
+///
+/// Like `Id`, this only ever compares and orders by `id`, ignoring
+/// `label` — so it's fine to put these in a `BTreeSet` keyed on
+/// identity, as [`DeviceResources`] does.
+pub struct Described<T: ?Sized> {
+    pub id: Id<T>,
+    pub label: Option<String>,
+}
+
+impl<T: ?Sized> Described<T> {
+    fn new(id: Id<T>, label: Option<String>) -> Self {
+        Self { id, label }
+    }
+}
+
+impl<T: ?Sized> Clone for Described<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            label: self.label.clone(),
+        }
+    }
+}
+
+// See the comment on `Id`'s hand-written impls: the same spurious-bound
+// problem applies here.
+impl<T: ?Sized> PartialEq for Described<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+impl<T: ?Sized> Eq for Described<T> {}
+impl<T: ?Sized> PartialOrd for Described<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<T: ?Sized> Ord for Described<T> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl<T: ?Sized> fmt::Display for Described<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.id, f)?;
+        if let Some(label) = &self.label {
+            write!(f, " {label:?}")?;
+        }
+        Ok(())
+    }
+}
+
+impl<T: ?Sized> fmt::Debug for Described<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
 
 pub type Instance = Audited<dyn DynInstance>;
 pub type Surface = Audited<dyn DynSurface>;
@@ -280,6 +341,11 @@ pub struct Audited<T: ?Sized, M = ()> {
     id: Id<Self>,
     shared: Arc<State>,
     metadata: M,
+
+    /// The label the caller gave this resource when creating it, if
+    /// any and if we were given the chance to see it. Purely for
+    /// diagnostics: see [`Described`].
+    label: Option<String>,
 }
 
 impl<T: ?Sized, M> Audited<T, M> {
@@ -291,7 +357,18 @@ impl<T: ?Sized, M> Audited<T, M> {
             id,
             shared,
             metadata,
+            label: None,
         }
+    }
+
+    /// Record `label` as this resource's label, for diagnostics.
+    ///
+    /// Chain this onto a `wrap`/`wrap_with` call at the point of
+    /// creation, where the descriptor's `label` field is at hand, e.g.
+    /// `Buffer::wrap(inner, shared).with_label(desc.label)`.
+    fn with_label(mut self, label: crate::Label<'_>) -> Self {
+        self.label = label.map(alloc::string::ToString::to_string);
+        self
     }
 
     /// Borrow the inner resource as its erased dynamic type.
@@ -308,6 +385,14 @@ impl<T: ?Sized, M> Audited<T, M> {
     /// need a type parameter for every resource kind it can mention.
     fn erased_id(&self) -> Id<dyn DynResource> {
         Id::new(self.id.num)
+    }
+
+    /// This resource's id and label, with its specific type erased.
+    ///
+    /// Like [`erased_id`](Self::erased_id), but keeps the label around
+    /// too, for a [`report::Violation`] to show.
+    fn described(&self) -> Described<dyn DynResource> {
+        Described::new(self.erased_id(), self.label.clone())
     }
 }
 
@@ -355,16 +440,16 @@ impl OwnedByDevice {
 /// their `destroy_*` counterparts unregister.
 #[derive(Debug, Default)]
 pub struct DeviceResources {
-    live: Mutex<BTreeSet<Id<dyn DynResource>>>,
+    live: Mutex<BTreeSet<Described<dyn DynResource>>>,
 }
 
 impl DeviceResources {
-    fn register(&self, id: Id<dyn DynResource>) {
-        self.live.lock().insert(id);
+    fn register(&self, described: Described<dyn DynResource>) {
+        self.live.lock().insert(described);
     }
 
     fn unregister(&self, id: Id<dyn DynResource>) {
-        self.live.lock().remove(&id);
+        self.live.lock().remove(&Described::new(id, None));
     }
 }
 

@@ -21,6 +21,7 @@ impl audit::Instance {
             id,
             shared: Arc::new(state),
             metadata: (),
+            label: None,
         }
     }
 }

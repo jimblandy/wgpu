@@ -66,7 +66,7 @@ impl Drop for Device {
             self.shared
                 .violation(report::Violation::DeviceDroppedWithLiveResources {
                     device: self.erased_id(),
-                    resources: live.iter().copied().collect(),
+                    resources: live.iter().cloned().collect(),
                     location: Location::force_capture(),
                 });
         }
@@ -95,8 +95,9 @@ impl crate::Device for Device {
     ) -> Result<super::Buffer, crate::DeviceError> {
         let inner = unsafe { self.inner.create_buffer(desc)? };
         let buffer =
-            super::Buffer::wrap_with(inner, self.shared.clone(), super::OwnedByDevice::new(self.id));
-        self.metadata.register(buffer.erased_id());
+            super::Buffer::wrap_with(inner, self.shared.clone(), super::OwnedByDevice::new(self.id))
+                .with_label(desc.label);
+        self.metadata.register(buffer.described());
         Ok(buffer)
     }
 
@@ -155,7 +156,7 @@ impl crate::Device for Device {
         desc: &crate::TextureDescriptor,
     ) -> Result<super::Texture, crate::DeviceError> {
         let inner = unsafe { self.inner.create_texture(desc)? };
-        Ok(super::Texture::wrap(inner, self.shared.clone()))
+        Ok(super::Texture::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     unsafe fn destroy_texture(&self, texture: super::Texture) {
@@ -172,7 +173,7 @@ impl crate::Device for Device {
         desc: &crate::TextureViewDescriptor,
     ) -> Result<super::TextureView, crate::DeviceError> {
         let inner = unsafe { self.inner.create_texture_view(texture.as_dyn(), desc)? };
-        Ok(super::TextureView::wrap(inner, self.shared.clone()))
+        Ok(super::TextureView::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     unsafe fn destroy_texture_view(&self, view: super::TextureView) {
@@ -184,7 +185,7 @@ impl crate::Device for Device {
         desc: &crate::SamplerDescriptor,
     ) -> Result<super::Sampler, crate::DeviceError> {
         let inner = unsafe { self.inner.create_sampler(desc)? };
-        Ok(super::Sampler::wrap(inner, self.shared.clone()))
+        Ok(super::Sampler::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     unsafe fn destroy_sampler(&self, sampler: super::Sampler) {
@@ -195,12 +196,13 @@ impl crate::Device for Device {
         &self,
         desc: &crate::CommandEncoderDescriptor<super::Queue>,
     ) -> Result<super::CommandEncoder, crate::DeviceError> {
+        let label = desc.label;
         let desc = crate::CommandEncoderDescriptor {
             label: desc.label,
             queue: desc.queue.as_dyn(),
         };
         let inner = unsafe { self.inner.create_command_encoder(&desc)? };
-        Ok(super::CommandEncoder::wrap(inner, self.shared.clone()))
+        Ok(super::CommandEncoder::wrap(inner, self.shared.clone()).with_label(label))
     }
 
     unsafe fn create_bind_group_layout(
@@ -208,7 +210,7 @@ impl crate::Device for Device {
         desc: &crate::BindGroupLayoutDescriptor,
     ) -> Result<super::BindGroupLayout, crate::DeviceError> {
         let inner = unsafe { self.inner.create_bind_group_layout(desc)? };
-        Ok(super::BindGroupLayout::wrap(inner, self.shared.clone()))
+        Ok(super::BindGroupLayout::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     unsafe fn destroy_bind_group_layout(&self, bg_layout: super::BindGroupLayout) {
@@ -219,6 +221,7 @@ impl crate::Device for Device {
         &self,
         desc: &crate::PipelineLayoutDescriptor<super::BindGroupLayout>,
     ) -> Result<super::PipelineLayout, crate::DeviceError> {
+        let label = desc.label;
         let bind_group_layouts: Vec<Option<&dyn crate::DynBindGroupLayout>> = desc
             .bind_group_layouts
             .iter()
@@ -231,7 +234,7 @@ impl crate::Device for Device {
             immediate_size: desc.immediate_size,
         };
         let inner = unsafe { self.inner.create_pipeline_layout(&desc)? };
-        Ok(super::PipelineLayout::wrap(inner, self.shared.clone()))
+        Ok(super::PipelineLayout::wrap(inner, self.shared.clone()).with_label(label))
     }
 
     unsafe fn destroy_pipeline_layout(&self, pipeline_layout: super::PipelineLayout) {
@@ -248,6 +251,7 @@ impl crate::Device for Device {
             super::AccelerationStructure,
         >,
     ) -> Result<super::BindGroup, crate::DeviceError> {
+        let label = desc.label;
         let buffers: Vec<_> = desc
             .buffers
             .iter()
@@ -300,7 +304,7 @@ impl crate::Device for Device {
         };
 
         let inner = unsafe { self.inner.create_bind_group(&desc)? };
-        Ok(super::BindGroup::wrap(inner, self.shared.clone()))
+        Ok(super::BindGroup::wrap(inner, self.shared.clone()).with_label(label))
     }
 
     unsafe fn destroy_bind_group(&self, group: super::BindGroup) {
@@ -313,7 +317,7 @@ impl crate::Device for Device {
         shader: crate::ShaderInput,
     ) -> Result<super::ShaderModule, crate::ShaderError> {
         let inner = unsafe { self.inner.create_shader_module(desc, shader)? };
-        Ok(super::ShaderModule::wrap(inner, self.shared.clone()))
+        Ok(super::ShaderModule::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     unsafe fn destroy_shader_module(&self, module: super::ShaderModule) {
@@ -328,6 +332,7 @@ impl crate::Device for Device {
             super::PipelineCache,
         >,
     ) -> Result<super::RenderPipeline, crate::PipelineError> {
+        let label = desc.label;
         let vertex_processor = match &desc.vertex_processor {
             crate::VertexProcessor::Standard {
                 vertex_buffers,
@@ -357,7 +362,7 @@ impl crate::Device for Device {
             cache: desc.cache.map(|c| c.as_dyn()),
         };
         let inner = unsafe { self.inner.create_render_pipeline(&desc)? };
-        Ok(super::RenderPipeline::wrap(inner, self.shared.clone()))
+        Ok(super::RenderPipeline::wrap(inner, self.shared.clone()).with_label(label))
     }
 
     unsafe fn destroy_render_pipeline(&self, pipeline: super::RenderPipeline) {
@@ -372,6 +377,7 @@ impl crate::Device for Device {
             super::PipelineCache,
         >,
     ) -> Result<super::ComputePipeline, crate::PipelineError> {
+        let label = desc.label;
         let desc = crate::ComputePipelineDescriptor {
             label: desc.label,
             layout: desc.layout.as_dyn(),
@@ -379,7 +385,7 @@ impl crate::Device for Device {
             cache: desc.cache.map(|c| c.as_dyn()),
         };
         let inner = unsafe { self.inner.create_compute_pipeline(&desc)? };
-        Ok(super::ComputePipeline::wrap(inner, self.shared.clone()))
+        Ok(super::ComputePipeline::wrap(inner, self.shared.clone()).with_label(label))
     }
 
     unsafe fn destroy_compute_pipeline(&self, pipeline: super::ComputePipeline) {
@@ -394,6 +400,7 @@ impl crate::Device for Device {
             super::PipelineCache,
         >,
     ) -> Result<super::RayTracingPipeline, crate::PipelineError> {
+        let label = desc.label;
         let intersection: Vec<_> = desc
             .intersection
             .iter()
@@ -412,7 +419,7 @@ impl crate::Device for Device {
             cache: desc.cache.map(|c| c.as_dyn()),
         };
         let inner = unsafe { self.inner.create_ray_tracing_pipeline(&desc)? };
-        Ok(super::RayTracingPipeline::wrap(inner, self.shared.clone()))
+        Ok(super::RayTracingPipeline::wrap(inner, self.shared.clone()).with_label(label))
     }
 
     unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: super::RayTracingPipeline) {
@@ -435,7 +442,7 @@ impl crate::Device for Device {
         desc: &crate::PipelineCacheDescriptor<'_>,
     ) -> Result<super::PipelineCache, crate::PipelineCacheError> {
         let inner = unsafe { self.inner.create_pipeline_cache(desc)? };
-        Ok(super::PipelineCache::wrap(inner, self.shared.clone()))
+        Ok(super::PipelineCache::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     fn pipeline_cache_validation_key(&self) -> Option<[u8; 16]> {
@@ -455,7 +462,7 @@ impl crate::Device for Device {
         desc: &wgt::QuerySetDescriptor<crate::Label>,
     ) -> Result<super::QuerySet, crate::DeviceError> {
         let inner = unsafe { self.inner.create_query_set(desc)? };
-        Ok(super::QuerySet::wrap(inner, self.shared.clone()))
+        Ok(super::QuerySet::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     unsafe fn destroy_query_set(&self, set: super::QuerySet) {
@@ -500,7 +507,7 @@ impl crate::Device for Device {
         desc: &crate::AccelerationStructureDescriptor,
     ) -> Result<super::AccelerationStructure, crate::DeviceError> {
         let inner = unsafe { self.inner.create_acceleration_structure(desc)? };
-        Ok(super::AccelerationStructure::wrap(inner, self.shared.clone()))
+        Ok(super::AccelerationStructure::wrap(inner, self.shared.clone()).with_label(desc.label))
     }
 
     unsafe fn get_acceleration_structure_build_sizes(
