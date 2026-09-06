@@ -1,0 +1,4 @@
+targets = "SPIRV2 | IR"
+
+[spv2]
+version = [1, 1]

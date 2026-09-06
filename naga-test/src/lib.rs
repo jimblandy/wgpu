@@ -33,6 +33,7 @@ bitflags::bitflags! {
         const HLSL = 1 << 6;
         const WGSL = 1 << 7;
         const NO_VALIDATION = 1 << 8;
+        const SPIRV2 = 1 << 9;
     }
 }
 
@@ -186,6 +187,33 @@ impl SpirvOutParameters {
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(default)]
+pub struct Spirv2OutParameters {
+    pub version: SpvOutVersion,
+    pub separate_entry_points: bool,
+}
+impl Default for Spirv2OutParameters {
+    fn default() -> Self {
+        Self {
+            version: SpvOutVersion::default(),
+            separate_entry_points: false,
+        }
+    }
+}
+impl Spirv2OutParameters {
+    pub fn to_options<'a>(
+        &'a self,
+        _shared_info: &WriterSharedOptions,
+        _debug_info: Option<naga::back::spv::DebugInfo<'a>>,
+    ) -> naga::back::spv2::Options {
+        use naga::back::spv2;
+        naga::back::spv2::Options {
+            lang_version: (self.version.0, self.version.1),
+        }
+    }
+}
+
 #[derive(Debug, Default, serde::Deserialize)]
 #[serde(default)]
 pub struct WgslOutParameters {
@@ -223,6 +251,9 @@ pub struct Parameters {
 
     // -- SPIR-V options --
     pub spv: SpirvOutParameters,
+
+    // -- SPIR-V 2 options --
+    pub spv2: Spirv2OutParameters,
 
     /// Defaults to [`Targets::non_wgsl_default()`] for `spv` and `glsl` snapshots,
     /// and [`Targets::wgsl_default()`] for `wgsl` snapshots.

@@ -11,6 +11,20 @@ Backend functions that export shader [`Module`](super::Module)s into binary and 
 
 use alloc::string::String;
 
+macro_rules! validation_failure {
+    ( $( $args:tt ),* ) => {
+        panic!( $( $args ),* )
+    };
+}
+
+macro_rules! lowering_failure {
+    ( $( $args:tt ),* ) => {
+        panic!( $( $args ),* )
+    };
+}
+
+pub mod ir;
+
 #[cfg(dot_out)]
 pub mod dot;
 #[cfg(glsl_out)]
@@ -21,6 +35,8 @@ pub mod hlsl;
 pub mod msl;
 #[cfg(spv_out)]
 pub mod spv;
+#[cfg(spv_out)]
+pub mod spv2;
 #[cfg(wgsl_out)]
 pub mod wgsl;
 

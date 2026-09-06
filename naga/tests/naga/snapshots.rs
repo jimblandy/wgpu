@@ -124,6 +124,30 @@ Note: this is an issue with snapshot configuration, not code. If you added a new
         );
     }
 
+    if targets.contains(Targets::SPIRV2) {
+        let mut debug_info = None;
+        if let Some(source_code) = source_code {
+            debug_info = Some(naga::back::spv::DebugInfo {
+                source_code,
+                file_name: &name,
+                // wgpu#6266: we technically know all the information here to
+                // produce the valid language but it's not too important for
+                // validation purposes
+                language: naga::back::spv::SourceLanguage::Unknown,
+            })
+        }
+
+        write_output_spv2(
+            input,
+            module,
+            &info,
+            debug_info,
+            &params.spv2,
+            &params.pipeline_constants,
+            &shared_info,
+        );
+    }
+
     if targets.contains(Targets::METAL) {
         write_output_msl(
             input,
@@ -382,6 +406,66 @@ fn write_output_spv_inner(
         dis
     };
     input.write_output_file("spv", extension, dis, DIR_OUT);
+    spv
+}
+
+fn write_output_spv2(
+    input: &Input,
+    module: &naga::Module,
+    info: &naga::valid::ModuleInfo,
+    debug_info: Option<naga::back::spv::DebugInfo>,
+    params: &Spirv2OutParameters,
+    pipeline_constants: &naga::back::PipelineConstants,
+    shared_options: &WriterSharedOptions,
+) {
+    let options = params.to_options(shared_options, debug_info);
+
+    let (module, info) =
+        naga::back::pipeline_constants::process_overrides(module, info, None, pipeline_constants)
+            .expect("override evaluation failed");
+
+    if params.separate_entry_points {
+        for ep in module.entry_points.iter() {
+            let spv_binary = write_output_spv2_inner(
+                input,
+                &module,
+                &info,
+                &options,
+                &format!("{}.spvasm", ep.name),
+            );
+            write_spirv_cross_glsl(
+                input,
+                &spv_binary,
+                &[(ep.name.clone(), ep.stage)],
+                &format!("{}.spvasm.glsl", ep.name),
+            );
+        }
+    } else {
+        let spv_binary = write_output_spv2_inner(input, &module, &info, &options, "spvasm");
+        let entry_points: Vec<(String, naga::ShaderStage)> = module
+            .entry_points
+            .iter()
+            .map(|ep| (ep.name.clone(), ep.stage))
+            .collect(); 
+       write_spirv_cross_glsl(input, &spv_binary, &entry_points, "spvasm.glsl");
+    }
+}
+
+fn write_output_spv2_inner(
+    input: &Input,
+    module: &naga::Module,
+    info: &naga::valid::ModuleInfo,
+    options: &naga::back::spv2::Options,
+    extension: &str,
+) -> Vec<u32> {
+    use naga::back::spv2;
+    use rspirv::binary::Disassemble;
+    println!("Generating SPIR-V for {:?} via spv2 backend", input.file_name);
+    let spv = spv2::write_vec(module, info, options).unwrap();
+    let dis = rspirv::dr::load_words(spv.clone())
+        .expect("Produced invalid SPIR-V")
+        .disassemble();
+    input.write_output_file("spv2", extension, dis, DIR_OUT);
     spv
 }
 
