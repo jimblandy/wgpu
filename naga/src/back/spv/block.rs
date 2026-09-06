@@ -3018,7 +3018,7 @@ impl BlockContext<'_> {
         //     let a = array(i, i, i);
         //     if (i == 0) {
         //         x += a[y];
-        //     } else [
+        //     } else {
         //         x += a[z];
         //     }
         // }
