@@ -248,7 +248,7 @@ extern crate wgpu_types as wgt;
 extern crate std;
 
 /// DirectX12 API internals.
-#[cfg(dx12)]
+//#[cfg(dx12)]
 pub mod dx12;
 /// GLES API internals.
 #[cfg(gles)]

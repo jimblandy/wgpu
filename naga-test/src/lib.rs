@@ -34,6 +34,7 @@ bitflags::bitflags! {
         const WGSL = 1 << 7;
         const NO_VALIDATION = 1 << 8;
         const SPIRV2 = 1 << 9;
+        const HLSL2 = 1 << 10;
     }
 }
 
@@ -214,6 +215,19 @@ impl Spirv2OutParameters {
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(default)]
+pub struct HLSL2OutParameters {
+    /// The hlsl shader model to be used
+    pub shader_model: naga::back::hlsl2::shader_model::ShaderModel,
+}
+
+impl Default for HLSL2OutParameters {
+    fn default() -> Self {
+        Self { shader_model: naga::back::hlsl2::shader_model::ShaderModel::V6_9 }
+    }
+}
+
 #[derive(Debug, Default, serde::Deserialize)]
 #[serde(default)]
 pub struct WgslOutParameters {
@@ -271,6 +285,9 @@ pub struct Parameters {
 
     // -- HLSL options --
     pub hlsl: naga::back::hlsl::Options,
+
+    // -- HLSL2 options --
+    pub hlsl2: HLSL2OutParameters,
 
     // -- WGSL options --
     pub wgsl: WgslOutParameters,

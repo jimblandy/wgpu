@@ -218,6 +218,48 @@ Note: this is an issue with snapshot configuration, not code. If you added a new
         );
     }
 
+    if targets.contains(Targets::HLSL2) {
+        let mut user_output_masks = naga::FastHashMap::default();
+        if let Some(ref module_spec) = params.fragment_module {
+            let full_path = input.input_directory(DIR_IN).join(&module_spec.path);
+
+            assert_eq!(
+                full_path.extension().unwrap().to_string_lossy(),
+                "wgsl",
+                "Currently all fragment modules must be in WGSL"
+            );
+
+            let frag_src = std::fs::read_to_string(full_path).unwrap();
+
+            let frag_module =
+                naga::front::wgsl::parse_str(&frag_src).expect("Failed to parse fragment module");
+
+            if let Some(entry_point) = frag_module.entry_points.iter().find(|&ep| {
+                ep.stage == naga::ShaderStage::Fragment && ep.name == module_spec.entry_point
+            }) {
+                let input_mask = naga::back::ir::compute_user_input_mask(&frag_module, entry_point);
+                user_output_masks.extend(
+                    module
+                        .entry_points
+                        .iter()
+                        .enumerate()
+                        .filter(|&(index, entry)| entry.stage == naga::ShaderStage::Vertex)
+                        .map(|(index, entry)| (index, input_mask.clone()))
+                );
+            }
+        }
+
+        write_output_hlsl2(
+            input,
+            module,
+            &info,
+            &params.hlsl2,
+            &params.pipeline_constants,
+            user_output_masks,
+            &shared_info,
+        );
+    }
+
     if targets.contains(Targets::WGSL) {
         write_output_wgsl(input, module, &info, &params.wgsl);
     }
@@ -461,7 +503,7 @@ fn write_output_spv2_inner(
     use naga::back::spv2;
     use rspirv::binary::Disassemble;
     println!("Generating SPIR-V for {:?} via spv2 backend", input.file_name);
-    let spv = spv2::write_vec(module, info, options).unwrap();
+    let spv = spv2::write_vec(module, info, options);
     let dis = rspirv::dr::load_words(spv.clone())
         .expect("Produced invalid SPIR-V")
         .disassemble();
@@ -605,6 +647,66 @@ fn write_output_hlsl(
 
     config
         .to_file(input.output_path("hlsl", "ron", DIR_OUT))
+        .unwrap();
+}
+
+fn write_output_hlsl2(
+    input: &Input,
+    module: &naga::Module,
+    info: &naga::valid::ModuleInfo,
+    out_params: &naga_test::HLSL2OutParameters,
+    pipeline_constants: &naga::back::PipelineConstants,
+    user_output_masks: naga::FastHashMap<usize, bit_set::BitSet>,
+    _shared_options: &WriterSharedOptions,
+) {
+    use naga::back::hlsl2;
+
+    println!("generating HLSL");
+
+    let (module, info) =
+        naga::back::pipeline_constants::process_overrides(module, info, None, pipeline_constants)
+            .expect("override evaluation failed");
+
+    let options = hlsl2::Options {
+        shader_model: out_params.shader_model,
+        user_output_masks,
+    };
+
+    let output = hlsl2::write(&module, &info, &options);
+
+    input.write_output_file("hlsl2", "hlsl", &output.source, DIR_OUT);
+
+    // DXC only validates one entry point at a time, and needs to know
+    // the shader model, so build an [`hlsl_snapshots::Config`] struct
+    // to describe them all.
+    // This file contains an info about profiles (shader stages) contains inside generated shader
+    // This info will be passed to dxc
+    let mut config = hlsl_snapshots::Config::empty();
+    for (index, ep) in module.entry_points.iter().enumerate() {
+        let name = &output.entry_point_names[index];
+        match ep.stage {
+            naga::ShaderStage::Vertex => &mut config.vertex,
+            naga::ShaderStage::Fragment => &mut config.fragment,
+            naga::ShaderStage::Compute => &mut config.compute,
+            naga::ShaderStage::Task => &mut config.task,
+            naga::ShaderStage::Mesh => &mut config.mesh,
+            naga::ShaderStage::RayGeneration
+            | naga::ShaderStage::AnyHit
+            | naga::ShaderStage::ClosestHit
+            | naga::ShaderStage::Miss => unreachable!(),
+        }
+        .push(hlsl_snapshots::ConfigItem {
+            entry_point: name.clone(),
+            target_profile: format!(
+                "{}_{}",
+                naga::back::hlsl::shader_stage_to_hlsl_str(ep.stage),
+                out_params.shader_model.to_str()
+            ),
+        });
+    }
+
+    config
+        .to_file(input.output_path("hlsl2", "ron", DIR_OUT))
         .unwrap();
 }
 

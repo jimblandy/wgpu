@@ -38,9 +38,11 @@ backend accepts.
 #![allow(unused)]
 
 mod adjust_names;
+mod builder;
 mod function;
-mod r#type;
 pub mod option;
+mod r#type;
+mod utils;
 
 use option::Options;
 
@@ -54,6 +56,8 @@ use crate::arena::{Arena, Handle, UniqueArena};
 
 use alloc::string::String;
 use alloc::vec::Vec;
+
+pub use utils::compute_user_input_mask;
 
 /// A backend IR module, suitable for generating platform shader code.
 ///
@@ -274,56 +278,23 @@ pub enum EntryPointStageInfo {
     }
 }
 
-#[derive(Debug)]
-struct ModuleContext<'m> {
-    module: &'m ir::Module,
-    info: &'m crate::valid::ModuleInfo,
-    options: &'m Options,
-
-    lowered_types: FastHashMap<Handle<ir::Type>, LoweredType>,
-    lowered_functions: FastHashMap<Handle<ir::Function>, Handle<Function>>,
-}
-
-/// How we decided to lower a particular [`ir::Type`].
-#[derive(Debug)]
-enum LoweredType {
-    /// The backend IR is the natural equivalent of the Naga IR.
-    Direct(Handle<Type>),
-
-    /// The backend IR type is the transposed, row-major equivalent of the Naga
-    /// IR matrix type. See [`option::TypeOptions::matrix_orientation`].
-    Transposed(Handle<Type>),
-
-    /// The backend IR is a struct with a member for each column. See
-    /// [`option::TypeOptions::replace_cx2_matrix_with_struct`].
-    StructOfColumns(Handle<Type>),
-}
-
 pub fn lower(module: &ir::Module,
              info: &crate::valid::ModuleInfo,
              options: Options) -> Module
 {
-    let mut ctx = ModuleContext {
-        module,
-        info,
-        options: &options,
-        lowered_types: Default::default(),
-        lowered_functions: Default::default(),
-    };
-    ctx.lowered_types.reserve(module.types.len());
-    ctx.lowered_functions.reserve(module.functions.len());
+    let mut builder = builder::ModuleBuilder::new(module, info, options);
 
     let mut out = Module::default();
 
     for (handle, function) in module.functions.iter() {
-        ctx.lower_function(handle, function, &mut out);
+        builder.lower_function(handle, function, &mut out);
     }
     
     for entry_point in &module.entry_points {
-        ctx.lower_entry_point(entry_point, &mut out);
+        builder.lower_entry_point(entry_point, &mut out);
     }
     
-    ctx.adjust_names(&mut out);
+    builder.adjust_names(&mut out);
 
     out
 }

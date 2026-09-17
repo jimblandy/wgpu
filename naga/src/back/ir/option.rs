@@ -3,6 +3,7 @@
 use crate::proc::{CaseInsensitiveKeywordSet, KeywordSet};
 
 use crate::back;
+use crate::FastHashMap;
 
 use alloc::vec::Vec;
 use alloc::vec;
@@ -23,9 +24,10 @@ pub struct TypeOptions {
     /// Naga matrices with two rows of four-byte elements have a stride of eight
     /// bytes per column, but some backend languages require their matrix types
     /// to allocate sixteen bytes per column, so we can't render Naga matrix
-    /// types as backend matrix types. Setting this flag directs lowering to
-    /// replace such Naga types with struct types containing one member per
-    /// matrix column, and adjust accesses accordingly.
+    /// types as the obvious corresponding backend matrix types. Setting this
+    /// flag directs lowering to store such Naga types as struct types
+    /// containing one member per matrix column, and adjust accesses
+    /// accordingly.
     pub replace_cx2_matrix_with_struct: bool,
 
     /// Use only the given orientation for matrix types in the output.
@@ -89,6 +91,16 @@ pub struct EntryPointOptions {
     /// How shader stage inputs and outputs (builtin and user-defined)
     /// should be passed to and returned from an entry point.
     pub io: ShaderStageIoStyle,
+
+    /// User-defined output restrictions for selected entry points.
+    ///
+    /// If this map has an entry for `i`, then the entry point at index `i` in
+    /// the Naga IR `Module` should have its user-defined outputs limited to
+    /// those whose locations are included in hte given `BitSet`.
+    // Should this be a struct of entry-point-specific options? Then shouldn't
+    // *that* type be more appropriately named `EntryPointOptions`? Options like
+    // `io` only make sense to apply globally. Ugh.
+    pub user_output_masks: FastHashMap<usize, bit_set::BitSet>,
 }
 
 #[derive(Debug)]

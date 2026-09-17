@@ -31,6 +31,8 @@ pub mod dot;
 pub mod glsl;
 #[cfg(hlsl_out)]
 pub mod hlsl;
+#[cfg(hlsl_out)]
+pub mod hlsl2;
 #[cfg(msl_out)]
 pub mod msl;
 #[cfg(spv_out)]
