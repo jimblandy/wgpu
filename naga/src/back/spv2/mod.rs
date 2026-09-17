@@ -92,7 +92,7 @@ pub fn supported_capabilities() -> crate::valid::Capabilities {
 pub fn write_vec(module: &crate::Module,
                  info: &crate::valid::ModuleInfo,
                  options: &Options,
-) -> Result<Vec<u32>, Error> {
+) -> Vec<u32> {
     // Lower the module to backend IR as necessary for SPIR-V.
     let lowered = back::ir::lower(
         module,
@@ -102,9 +102,11 @@ pub fn write_vec(module: &crate::Module,
                 replace_cx2_matrix_with_struct: true,
                 spirv_unique_types: true,
                 no_atomic_types: true,
+                matrix_orientation: back::ir::MatrixOrientation::ColumnMajor,
             },
             entry_points: back::ir::option::EntryPointOptions {
                 io: back::ir::option::ShaderStageIoStyle::Globals,
+                user_output_masks: Default::default(),
             },
             naming_rules: todo!(),
         }
@@ -119,5 +121,5 @@ pub fn write_vec(module: &crate::Module,
 
     context.generate_functions(&mut builder);
 
-    Ok(builder.build())
+    builder.build()
 }

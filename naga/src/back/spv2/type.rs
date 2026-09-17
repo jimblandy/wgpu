@@ -30,11 +30,13 @@ impl<'m> super::Context<'m> {
                 builder.type_vector(id, scalar_id, size);
             }
             Ti::Matrix {
-                columns,
-                column_type,
+                orientation,
+                size,
+                element,
             } => {
-                let column_type_id = self.type_id(column_type);
-                builder.type_matrix(id, column_type_id, columns);
+                assert!(orientation == back::ir::MatrixOrientation::ColumnMajor);
+                let column_type_id = self.type_id(element);
+                builder.type_matrix(id, column_type_id, size);
             }
             Ti::Pointer { base, space } => {
                 let base_id = self.type_id(base);

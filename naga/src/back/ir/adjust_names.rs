@@ -14,7 +14,7 @@ they're given in the backend IR, a completed [`back::ir::Module`] is
 guaranteed to use only legal identifier names that are distinct within
 their relevant scopes.
 
-This module defines [`back::ir::ModuleContext::adjust_names`], a function
+This module defines [`back::ir::builder::ModuleBuilder::adjust_names`], a function
 that makes a pass over the backend `Module` and ensures that each name
 is a legal identifier in the target language, and distinct as
 necessary within its scope.
@@ -30,7 +30,7 @@ use crate::back;
 
 use alloc::vec::Vec;
 
-impl<'m> back::ir::ModuleContext<'m> {
+impl<'m> back::ir::builder::ModuleBuilder<'m> {
     /// Ensure all items in `out` are named by legal, unshadowed identifiers.
     ///
     /// Assign names to all types, functions, variables, ... in `out` such that

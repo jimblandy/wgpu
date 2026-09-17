@@ -7,9 +7,9 @@ use crate::{back, ir};
 use alloc::vec;
 use alloc::vec::Vec;
 
-impl<'m> back::ir::ModuleContext<'m> {
+impl<'m> back::ir::builder::ModuleBuilder<'m> {
     pub fn lower_function(&mut self, handle: Handle<ir::Function>, function: &ir::Function, out: &mut back::ir::Module) {
-        let span = self.module.functions.get_span(handle);
+        let span = self.input.functions.get_span(handle);
 
         let back_function = back::ir::Function {
             name: function.name.clone(),
