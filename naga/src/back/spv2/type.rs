@@ -16,10 +16,6 @@ impl<'m> super::Context<'m> {
         }
     }
 
-    fn type_id(&self, ty: Handle<back::ir::Type>) -> Word {
-        self.ir_types[self.module.types[ty].inner]
-    }
-
     fn generate_type(&mut self, ty: &back::ir::Type, builder: &mut Builder) {
         use back::ir::TypeInner as Ti;
         let id = builder.next_id();
@@ -40,7 +36,7 @@ impl<'m> super::Context<'m> {
             }
             Ti::Pointer { base, space } => {
                 let base_id = self.type_id(base);
-                let storage_class = builder::map_storage_class(space);
+                let storage_class = map_storage_class(space);
                 builder.type_pointer(id, storage_class, base_id);
             }
             Ti::Array {
@@ -123,5 +119,23 @@ impl<'m> super::Context<'m> {
         builder: &mut Builder,
     ) {
         todo!()
+    }
+}
+
+const fn map_storage_class(space: back::ir::AddressSpace) -> spirv::StorageClass {
+    use back::ir::AddressSpace as As;
+    match space {
+        As::Handle => spirv::StorageClass::UniformConstant,
+        As::Function => spirv::StorageClass::Function,
+        As::Private => spirv::StorageClass::Private,
+        As::Storage { .. } => spirv::StorageClass::StorageBuffer,
+        As::Uniform => spirv::StorageClass::Uniform,
+        As::WorkGroup => spirv::StorageClass::Workgroup,
+        As::Immediate => spirv::StorageClass::PushConstant,
+        As::TaskPayload => spirv::StorageClass::TaskPayloadWorkgroupEXT,
+        As::RayPayload => spirv::StorageClass::RayPayloadKHR,
+        As::IncomingRayPayload => spirv::StorageClass::IncomingRayPayloadKHR,
+        As::Input => todo!(),
+        As::Output => todo!(),
     }
 }

@@ -18,7 +18,7 @@ mod function;
 
 use builder::Builder;
 use crate::back;
-use crate::arena::HandleVec;
+use crate::arena::{Handle, HandleVec};
 use spirv::Word;
 
 use thiserror::Error;
@@ -82,6 +82,10 @@ impl<'m> Context<'m> {
             ext_debug_printf: None,
         }
     }
+
+    fn type_id(&self, ty: Handle<back::ir::Type>) -> Word {
+        self.ir_types[self.module.types[ty].inner]
+    }
 }
 
 pub fn supported_capabilities() -> crate::valid::Capabilities {
@@ -108,7 +112,7 @@ pub fn write_vec(module: &crate::Module,
                 io: back::ir::option::ShaderStageIoStyle::Globals,
                 user_output_masks: Default::default(),
             },
-            naming_rules: todo!(),
+            naming_rules: None,
         }
     );
 

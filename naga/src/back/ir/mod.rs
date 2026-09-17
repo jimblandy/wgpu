@@ -254,7 +254,8 @@ pub enum Attribute {
 pub struct Function {
     pub name: Option<String>,
     pub arguments: Vec<Argument>,
-    pub entry_point_info: Option<EntryPointInfo>
+    pub entry_point_info: Option<EntryPointInfo>,
+    pub result: FunctionResult,
 }
 
 #[derive(Debug)]
@@ -276,6 +277,12 @@ pub enum EntryPointStageInfo {
     Compute {
         workgroup_size: [u32; 3],
     }
+}
+
+#[derive(Debug)]
+pub struct FunctionResult {
+    pub ty: Handle<Type>,
+    pub attributes: Vec<Attribute>,
 }
 
 pub fn lower(module: &ir::Module,
