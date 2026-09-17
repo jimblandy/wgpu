@@ -12,7 +12,7 @@ use alloc::vec;
 pub struct Options {
     pub types: TypeOptions,
     pub entry_points: EntryPointOptions,
-    pub naming_rules: NamingRules,
+    pub naming_rules: Option<NamingRules>,
 }
 
 /// Options for lowering types and operations on them.

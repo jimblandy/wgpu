@@ -591,53 +591,6 @@ impl super::Instruction {
     }
 
     //
-    //  Function Instructions
-    //
-
-    pub(super) fn function(
-        return_type_id: Word,
-        id: Word,
-        function_control: spirv::FunctionControl,
-        function_type_id: Word,
-    ) -> Self {
-        let mut instruction = Self::new(Op::Function);
-        instruction.set_type(return_type_id);
-        instruction.set_result(id);
-        instruction.add_operand(function_control.bits());
-        instruction.add_operand(function_type_id);
-        instruction
-    }
-
-    pub(super) fn function_parameter(result_type_id: Word, id: Word) -> Self {
-        let mut instruction = Self::new(Op::FunctionParameter);
-        instruction.set_type(result_type_id);
-        instruction.set_result(id);
-        instruction
-    }
-
-    pub(super) const fn function_end() -> Self {
-        Self::new(Op::FunctionEnd)
-    }
-
-    pub(super) fn function_call(
-        result_type_id: Word,
-        id: Word,
-        function_id: Word,
-        argument_ids: &[Word],
-    ) -> Self {
-        let mut instruction = Self::new(Op::FunctionCall);
-        instruction.set_type(result_type_id);
-        instruction.set_result(id);
-        instruction.add_operand(function_id);
-
-        for argument_id in argument_ids {
-            instruction.add_operand(*argument_id);
-        }
-
-        instruction
-    }
-
-    //
     //  Image Instructions
     //
 
