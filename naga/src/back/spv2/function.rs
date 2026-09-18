@@ -14,7 +14,9 @@ impl<'m> super::Context<'m> {
         for (handle, function) in self.module.functions.iter() {
             let function_id = builder.next_id();
             let return_type_id = self.type_id(function.result.ty);
-            let function_type_id = 
+            let function_type_id = todo!();
+
+            todo();
         }
     }
 }

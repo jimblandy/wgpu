@@ -20,6 +20,7 @@ impl<'m> super::Context<'m> {
         use back::ir::TypeInner as Ti;
         let id = builder.next_id();
         match self.module.inner_types[ty.inner] {
+            Ti::Unit => builder.type_void(id),
             Ti::Scalar(scalar) => self.generate_scalar(id, scalar, builder),
             Ti::Vector { size, scalar } => {
                 let scalar_id = self.type_id(scalar);
@@ -58,6 +59,9 @@ impl<'m> super::Context<'m> {
             }
             Ti::Struct { ref members } => {
                 self.generate_struct(id, members, builder);
+            }
+            Ti::Function { ref arguments, result } => {
+                self.generate_function(id, arguments, result);
             }
             Ti::Atomic(_) => lowering_failure!("requested no atomic types"),
             Ti::Image(ref image_type) => {
@@ -110,6 +114,16 @@ impl<'m> super::Context<'m> {
             }
             builder.member_decorate(struct_id, i, spirv::Decoration::Offset, &[member.offset]);
         }
+    }
+
+    fn generate_function(
+        &mut self,
+        function_id: Word,
+        arguments: &[Handle<back::ir::Type>],
+        result: Handle<back::ir::Type>,
+        builder: &mut Builder,
+    ) {
+        todo!()
     }
 
     fn generate_image(

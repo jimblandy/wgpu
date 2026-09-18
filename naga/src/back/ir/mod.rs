@@ -33,6 +33,30 @@ backend accepts.
 
 [`back::ir::Module`]: Module
 
+# Naming
+
+In most target languages, references to items (functions; globals) identify
+their referent by name. In binary formats like SPIR-V, however, referents are
+identified by number, and names are used only for diagnostics and debugging.
+
+For name-based languages, the backend must supply an [`Options::naming_rules`]
+value, listing reserved words, forbidden prefixes, and so on. The lowered module
+is guaranteed to provide names that respect the provided rules for all items
+that can be named, except for non-struct types.
+
+For languages that do not use names, the backend should let
+[`Options::naming_rules`] be `None`. In this case, the lowered module will pass
+along the names used in the original Naga IR module on a best-effort basis.
+Names may clash, may not be valid identifiers in any language, or may even be
+omitted altogether.
+
+Note that entry point names are not adjusted according to the naming rules.
+Since the user will use them to identify the entry points that pipelines should
+use, their names must be preserved as-is. See [`EntryPointInfo::name`] for
+details.
+
+We don't reiterate these rules on every `name` field in the IR.
+
 */
 
 #![allow(unused)]
@@ -94,9 +118,6 @@ pub struct Module {
 pub struct Type {
     /// Name of the type. If `None`, the type is written using the language's
     /// usual syntax.
-    ///
-    /// If given, the name is always unique within the module, and never
-    /// conflicts with the backend language's reserved words.
     pub name: Option<String>,
 
     /// Specifics of this type.
@@ -105,6 +126,9 @@ pub struct Type {
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum TypeInner {
+    /// The zero-sized unit type, with only one value.
+    Unit,
+
     /// A single scalar value, either integer or floating-point.
     Scalar(Scalar),
 
@@ -152,6 +176,11 @@ pub enum TypeInner {
 
     Struct {
         members: Vec<StructMember>,
+    },
+
+    Function {
+        arguments: Vec<Handle<Type>>,
+        result: Handle<Type>,
     },
 
     Image(ImageType),
@@ -248,14 +277,39 @@ pub enum Attribute {
 
     /// Texture bound at `index` in a flat buffer name space (Metal)
     TextureIndex(usize),
+
+    /// The size of the workgroup. For compute shader entry points.
+    WorkgroupSize([u32; 3]),
 }
 
+/// A backend function.
+///
+/// This includes functions lowered from Naga IR, specializations of such
+/// functions for particular argument types, and functions sythesized entirely
+/// by the lowering process.
 #[derive(Debug)]
 pub struct Function {
     pub name: Option<String>,
+
+    /// The function's arguments.
     pub arguments: Vec<Argument>,
-    pub entry_point_info: Option<EntryPointInfo>,
+
+    /// The function's return type, with any attributes.
+    ///
+    /// Unlike [`ir::Function::result`], backend `Function`s that return nothing
+    /// still have a `FunctionResult`, whose type is `TypeInner::Unit`.
     pub result: FunctionResult,
+
+    /// Attributes on this function.
+    pub attributes: Vec<Attribute>,
+
+    /// If this function is an entry point, extra
+    pub entry_point_info: Option<EntryPointInfo>,
+
+    /// The type of this function: a `TypeInner::Function` type that includes
+    /// both the return type and the argument types. This type always matches
+    /// the types given in `arguments` and` result`.
+    pub function_type: Handle<Type>,
 }
 
 #[derive(Debug)]
@@ -267,21 +321,30 @@ pub struct Argument {
 
 #[derive(Debug)]
 pub struct EntryPointInfo {
-    /// The entry point name. This is guaranteed to be a valid 
+    /// The entry point name.
+    ///
+    /// This is the name the user would pass to the API to select this entry
+    /// point for use in a pipeline, supplied in the input shader source
+    /// presented to Naga.
+    ///
+    /// If this would be an invalid identifier in the target language, then
+    /// [`Function::name`] is present and is a valid identifier. Since it is
+    /// necessarily different from this, the backend should supply a renaming
+    /// table, mapping the original names the user supplied to the names
+    /// actually used in the module.
     pub name: String,
-    pub stage: EntryPointStageInfo,
 }
 
-#[derive(Debug)]
-pub enum EntryPointStageInfo {
-    Compute {
-        workgroup_size: [u32; 3],
-    }
-}
-
+/// The return type of a function, along with any attributes applied to it.
 #[derive(Debug)]
 pub struct FunctionResult {
+    /// The type of the return value. If the function returns no value, this is
+    /// a type whose [`inner`] is [`TypeInner::Unit`].
+    ///
+    /// [`inner`]: Type::inner
     pub ty: Handle<Type>,
+
+    /// Attributes to apply to the return value.
     pub attributes: Vec<Attribute>,
 }
 
@@ -291,17 +354,15 @@ pub fn lower(module: &ir::Module,
 {
     let mut builder = builder::ModuleBuilder::new(module, info, options);
 
-    let mut out = Module::default();
-
     for (handle, function) in module.functions.iter() {
-        builder.lower_function(handle, function, &mut out);
+        builder.lower_function(handle, function, &mut builder);
     }
     
     for entry_point in &module.entry_points {
-        builder.lower_entry_point(entry_point, &mut out);
+        builder.lower_entry_point(entry_point, &mut builder);
     }
     
-    builder.adjust_names(&mut out);
+    builder.adjust_names();
 
-    out
+    builder.lowered
 }

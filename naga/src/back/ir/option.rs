@@ -12,6 +12,20 @@ use alloc::vec;
 pub struct Options {
     pub types: TypeOptions,
     pub entry_points: EntryPointOptions,
+
+    /// The set of naming rules the output module must respect.
+    ///
+    /// If present, names in the final lowered module will respect these rules.
+    /// See the documentation for the [`ModuleBuilder::adjust_names`][an] module for
+    /// details.
+    ///
+    /// For target languages like SPIR-V, in which references to definitions do
+    /// not use names to identify their referents, this can be `None`. In this
+    /// case, names in the module are simply provided on a best-effort basis, for
+    /// diagnostic and debugging purposes. Names may conflict, be invalid
+    /// identifiers, or be absent altogether.
+    ///
+    /// [an]: super::builder::ModuleBuilder::adjust_names
     pub naming_rules: Option<NamingRules>,
 }
 
@@ -118,6 +132,7 @@ pub enum ShaderStageIoStyle {
 
 #[derive(Debug)]
 pub struct NamingRules {
+    /// Reserved words in the language.
     pub keywords: &'static KeywordSet,
     pub builtin_identifiers: &'static KeywordSet,
     pub keywords_case_insensitive: &'static CaseInsensitiveKeywordSet,
