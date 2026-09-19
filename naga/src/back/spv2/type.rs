@@ -20,17 +20,18 @@ impl<'m> super::Context<'m> {
         use back::ir::TypeInner as Ti;
         let id = builder.next_id();
         match self.module.inner_types[ty.inner] {
-            Ti::Scalar(scalar) => self.generate_scalar(id, scalar, builder),
+            Ti::Unit => builder.type_void(id),
+            Ti::Scalar(scalar) => self.generate_scalar_type(id, scalar, builder),
             Ti::Vector { size, scalar } => {
                 let scalar_id = self.type_id(scalar);
                 builder.type_vector(id, scalar_id, size);
             }
             Ti::Matrix {
-                orientation,
+                indexing: orientation,
                 size,
                 element,
             } => {
-                assert!(orientation == back::ir::MatrixOrientation::ColumnMajor);
+                assert!(orientation == back::ir::MatrixComponent::Columns);
                 let column_type_id = self.type_id(element);
                 builder.type_matrix(id, column_type_id, size);
             }
@@ -57,11 +58,14 @@ impl<'m> super::Context<'m> {
                 builder.type_runtime_array(id, element_type_id);
             }
             Ti::Struct { ref members } => {
-                self.generate_struct(id, members, builder);
+                self.generate_struct_type(id, members, builder);
             }
             Ti::Atomic(_) => lowering_failure!("requested no atomic types"),
+            Ti::Function { ref arguments, result } => {
+                self.generate_function_type(id, arguments, result, builder);
+            }
             Ti::Image(ref image_type) => {
-                self.generate_image(id, image_type, builder);
+                self.generate_image_type(id, image_type, builder);
             }
             Ti::Sampler { comparison } => todo!(),
             Ti::AccelerationStructure { vertex_return } => todo!(),
@@ -71,7 +75,7 @@ impl<'m> super::Context<'m> {
         self.ir_types.insert(ty.inner, id);
     }
 
-    fn generate_scalar(&mut self, id: Word, scalar: back::ir::Scalar, builder: &mut Builder) {
+    fn generate_scalar_type(&mut self, id: Word, scalar: back::ir::Scalar, builder: &mut Builder) {
         use super::instruction::Signedness;
         use back::ir::ScalarKind as Sk;
         match scalar.kind {
@@ -93,7 +97,7 @@ impl<'m> super::Context<'m> {
         }
     }
 
-    fn generate_struct(
+    fn generate_struct_type(
         &mut self,
         struct_id: Word,
         members: &[back::ir::StructMember],
@@ -112,7 +116,17 @@ impl<'m> super::Context<'m> {
         }
     }
 
-    fn generate_image(
+    fn generate_function_type(
+        &mut self,
+        function_id: Word,
+        arguments: &[Handle<back::ir::Type>],
+        result: Handle<back::ir::Type>,
+        builder: &mut Builder,
+    ) {
+        todo!()
+    }
+
+    fn generate_image_type(
         &mut self,
         image_id: Word,
         image_type: &back::ir::ImageType, 

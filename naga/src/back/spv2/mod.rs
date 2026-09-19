@@ -106,7 +106,7 @@ pub fn write_vec(module: &crate::Module,
                 replace_cx2_matrix_with_struct: true,
                 spirv_unique_types: true,
                 no_atomic_types: true,
-                matrix_orientation: back::ir::MatrixOrientation::ColumnMajor,
+                matrix_indexing: back::ir::MatrixComponent::Columns,
             },
             entry_points: back::ir::option::EntryPointOptions {
                 io: back::ir::option::ShaderStageIoStyle::Globals,

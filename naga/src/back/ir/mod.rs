@@ -33,26 +33,54 @@ backend accepts.
 
 [`back::ir::Module`]: Module
 
+# Naming
+
+In most target languages, references to items (functions; globals) identify
+their referent by name. In binary formats like SPIR-V, however, referents are
+identified by number, and names are used only for diagnostics and debugging.
+
+For name-based languages, the backend must supply an [`Options::naming_rules`]
+value, listing reserved words, forbidden prefixes, and so on. The lowered module
+is guaranteed to provide names that respect the provided rules for all items
+that can be named, except for non-struct types.
+
+For languages that do not use names, the backend should let
+[`Options::naming_rules`] be `None`. In this case, the lowered module will pass
+along the names used in the original Naga IR module on a best-effort basis.
+Names may clash, may not be valid identifiers in any language, or may even be
+omitted altogether.
+
+Note that entry point names are not adjusted according to the naming rules.
+Since the user will use them to identify the entry points that pipelines should
+use, their names must be preserved as-is. See [`EntryPointInfo::name`] for
+details.
+
+We don't reiterate these rules on every `name` field in the IR.
+
 */
 
 #![allow(unused)]
 
-mod adjust_names;
 mod builder;
 mod function;
 pub mod option;
+mod pass;
 mod r#type;
 mod utils;
 
 use option::Options;
 
+use crate::{back, ir, valid};
+
 // The following backend IR types are identical to their frontend counterparts.
 // Don't `use` frontend IR types otherwise; refer to them with an `ir::` prefix.
-pub use crate::ir::{BuiltIn, ImageClass, ImageDimension, Interpolation, Sampling, Scalar, ScalarKind, StorageAccess, StorageFormat, VectorSize};
-use crate::ir;
+pub use ir::{
+    BuiltIn, ImageClass, ImageDimension, Interpolation, Sampling, Scalar, ScalarKind,
+    ShaderStage, StorageAccess, StorageFormat, VectorSize,
+};
 
-use crate::FastHashMap;
 use crate::arena::{Arena, Handle, UniqueArena};
+use crate::FastHashMap;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -86,7 +114,7 @@ pub struct Module {
 
     /// The module's functions, including entry points.
     ///
-    /// This arena is ordered so that callees appear before callers. 
+    /// This arena is ordered so that callees appear before callers.
     pub functions: Arena<Function>,
 }
 
@@ -94,9 +122,6 @@ pub struct Module {
 pub struct Type {
     /// Name of the type. If `None`, the type is written using the language's
     /// usual syntax.
-    ///
-    /// If given, the name is always unique within the module, and never
-    /// conflicts with the backend language's reserved words.
     pub name: Option<String>,
 
     /// Specifics of this type.
@@ -105,6 +130,9 @@ pub struct Type {
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum TypeInner {
+    /// The zero-sized unit type, with only one value.
+    Unit,
+
     /// A single scalar value, either integer or floating-point.
     Scalar(Scalar),
 
@@ -112,22 +140,41 @@ pub enum TypeInner {
         size: VectorSize,
 
         /// The vector's element type. This must be a [`TypeInner::Scalar`].
-        scalar: Handle<Type>
+        scalar: Handle<Type>,
     },
 
     Matrix {
-        /// Whether this matrix is row-major or column-major.
+        /// How this matrix is indexed.
         ///
-        /// If this is `ColMajor`, then the "outer elements" of the
-        /// matrix are columns: `size` is the number of columns, and
-        /// `element` is the column type. If this is `RowMajor`, then
-        /// those refer to rows, instead.
+        /// If this is `FOO` (`Row` or `Column`), then the expression `m[i]`
+        /// produces the `i`'th `FOO` of `m`.
         ///
-        /// This also describes how the matrix is stored in memory.
+        /// This does not affect the meaning of matrix multiplication:
         ///
-        /// See [`option::TypeOptions::matrix_orientation`] for
-        /// relevant details.
-        orientation: MatrixOrientation,
+        /// - `m * v` always produces a vector whose `i`'th element is the dot
+        ///   product of the `i`-th row of `m` with `v`
+        ///
+        /// - `v * m` always produces a vector whose `j`'th element is the dot
+        ///   product of `v` with the `j`-th column of `m`
+        ///
+        /// - `m * n` always produces a matrix whose element at row `i`, column `j`
+        ///   is the dot product of the `i-th row of `m` with the `j`-th column of
+        ///   `n`.
+        ///
+        /// See [`pass::transpose_matrices`] for details.
+        indexing: MatrixComponent,
+
+        /// How this matrix is stored.
+        ///
+        /// If this is `FOO` (`Row` or `Column`), then the matrix is stored as a
+        /// sequence of `FOO`s in memory, with lower-indexed `FOO`s at lower
+        /// addresses.
+        ///
+        /// In HLSL, this would contribute a `row_major` or `col_major`
+        /// qualifier to the matrix type.
+        ///
+        /// See [`pass::transpose_matrices`] for details.
+        layout: MatrixComponent,
 
         /// The number of outer elements in the matrix.
         size: VectorSize,
@@ -154,19 +201,34 @@ pub enum TypeInner {
         members: Vec<StructMember>,
     },
 
+    Function {
+        arguments: Vec<Handle<Type>>,
+        result: Handle<Type>,
+    },
+
     Image(ImageType),
 
-    Sampler { comparison: bool },
+    Sampler {
+        comparison: bool,
+    },
 
-    AccelerationStructure { vertex_return: bool },
-    RayQuery { vertex_return: bool },
-    BindingArray { base: Handle<Type>, size: Option<usize> },
+    AccelerationStructure {
+        vertex_return: bool,
+    },
+    RayQuery {
+        vertex_return: bool,
+    },
+    BindingArray {
+        base: Handle<Type>,
+        size: Option<usize>,
+    },
 }
 
+/// How indexing operations apply to a matrix.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum MatrixOrientation {
-    RowMajor,
-    ColumnMajor,
+pub enum MatrixComponent {
+    Row,
+    Column,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -248,14 +310,38 @@ pub enum Attribute {
 
     /// Texture bound at `index` in a flat buffer name space (Metal)
     TextureIndex(usize),
+
+    /// The size of the workgroup. For compute shader entry points.
+    WorkgroupSize([u32; 3]),
 }
 
+/// A backend function.
+///
+/// This includes functions lowered from Naga IR, specializations of such
+/// functions for particular argument types, and functions sythesized entirely
+/// by the lowering process.
 #[derive(Debug)]
 pub struct Function {
     pub name: Option<String>,
+
+    /// The function's arguments.
     pub arguments: Vec<Argument>,
-    pub entry_point_info: Option<EntryPointInfo>,
+
+    /// The function's return type, with any attributes.
+    ///
+    /// Unlike [`ir::Function::result`], backend `Function`s that return nothing
+    /// still have a `FunctionResult`, whose type is `TypeInner::Unit`.
     pub result: FunctionResult,
+
+    /// If this function is an entry point, extra information about that.
+    ///
+    /// Note that some 
+    pub entry_point_info: Option<EntryPointInfo>,
+
+    /// The type of this function: a `TypeInner::Function` type that includes
+    /// both the return type and the argument types. This type always matches
+    /// the types given in `arguments` and` result`.
+    pub function_type: Handle<Type>,
 }
 
 #[derive(Debug)]
@@ -267,41 +353,82 @@ pub struct Argument {
 
 #[derive(Debug)]
 pub struct EntryPointInfo {
-    /// The entry point name. This is guaranteed to be a valid 
+    /// The entry point name.
+    ///
+    /// This is the name the user would pass to the API to select this entry
+    /// point for use in a pipeline, supplied in the input shader source
+    /// presented to Naga.
+    ///
+    /// If this would be an invalid identifier in the target language, then
+    /// [`Function::name`] is present and is a valid identifier. Since it is
+    /// necessarily different from this, the backend should supply a renaming
+    /// table, mapping the original names the user supplied to the names
+    /// actually used in the module.
     pub name: String,
-    pub stage: EntryPointStageInfo,
+
+    /// The shader stage for which this entry point can be used.
+    pub stage: ShaderStage,
 }
 
-#[derive(Debug)]
-pub enum EntryPointStageInfo {
-    Compute {
-        workgroup_size: [u32; 3],
-    }
-}
-
+/// The return type of a function, along with any attributes applied to it.
 #[derive(Debug)]
 pub struct FunctionResult {
+    /// The type of the return value.
+    ///
+    /// If the function returns no value, this is a type whose [`inner`] is
+    /// [`TypeInner::Unit`].
+    ///
+    /// [`inner`]: Type::inner
     pub ty: Handle<Type>,
+
+    /// Attributes to apply to the return value.
     pub attributes: Vec<Attribute>,
 }
 
-pub fn lower(module: &ir::Module,
-             info: &crate::valid::ModuleInfo,
-             options: Options) -> Module
-{
-    let mut builder = builder::ModuleBuilder::new(module, info, options);
+struct ModuleContext<'m> {
+    /// The Naga IR module we're lowering.
+    input: &'m ir::Module,
+    info: &'m valid::ModuleInfo,
 
-    let mut out = Module::default();
+    /// Options controlling how `input` should be lowered.
+    options: Options,
+}
+
+impl<'m> ModuleContext<'m> {
+    pub fn new(
+        module: &'m ir::Module,
+        info: &'m valid::ModuleInfo,
+        options: Options,
+    ) -> ModuleContext<'m> {
+        let mut context = Self {
+            input: module,
+            info,
+            options,
+        };
+
+        context
+    }
+}
+
+pub fn lower(module: &ir::Module, info: &valid::ModuleInfo, options: Options) -> Module {
+    let mut ctx = ModuleContext::new(module, info, options);
+    let mut builder = builder::ModuleBuilder::new(module);
 
     for (handle, function) in module.functions.iter() {
-        builder.lower_function(handle, function, &mut out);
+        ctx.lower_function(handle, function, &mut builder);
     }
-    
-    for entry_point in &module.entry_points {
-        builder.lower_entry_point(entry_point, &mut out);
-    }
-    
-    builder.adjust_names(&mut out);
 
-    out
+    for entry_point in &module.entry_points {
+        ctx.lower_entry_point(entry_point, &mut builder);
+    }
+
+    if ctx.options.types.transpose_matrices {
+        builder.transpose_matrices();
+    }
+
+    if let Some(ref rules) = ctx.options.naming_rules {
+        builder.adjust_names(rules);
+    }
+
+    builder.module
 }

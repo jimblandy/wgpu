@@ -7,6 +7,12 @@ use spv2::instruction::Instruction;
 use spirv::{Op, Word};
 
 impl super::Builder {
+    pub fn type_void(&mut self, id: Word) {
+        let mut instruction = Instruction::new(Op::TypeVoid);
+        instruction.set_result(id);
+        instruction.to_words(&mut self.declarations);
+    }
+
     pub fn type_bool(&mut self, id: Word) {
         let mut instruction = Instruction::new(Op::TypeBool);
         instruction.set_result(id);

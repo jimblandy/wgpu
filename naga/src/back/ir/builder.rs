@@ -1,19 +1,12 @@
 /*! A builder type for backend IR modules. */
 
-use crate::{back, ir, valid};
-use crate::FastHashMap;
 use crate::arena::Handle;
+use crate::FastHashMap;
+use crate::{back, ir, valid};
 
-pub struct ModuleBuilder<'m> {
-    /// The Naga IR module we're lowering.
-    pub input: &'m ir::Module,
-    pub info: &'m valid::ModuleInfo,
-
-    /// Options controlling how `input` should be lowered.
-    pub options: back::ir::option::Options,
-
+pub struct ModuleBuilder {
     /// The lowered module under construction.
-    pub lowered: back::ir::Module,
+    pub module: back::ir::Module,
 
     /// A map from Naga IR types to their backend IR equivalents.
     pub lowered_types: FastHashMap<Handle<ir::Type>, Handle<back::ir::Type>>,
@@ -43,13 +36,10 @@ pub enum StoreType {
     StructOfColumns(Handle<back::ir::Type>),
 }
 
-impl<'m> ModuleBuilder<'m> {
-    pub fn new(module: &'m ir::Module, info: &'m valid::ModuleInfo, options: back::ir::option::Options) -> ModuleBuilder<'m> {
+impl<'m> ModuleBuilder {
+    pub fn new(module: &ir::Module) -> ModuleBuilder {
         let mut builder = Self {
-            input: module,
-            info,
-            options,
-            lowered: back::ir::Module::default(),
+            module: back::ir::Module::default(),
             lowered_types: Default::default(),
             store_types: Default::default(),
             lowered_functions: Default::default(),

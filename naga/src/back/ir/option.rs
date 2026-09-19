@@ -12,6 +12,18 @@ use alloc::vec;
 pub struct Options {
     pub types: TypeOptions,
     pub entry_points: EntryPointOptions,
+
+    /// The set of naming rules the output module must respect.
+    ///
+    /// If present, names in the final lowered module will respect these rules.
+    /// See the module documentation for [`back::ir::pass::adjust_names`] for
+    /// details.
+    ///
+    /// For target languages like SPIR-V, in which references to definitions do
+    /// not use names to identify their referents, this can be `None`. In this
+    /// case, names in the module are simply provided on a best-effort basis, for
+    /// diagnostic and debugging purposes. Names may conflict, be invalid
+    /// identifiers, or be absent altogether.
     pub naming_rules: Option<NamingRules>,
 }
 
@@ -21,52 +33,16 @@ pub struct TypeOptions {
     /// Replace matrices that have two rows of four-byte elements with structs
     /// with a separate member for each vector.
     ///
-    /// Naga matrices with two rows of four-byte elements have a stride of eight
-    /// bytes per column, but some backend languages require their matrix types
-    /// to allocate sixteen bytes per column, so we can't render Naga matrix
-    /// types as the obvious corresponding backend matrix types. Setting this
-    /// flag directs lowering to store such Naga types as struct types
-    /// containing one member per matrix column, and adjust accesses
-    /// accordingly.
+    /// See the module documentation for [`back::ir::pass::struct_for_matrix`]
+    /// for details.
     pub replace_cx2_matrix_with_struct: bool,
 
-    /// Use only the given orientation for matrix types in the output.
+    /// Use row-indexed matrix types in the output to represent Naga IR matrix
+    /// values.
     ///
-    /// HLSL matrices are row-major: `matrix<T, N, M>` is a matrix of `N` rows
-    /// and `M columns, and `m[i]` retrieves the `i`'th *row* of a matrix `m`.
-    /// However, unless the `row_major` type qualifier is present, HLSL matrices
-    /// are *stored* in column-major order. Naga backend IR has no representation
-    /// for matrices that are indexed one way but stored in the other, so all
-    /// matrix types in generated HLSL must have the `row_major` qualifier --- at
-    /// least if they are stored anywhere. The qualifier has no effect on
-    /// indexing or multiplication operations, and HLSL treats qualified and
-    /// unqualified matrix types as interconvertible.
-    ///
-    /// Even though a Naga IR expression `Access { base, index }`, where `base`
-    /// is a matrix, retrieves the `index`'th column of `base`, it is still
-    /// possible to translate such expressions to `m[i]` in a row-major language
-    /// like HLSL, with some trickery:
-    ///
-    /// - As explained above, assume that both indexing and storage are
-    ///   row-major: no mixed-orientation madness.
-    ///
-    /// - Render a Naga IR column-major CxR matrix as a backend IR row-major
-    ///   matrix with C rows and R columns: that is, transpose the row and column
-    ///   dimensions.
-    ///
-    /// - Perform loads and stores *directly*. If the contents of memory are laid
-    ///   out as column-major CxR matrix, loading that as a row-major matrix of C
-    ///   rows and R columns gives you the transpose of the intended value.
-    ///
-    /// - Since the matrices are transposed, an indexing expression on a
-    ///   row-major matrix retrieves the "columns" of the intended Naga IR value,
-    ///   so `Access { base, index }` can be rendered as `base[index]`.
-    /// 
-    /// - For vector-matrix multiplication, since `transpose(m) * v` is
-    ///   equivalent to `v * m` (note the reversal of the operands), and
-    ///   `v * transpose(m)` is equivalent to `m * v`, we can render Naga IR
-    ///   `m * v` and `v * m` simply by reversing the operands.
-    pub matrix_orientation: back::ir::MatrixOrientation,
+    /// See the module documentation for [`back::ir::pass::transpose_matrices`]
+    /// for details.
+    pub transpose_matrices: bool,
 
     /// Ensure the module's [`TypeInner`]s are unique as required for SPIR-V.
     ///
@@ -118,8 +94,16 @@ pub enum ShaderStageIoStyle {
 
 #[derive(Debug)]
 pub struct NamingRules {
+    /// Reserved words in the language.
     pub keywords: &'static KeywordSet,
+
+    /// Identifiers which can be shadowed, but which we should avoid defining
+    /// anyway because synthesized code might want to use these bindings.
     pub builtin_identifiers: &'static KeywordSet,
+
+    /// Words that are reserved regardless of case.
     pub keywords_case_insensitive: &'static CaseInsensitiveKeywordSet,
+
+    /// Identifier prefixes that our definitions must not use.
     pub reserved_prefixes: Vec<&'static str>,
 }

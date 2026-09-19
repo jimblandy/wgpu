@@ -235,22 +235,6 @@ impl Instruction {
     }
 
     //
-    //  Type-Declaration Instructions
-    //
-
-    pub fn type_void(id: Word) -> Self {
-        let mut instruction = Self::new(Op::TypeVoid);
-        instruction.set_result(id);
-        instruction
-    }
-
-    pub fn type_bool(id: Word) -> Self {
-        let mut instruction = Self::new(Op::TypeBool);
-        instruction.set_result(id);
-        instruction
-    }
-
-    //
     //  Constant-Creation Instructions
     //
 

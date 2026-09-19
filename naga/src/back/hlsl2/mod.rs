@@ -52,7 +52,8 @@ pub struct HLSLOutput {
     /// HLSL source code.
     pub source: String,
 
-    /// The name assigned to each entry point.
+    /// The name that `source` uses for each entry point in the input
+    /// Naga IR `Module`
     ///
     /// The `i`'th element of this vector is the name we assigned to
     /// the `i`'th entry point in the Naga IR `Module`.
