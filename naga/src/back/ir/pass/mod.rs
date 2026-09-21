@@ -2,4 +2,4 @@
 
 pub mod adjust_names;
 pub mod transpose_matrices;
-pub mod struct_for_matrix;
+pub mod store_type;

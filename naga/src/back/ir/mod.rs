@@ -176,6 +176,9 @@ pub enum TypeInner {
         /// See [`pass::transpose_matrices`] for details.
         layout: MatrixComponent,
 
+        /// The stride between elements, in bytes.
+        stride: u32,
+
         /// The number of outer elements in the matrix.
         size: VectorSize,
 

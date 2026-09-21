@@ -12,6 +12,7 @@ use alloc::vec;
 pub struct Options {
     pub types: TypeOptions,
     pub entry_points: EntryPointOptions,
+    pub expressions: ExpressionOptions,
 
     /// The set of naming rules the output module must respect.
     ///
